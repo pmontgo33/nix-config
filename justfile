@@ -1,6 +1,9 @@
 nrs:
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#hp-nixos
 
+nfc:
+ nix flake check
+
 secrets:
   -nix-shell -p sops --run "SOPS_AGE_KEY_FILE='/etc/sops/age/keys.txt' sops secrets/secrets.yaml"
 

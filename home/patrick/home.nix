@@ -1,4 +1,4 @@
-{ config, outputs, pkgs, ... }:
+{ config, inputs, outputs, pkgs, ... }:
 
 {
   home.username = "patrick";
@@ -10,7 +10,8 @@
     git
     vim
     just
-    cowsay
+    nurl
+#     cowsay
   ];
 
   programs.git = {
@@ -21,27 +22,28 @@
 
   programs.firefox = {
     enable = true;
+    profiles = {
+      default = {
+        id = 0;
+        name = "default";
+        isDefault = true;
+        settings = {
+          # "browser.startup.homepage" = "https://duckduckgo.com";
+          "browser.search.defaultenginename" = "DuckDuckGo";
+          "browser.search.order.1" = "DuckDuckGo";
+
+          # "widget.use-xdg-desktop-portal.file-picker" = 1;
+        };
+        search = {
+          force = true;
+          default = "DuckDuckGo";
+          order = [ "DuckDuckGo" "Google" ];
+        };
+
+        #TODO Add extensions: Need bitwarden and ublock-origin
+      };
+    };
   };
-#       profiles = {
-#         default = {
-#           id = 0;
-#           name = "default";
-#           isDefault = true;
-#           settings = {
-#             # "browser.startup.homepage" = "https://duckduckgo.com";
-#             "browser.search.defaultenginename" = "ddg";
-#             "browser.search.order.1" = "ddg";
-#
-#             "signon.rememberSignons" = false;
-#           };
-#           search = {
-#             force = true;
-#             default = "ddg";
-#             order = [ "ddg" "google" ];
-#           };
-#         };
-#       };
-#     };
 
 
 

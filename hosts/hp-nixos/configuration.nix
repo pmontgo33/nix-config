@@ -87,7 +87,9 @@
       DisableTelemetry = true;
       DisableFirefoxStudies = true;
       DisablePocket = true;
+      SearchBar = "unified";
     };
+
   };
 
   # List packages installed in system profile. To search, run:

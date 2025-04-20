@@ -30,6 +30,7 @@
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
 
           home-manager.users.patrick = import ./home/patrick/home.nix;
           home-manager.users.lina = import ./home/lina/home.nix;
