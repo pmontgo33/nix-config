@@ -10,9 +10,10 @@
     git
     vim
     just
-    nurl
 #     cowsay
   ];
+
+
 
   programs.git = {
     enable = true;
