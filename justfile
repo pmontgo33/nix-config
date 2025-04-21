@@ -1,5 +1,5 @@
-nrs:
-  sudo nixos-rebuild switch --flake /home/patrick/nix-config#hp-nixos
+nrs host="$hostname":
+  sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}}
 
 nfc:
  nix flake check
