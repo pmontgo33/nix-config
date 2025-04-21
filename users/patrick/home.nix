@@ -10,7 +10,7 @@
     git
     vim
     just
-#     cowsay
+    cowsay
   ];
 
 
