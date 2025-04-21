@@ -1,6 +1,13 @@
 # Common configuration for all hosts
 
-{ lib, inputs, outputs, ... }: {
+{ lib, pkgs, inputs, outputs, ... }: {
+
+  environment.systemPackages = with pkgs; [
+    wget
+    git
+    vim
+  ];
+
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;

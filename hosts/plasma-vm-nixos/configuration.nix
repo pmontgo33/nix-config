@@ -2,12 +2,14 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, inputs, ... }:
 
 {
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
+      ../../users/patrick
+      ../common/desktop.nix
     ];
 
   # Bootloader.
@@ -80,32 +82,10 @@
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
-  users.users.patrick = {
-    isNormalUser = true;
-    description = "Patrick";
-    extraGroups = [ "networkmanager" "wheel" ];
-    packages = with pkgs; [
-      kdePackages.kate
-    #  thunderbird
-    ];
-  };
-
-  # Install firefox.
-  programs.firefox.enable = true;
-
-  # Allow unfree packages
-  nixpkgs.config.allowUnfree = true;
-
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-    wget
-    git
-    vim
-    libreoffice-qt
-    hunspell
-    hunspellDicts.en_US
+
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -127,7 +107,6 @@
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
 
-  services.flatpak.enable = true;
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions

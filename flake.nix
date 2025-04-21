@@ -15,9 +15,11 @@
       # to avoid problems caused by different versions of nixpkgs.
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    agenix.url = "github:ryantm/agenix";
   };
 
-  outputs = inputs@{ self, nixpkgs, home-manager, ... }: {
+  outputs = inputs@{ self, nixpkgs, home-manager, agenix, ... }: {
     
     ## hp-nixos ##
     nixosConfigurations.hp-nixos = nixpkgs.lib.nixosSystem {
@@ -25,6 +27,7 @@
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/hp-nixos
+        agenix.nixosModules.default
 
         home-manager.nixosModules.home-manager
         {
@@ -46,6 +49,7 @@
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/plasma-vm-nixos
+        agenix.nixosModules.default
 
         home-manager.nixosModules.home-manager
         {
@@ -58,6 +62,7 @@
           # Optionally, use home-manager.extraSpecialArgs to pass arguments to home.nix
         }
       ];
+
     };
   };
 }

@@ -1,8 +1,11 @@
-nrs host="$hostname":
+nrs host="$HOSTNAME":
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}}
 
 nfc:
- nix flake check
+  nix flake check
+
+agenix file:
+  cd secrets && nix run github:ryantm/agenix -- -e {{file}}
 
 secrets:
   -nix-shell -p sops --run "SOPS_AGE_KEY_FILE='/etc/sops/age/keys.txt' sops secrets/secrets.yaml"
