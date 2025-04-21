@@ -1,6 +1,9 @@
 nrs:
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#hp-nixos
 
+nrs wtf:
+  sudo nixos-rebuild switch --flake /home/patrick/nix-config#hp-nixos --show-trace --print-build-logs --verbose
+
 nfc:
  nix flake check
 
