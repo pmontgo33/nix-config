@@ -10,6 +10,8 @@
       ./hardware-configuration.nix
       ../../users/patrick
       ../../users/lina
+      ../common/desktop.nix
+      ../../modules/tailscale.nix
     ];
 
   # Bootloader.
@@ -85,25 +87,8 @@
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-    libreoffice-qt
-    hunspell
-    hunspellDicts.en_US
+
   ];
-
-  #Install flatpak
-  services.flatpak.enable = true;
-
-  # Install firefox.
-  programs.firefox = {
-    enable = true;
-    policies = {
-      DisableTelemetry = true;
-      DisableFirefoxStudies = true;
-      DisablePocket = true;
-      SearchBar = "unified";
-    };
-
-  };
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;

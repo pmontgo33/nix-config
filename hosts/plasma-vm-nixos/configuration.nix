@@ -10,6 +10,7 @@
       ./hardware-configuration.nix
       ../../users/patrick
       ../common/desktop.nix
+      ../../modules/tailscale.nix
     ];
 
   # Bootloader.
