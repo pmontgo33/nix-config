@@ -5,7 +5,10 @@ nrs-wtf host="$HOSTNAME":
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --show-trace --print-build-logs --verbose
 
 nfc:
- nix flake check
+  nix flake check
+
+agenix file:
+  cd secrets && nix run github:ryantm/agenix -- -e {{file}}
 
 secrets:
   -nix-shell -p sops --run "SOPS_AGE_KEY_FILE='/etc/sops/age/keys.txt' sops secrets/secrets.yaml"
