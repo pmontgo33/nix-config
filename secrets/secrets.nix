@@ -7,6 +7,6 @@ let
   keys = [ plasma-vm-nixos hp-nixos ];
 in
 {
-  "secret1.age".publicKeys = [ keys ];
+  "secret1.age".publicKeys = [ plasma-vm-nixos hp-nixos ];
   # "secret1.age".publicKeys = [ users systems ];
 }
