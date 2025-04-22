@@ -1,6 +1,9 @@
 nrs host="$HOSTNAME":
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}}
 
+nrs-wtf host="$HOSTNAME":
+  sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --show-trace --print-build-logs --verbose
+
 nfc:
   nix flake check
 
