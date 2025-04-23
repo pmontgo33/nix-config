@@ -9,9 +9,12 @@
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
       ../../users/patrick
-      ../common/desktop.nix
-      ../../modules/tailscale.nix
+#       ../common/desktop.nix
+#       ../../modules/tailscale.nix
     ];
+
+  extra-services.desktop.enable = true;
+  extra-services.tailscale.enable = true;
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;

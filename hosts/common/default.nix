@@ -2,6 +2,11 @@
 
 { lib, pkgs, inputs, outputs, ... }: {
 
+  imports =
+    [
+      ./extra-services
+    ];
+
   environment.systemPackages = with pkgs; [
     wget
     git

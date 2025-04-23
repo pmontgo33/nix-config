@@ -10,9 +10,12 @@
       ./hardware-configuration.nix
       ../../users/patrick
       ../../users/lina
-      ../common/desktop.nix
-      ../../modules/tailscale.nix
+#       ../common/extra-services/desktop.nix
+#       ../../modules/tailscale.nix
     ];
+
+  extra-services.desktop.enable = true;
+  extra-services.tailscale.enable = true;
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
