@@ -7,6 +7,7 @@
     shell = pkgs.fish;
 
     packages = with pkgs; [
+      standardnotes
       #cowsay
     ];
   };
