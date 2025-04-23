@@ -1,26 +1,22 @@
-/*
-For installation on LXC, add these lines to /etc/pve/lxc/ID.conf:
-lxc.cgroup2.devices.allow: c 10:200 rwm
-lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
-
-For LXC, run:
-tailscale up --ssh --accept-dns=false
-For other, run:
-tailscale up --ssh
-
-*/
-
+{config, ...}:
 {
-  imports = [
-    ../modules/secrets.nix
-  ];
+  /*
+  For installation on LXC, add these lines to /etc/pve/lxc/ID.conf:
+  lxc.cgroup2.devices.allow: c 10:200 rwm
+  lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+
+  For LXC, run:
+  tailscale up --ssh --accept-dns=false
+  For other, run:
+  tailscale up --ssh
+
+  */
 
   services.tailscale = {
     enable = true;
 #    interfaceName = "userspace-networking";
     openFirewall = true;
-    # authKeyFile = "/etc/nixos/.tailscale-auth-key"; # Place authkey file at root directory of configuration.nix
-    authKeyFile = "/run/secrets/tailscale-auth-key";
+    authKeyFile = config.age.secrets.tailscale_auth_key.path;
     extraUpFlags = [
       "--force-reauth"
       "--reset"
