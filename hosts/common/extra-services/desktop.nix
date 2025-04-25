@@ -11,6 +11,7 @@ in {
       libreoffice-qt
       hunspell
       hunspellDicts.en_US
+      kdePackages.kolourpaint
     ];
 
     #Install flatpak

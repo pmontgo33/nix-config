@@ -1,6 +1,10 @@
 nrs host="$HOSTNAME":
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}}
 
+#nrs-remote host
+#  login := if host ==
+#  sudo nixos-rebuid switch --flake /home/patrick/nix-config#{{host}}
+
 nrs-wtf host="$HOSTNAME":
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --show-trace --print-build-logs --verbose
 
