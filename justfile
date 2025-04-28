@@ -1,5 +1,18 @@
+#nrs host="$HOSTNAME":
+#  {{ if {{host}} == {{env("HOSTNAME")}} {
+#    #echo "Target matches HOSTNAME: {{host}}"
+#    sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}}
+#  } else {
+#    #echo "Target does not match HOSTNAME: {{host}}"
+#    sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --target-host patrick@{{host}} --use-remote-sudo
+#  } }}
+
 nrs host="$HOSTNAME":
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}}
+
+nrs-r host:
+  sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --target-host root@{{host}} --use-remote-sudo
+
 
 #nrs-remote host
 #  login := if host ==

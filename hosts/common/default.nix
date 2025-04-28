@@ -11,8 +11,14 @@
     wget
     git
     vim
+    just
+    fail2ban
   ];
 
+
+
+  # Set Timezone
+  time.timeZone = "America/New_York";
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;

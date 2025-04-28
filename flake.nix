@@ -64,5 +64,27 @@
       ];
 
     };
+
+    ## nix-fury ##
+    nixosConfigurations.nix-fury = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = { inherit inputs; };
+      modules = [
+        ./hosts/nix-fury
+        agenix.nixosModules.default
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+
+   #       home-manager.users.patrick = import ./users/patrick/home.nix;
+
+          # Optionally, use home-manager.extraSpecialArgs to pass arguments to home.nix
+        }
+      ];
+
+    };
   };
 }
