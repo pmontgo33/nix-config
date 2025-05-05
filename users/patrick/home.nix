@@ -46,6 +46,9 @@
     };
   };
 
+  programs.ssh.enable = true;
+  # programs.ssh.extraConfig = builtins.readFile ./ssh.conf;
+
 
 
   # This value determines the home Manager release that your
