@@ -34,11 +34,6 @@ cd nix-config
 ```
 
 ### 2. Set Up Your Environment
-Evaluate and apply the configurations using `nix` commands:
-```bash
-nix-env -iA nixpkgs.<package-name>
-```
-
 If you’re using NixOS, you can apply the system configurations:
 ```bash
 sudo nixos-rebuild switch --flake .
