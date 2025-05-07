@@ -48,4 +48,6 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 
 ## Acknowledgments
 
-This repository is a reflection of my personal journey with Nix. A big thanks to the Nix community for creating such a robust and flexible tool for managing systems and packages!
+I have used many sources to learn how to organize and implement a flake based Nix Configuration. Some notable resources include:
+- [Sascha Koenig Youtube Playlist](https://www.youtube.com/playlist?list=PLCQqUlIAw2cCuc3gRV9jIBGHeekVyBUnC)
+- [Sascha Koenig Repository](https://code.m3ta.dev/m3tam3re/nixcfg)
