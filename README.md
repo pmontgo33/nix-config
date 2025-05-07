@@ -12,7 +12,7 @@ Here's an overview of the structure of this repository:
 
 - **`flake.nix`**: The central entry point for managing configurations using Nix flakes.
 - **`users/`**: Contains user-specific configurations, including home-manager configurations.
-- **`secrets/`**: A directory for securely managing sensitive files or configurations, such as SSH keys or other encrypted secrets. I use agenix to encrypt secrets.
+- **`secrets/`**: A directory for securely managing sensitive files or configurations, such as SSH keys or other encrypted secrets. I use [agenix](https://github.com/ryantm/agenix) to encrypt secrets.
 - **`hosts/`**: Contains host-specific configurations for different machines or environments.
 - **`justfile`**: A task runner file used to simplify and streamline common commands and workflows.
 - **`nixos-config_old/`**: Contains older NixOS-related configurations and scripts, including shared settings, host configurations, and deployment scripts.
