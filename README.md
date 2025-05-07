@@ -1,6 +1,6 @@
 # Monty Nix Configuration
 
-Welcome to **Monty's Nix Configuration** repository! This is my personal collection of **Nix** configurations, designed to manage and define my development environments, system configurations, and workflows using the **Nix** package manager and the **NixOS** declarative configuration system.
+Welcome to **Monty's Nix Configuration** repository! This is my personal collection of **Nix** configurations, designed to manage and define my homelab and desktop environments, system configurations, and workflows using the **Nix** package manager and the **NixOS** declarative configuration system.
 
 ## Overview
 
