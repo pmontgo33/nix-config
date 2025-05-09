@@ -1,18 +1,17 @@
 { config, inputs, outputs, pkgs, ... }:
 
 {
+
   home.username = "patrick";
   home.homeDirectory = "/home/patrick";
 
   home.packages = with pkgs; [
-    kdePackages.kate
     wget
     git
     vim
     just
-    cowsay
+    #cowsay
   ];
-
 
 
   programs.git = {
