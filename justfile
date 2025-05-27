@@ -8,7 +8,7 @@ nrs-wtf host="$HOSTNAME":
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --show-trace --print-build-logs --verbose
 
 nfc:
-  nix flake check
+  sudo nix flake check
 
 agenix file:
   cd secrets && nix run github:ryantm/agenix -- -e {{file}}

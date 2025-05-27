@@ -9,4 +9,6 @@ imports = [ ./home.nix ];
     cowsay
   ];
 
+  services.syncthing.enable = true;
+
 }
