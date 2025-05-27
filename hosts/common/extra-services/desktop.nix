@@ -12,6 +12,7 @@ in {
       hunspell
       hunspellDicts.en_US
       kdePackages.kolourpaint
+      kdePackages.kcalc
     ];
 
     #Install flatpak
