@@ -1,15 +1,13 @@
 { config, pkgs, inputs, ... }: {
 
+  imports = [ ../../hosts/common/extra-services ];
+
   users.users.patrick = {
     isNormalUser = true;
     description = "Patrick";
     extraGroups = [ "networkmanager" "wheel" ];
     shell = pkgs.fish;
 
-    packages = with pkgs; [
-      standardnotes
-      #cowsay
-    ];
   };
 
   security.sudo.extraRules = [

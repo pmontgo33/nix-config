@@ -1,7 +1,7 @@
 { lib, config, pkgs, inputs, outputs, ... }:
 
 {
-imports = [ ../common ];
+  imports = [ ../../home.nix ];
 
   home.packages = with pkgs; [
     kdePackages.kate
@@ -11,5 +11,4 @@ imports = [ ../common ];
   ];
 
   services.syncthing.enable = true;
-
 }

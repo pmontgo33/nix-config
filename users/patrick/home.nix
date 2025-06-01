@@ -2,6 +2,8 @@
 
 {
 
+  imports = [ ];
+
   home.username = "patrick";
   home.homeDirectory = "/home/patrick";
 
