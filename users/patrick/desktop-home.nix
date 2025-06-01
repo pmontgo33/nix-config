@@ -7,6 +7,7 @@ imports = [ ./home.nix ];
     kdePackages.kate
     signal-desktop
     cowsay
+    anytype
   ];
 
   services.syncthing.enable = true;
