@@ -1,7 +1,7 @@
 { lib, config, pkgs, inputs, outputs, ... }:
 
 {
-imports = [ ./home.nix ];
+imports = [ ../common ];
 
   home.packages = with pkgs; [
     kdePackages.kate
