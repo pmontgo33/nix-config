@@ -26,7 +26,7 @@
     ansible-lint
     terraform
     sshpass
-
+    vlc
   ];
 
 

@@ -5,10 +5,8 @@
   users.users.patrick = {
 
       packages = with pkgs; [
-        standardnotes
-        #cowsay
+        cowsay
       ];
   };
 
-  extra-services.mount_media.enable = true;
 }

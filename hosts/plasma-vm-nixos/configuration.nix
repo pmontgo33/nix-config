@@ -8,7 +8,7 @@
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
-      ../../users/patrick
+      ../../users/patrick/hosts/hp-nixos
 #       ../common/desktop.nix
 #       ../../modules/tailscale.nix
     ];

@@ -1,9 +1,9 @@
 { lib, config, pkgs, inputs, outputs, ... }:
 
 with lib; let
-  cfg = config.home-services.mount_media;
+  cfg = config.extra-services.mount_media;
 in {
-  options.home-services.mount_media.enable = mkEnableOption "mount the media share from TrueNAS";
+  options.extra-services.mount_media.enable = mkEnableOption "mount the media share from TrueNAS";
 
   config = mkIf cfg.enable {
 
