@@ -4,10 +4,8 @@
   imports = [ ../../common/home.nix ];
 
   home.packages = with pkgs; [
-    kdePackages.kate
-    signal-desktop
+    google-chrome
     #cowsay
-    anytype
   ];
 
   services.syncthing.enable = true;

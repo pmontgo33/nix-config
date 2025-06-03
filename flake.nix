@@ -36,7 +36,7 @@
           home-manager.backupFileExtension = "backup";
 
           home-manager.users.patrick = import ./users/patrick/hosts/hp-nixos/home.nix;
-          home-manager.users.lina = import ./users/lina/home.nix;
+          home-manager.users.lina = import ./users/lina/hosts/hp-nixos/home.nix;
 
           # Optionally, use home-manager.extraSpecialArgs to pass arguments to home.nix
         }

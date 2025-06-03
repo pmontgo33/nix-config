@@ -5,7 +5,7 @@
   home.homeDirectory = "/home/lina";
 
   home.packages = with pkgs; [
-    google-chrome
+
     #cowsay
   ];
 

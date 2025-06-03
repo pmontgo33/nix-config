@@ -9,7 +9,7 @@
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
       ../../users/patrick/hosts/hp-nixos
-      ../../users/lina
+      ../../users/lina/hosts/hp-nixos
 #       ../common/extra-services/desktop.nix
 #       ../../modules/tailscale.nix
     ];
