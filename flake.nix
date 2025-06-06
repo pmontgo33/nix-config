@@ -16,7 +16,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    agenix.url = "github:ryantm/agenix";
+    agenix = {
+      url = "github:ryantm/agenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, home-manager, agenix, ... }: {
@@ -34,9 +37,11 @@
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.backupFileExtension = "backup";
-
+          home-manager.sharedModules = [agenix.homeManagerModules.default];
+          home-manager.extraSpecialArgs = { inherit inputs; };
           home-manager.users.patrick = import ./users/patrick/hosts/hp-nixos/home.nix;
           home-manager.users.lina = import ./users/lina/hosts/hp-nixos/home.nix;
+
 
           # Optionally, use home-manager.extraSpecialArgs to pass arguments to home.nix
         }
@@ -56,6 +61,8 @@
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.backupFileExtension = "backup";
+          home-manager.sharedModules = [agenix.homeManagerModules.default];
+          home-manager.extraSpecialArgs = { inherit inputs; };
 
           home-manager.users.patrick = import ./users/patrick/hosts/hp-nixos/home.nix;
 
