@@ -35,6 +35,23 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
+  # Enable Syncthing service system-wide
+  services.syncthing = {
+    enable = true;
+    # Run as a system service rather than per-user
+    systemService = true;
+
+    # Optional: Configure web UI settings
+    settings = {
+      gui = {
+        address = "127.0.0.1:8384";
+        # Set authentication (optional, but recommended)
+        user = "admin";
+        password = "test";
+      };
+    };
+  };
+
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
   # networking.firewall.allowedUDPPorts = [ ... ];

@@ -2,7 +2,7 @@ let
 
   plasma-vm-nixos_patrick = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDXXXLRz5H2YLUGkvx6KTd5h/xTv1luy/51YPkank4LG";
   hp-nixos_patrick = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEr9aBBJ73I/tXOT00krxHglmAqZ0A8xt7Hk5s2zMwCo";
-  users = [ plasma-vm-nixos_patrick hp-nixos_patrick ];
+  user_patrick = [ plasma-vm-nixos_patrick hp-nixos_patrick ];
 
   plasma-vm-nixos_system = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHvLDQ46pJQTzxM9/nU6GMO7EsB9LCdZEELl4YY0F/4Y";
   hp-nixos_system = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZIPGwINVdrqVoIzupSTMJFOty431KipytXKaKRFdHT";
@@ -11,6 +11,8 @@ let
 
 in
 {
-  "tailscale_auth_key.age".publicKeys = users ++ systems;
+  "syncthing_password.age".publicKeys = user_patrick ++ systems;
+  "st_truenas_device_id.age".publicKeys = user_patrick ++ systems;
+  "tailscale_auth_key.age".publicKeys = user_patrick ++ systems;
   # "secret1.age".publicKeys = [ users systems ];
 }

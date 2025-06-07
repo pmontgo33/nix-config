@@ -1,6 +1,6 @@
 { config, pkgs, inputs, ... }: {
 
-  imports = [ ../../common ];
+  imports = [ ../../common ./secrets.nix ];
 
   users.users.patrick = {
 
