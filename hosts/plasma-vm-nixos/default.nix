@@ -1,3 +1,3 @@
 {
-  imports = [ ../common ./secrets.nix ./configuration.nix ];
+  imports = [ ../common ./configuration.nix ];
 }

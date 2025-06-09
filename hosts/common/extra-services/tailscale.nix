@@ -22,7 +22,7 @@ in {
       enable = true;
   #    interfaceName = "userspace-networking";
       openFirewall = true;
-      authKeyFile = config.age.secrets.tailscale_auth_key.path;
+      authKeyFile = config.sops.secrets.tailscale_auth_key.path;
       extraUpFlags = [
         "--force-reauth"
         "--reset"

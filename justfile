@@ -17,7 +17,7 @@ agenix-rekey:
   cd secrets && nix run github:ryantm/agenix -- -r
 
 secrets:
-  -nix-shell -p sops --run "SOPS_AGE_KEY_FILE='/etc/sops/age/keys.txt' sops secrets/secrets.yaml"
+  -nix-shell -p sops --run "SOPS_AGE_KEY_FILE='/home/patrick/.config/sops/age/keys.txt' sops secrets/secrets.yaml"
 
 git-acpush message branch="master":
   git add .
