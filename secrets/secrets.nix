@@ -12,8 +12,8 @@
     # Define secrets
     secrets = {
       "tailscale_auth_key" = {};
-      "syncthing_password" = {};
-      "syncthing_truenas_device_id" = {};
+      "pbs-password" = {};
+      "pbs-fingerprint" = {};
 
 #       "user-password" = { neededForUsers = true; };
 #       "wifi-password" = {};
