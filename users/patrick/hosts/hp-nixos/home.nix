@@ -9,6 +9,4 @@
     #cowsay
     anytype
   ];
-
-  services.syncthing.enable = true;
 }

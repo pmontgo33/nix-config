@@ -3,7 +3,7 @@
 {
 # Enable sops
   sops = {
-    defaultSopsFile = ../../secrets/secrets.yaml;
+    defaultSopsFile = ./secrets.yaml;
     defaultSopsFormat = "yaml";
 
     # Specify the age key file location
@@ -12,6 +12,8 @@
     # Define secrets
     secrets = {
       "tailscale_auth_key" = {};
+      "syncthing_password" = {};
+      "syncthing_truenas_device_id" = {};
 
 #       "user-password" = { neededForUsers = true; };
 #       "wifi-password" = {};

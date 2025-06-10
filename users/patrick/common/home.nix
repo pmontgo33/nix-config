@@ -2,7 +2,7 @@
 
 {
 
-  imports = [ ];
+  imports = [  ../../../secrets ];
 
   home.username = "patrick";
   home.homeDirectory = "/home/patrick";
