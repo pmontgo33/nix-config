@@ -12,8 +12,16 @@
     # Define secrets
     secrets = {
       "tailscale_auth_key" = {};
-      "pbs-password" = {};
-      "pbs-fingerprint" = {};
+      "pbs-password" = {
+#         mode = "0400";
+#         owner = "root";
+#         group = "root";
+      };
+      "pbs-fingerprint" = {
+#         mode = "0400";
+#         owner = "root";
+#         group = "root";
+      };
 
 #       "user-password" = { neededForUsers = true; };
 #       "wifi-password" = {};
