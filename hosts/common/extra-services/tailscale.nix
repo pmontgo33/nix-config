@@ -18,6 +18,15 @@ in {
   options.extra-services.tailscale.enable = mkEnableOption "enable tailscale config";
 
   config = mkIf cfg.enable {
+
+    # sops secrets configuration
+    sops = {
+      defaultSopsFile = ../../../secrets/secrets.yaml;
+      secrets = {
+        "tailscale_auth_key" = {};
+      };
+    };
+
     services.tailscale = {
       enable = true;
   #    interfaceName = "userspace-networking";

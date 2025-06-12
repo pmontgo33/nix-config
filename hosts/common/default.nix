@@ -5,7 +5,6 @@
   imports =
     [
       ./extra-services
-      ../../secrets
     ];
 
   environment.systemPackages = with pkgs; [

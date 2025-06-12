@@ -8,5 +8,4 @@
     #cowsay
   ];
 
-  services.syncthing.enable = true;
 }

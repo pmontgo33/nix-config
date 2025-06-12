@@ -10,8 +10,7 @@
       ./hardware-configuration.nix
       ../../users/patrick/hosts/hp-nixos
       ../../users/lina/hosts/hp-nixos
-#       ../common/extra-services/desktop.nix
-#       ../../modules/tailscale.nix
+      ../../secrets
     ];
 
   extra-services.desktop.enable = true;

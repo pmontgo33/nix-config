@@ -7,20 +7,14 @@ in {
 
   config = mkIf cfg.enable {
 
-    # SOPS secrets configuration
-#     sops.secrets.pbs-password = {
-#       sopsFile = ./secrets.yaml;  # Adjust path to your secrets file
-#       mode = "0400";
-#       owner = "root";
-#       group = "root";
-#     };
-#
-#     sops.secrets.pbs-fingerprint = {
-#       sopsFile = ./secrets.yaml;  # Adjust path to your secrets file
-#       mode = "0400";
-#       owner = "root";
-#       group = "root";
-#     };
+    # sops secrets configuration
+    sops = {
+      defaultSopsFile = ../../../secrets/secrets.yaml;
+      secrets = {
+        "pbs-password" = {};
+        "pbs-fingerprint" = {};
+      };
+    };
 
     # Install Proxmox Backup Client and utility scripts
     environment.systemPackages = with pkgs; [

@@ -9,8 +9,7 @@
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
       ../../users/patrick/hosts/hp-nixos
-#       ../common/desktop.nix
-#       ../../modules/tailscale.nix
+      ../../secrets
     ];
 
   extra-services.desktop.enable = true;
