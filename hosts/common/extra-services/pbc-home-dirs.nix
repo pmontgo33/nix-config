@@ -102,17 +102,17 @@ in {
       '')
     ];
 
-    # Timer for home directories backup
+    # Timer for home directories backup - daily at 12:30 AM with wake from sleep
     systemd.timers.proxmox-backup-homes = {
-      description = "Run Proxmox home directories backup every 6 hours";
+      description = "Run Proxmox home directories backup daily at 12:30 AM";
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnBootSec = "15min";  # Wait 15 minutes after boot
-        OnUnitActiveSec = "6h";  # Run every 6 hours
-        Persistent = true;  # Catch up on missed runs
-        RandomizedDelaySec = "30min";  # Add some randomization
+#         OnCalendar = "daily";
+        OnCalendar = "*-*-* 00:30:00";  # More explicit 12:30 AM format
+#         Persistent = true;  # Catch up on missed runs
+        WakeSystem = true;  # Wake the system from sleep/suspend
       };
-    };
+};
 
     # Create Backup of all Home directories
     systemd.services.proxmox-backup-homes = {
