@@ -1,9 +1,9 @@
 { lib, config, pkgs, inputs, outputs, ... }:
 
 with lib; let
-  cfg = config.extra-services.pbc-home-dirs;
+  cfg = config.extra-services.pbs-home-dirs;
 in {
-  options.extra-services.pbc-home-dirs.enable = mkEnableOption "enable pbc-home-dirs config";
+  options.extra-services.pbs-home-dirs.enable = mkEnableOption "enable pbc-home-dirs config";
 
   config = mkIf cfg.enable {
 

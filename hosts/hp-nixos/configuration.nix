@@ -18,7 +18,7 @@
   extra-services.tailscale.enable = true;
 #   extra-services.tmux.enable = true;
   extra-services.mount_home_media.enable = true;
-  extra-services.pbc-home-dirs.enable = true;
+  extra-services.pbs-home-dirs.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
