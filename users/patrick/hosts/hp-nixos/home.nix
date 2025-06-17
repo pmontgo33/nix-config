@@ -16,6 +16,7 @@
     profiles.default.extensions = with pkgs.vscode-extensions; [
       jnoortheen.nix-ide
       redhat.ansible
+      redhat.vscode-yaml # dependency for redhat.ansible
       ms-python.python # dependency for redhat.ansible
       samuelcolvin.jinjahtml
     ];
