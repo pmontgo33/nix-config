@@ -6,6 +6,7 @@
   home.packages = with pkgs; [
     kdePackages.kate
     signal-desktop
+    vscodium
     #cowsay
     anytype
   ];

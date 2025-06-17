@@ -102,23 +102,21 @@ in {
       '')
     ];
 
-    # Timer for home directories backup - daily at 12:30 AM with wake from sleep
+    # Timer for home directories backup - 1 minute after user login
     systemd.timers.proxmox-backup-homes = {
-      description = "Run Proxmox home directories backup daily at 12:30 AM";
+      description = "Run Proxmox home directories backup 1 minute after user login";
       wantedBy = [ "timers.target" ];
       timerConfig = {
-#         OnCalendar = "daily";
-        OnCalendar = "*-*-* 00:30:00";  # More explicit 12:30 AM format
-#         Persistent = true;  # Catch up on missed runs
-        WakeSystem = true;  # Wake the system from sleep/suspend
+        OnActiveSec = "1min";  # Run 1 minute after the timer itself is activated
       };
-};
+    };
 
     # Create Backup of all Home directories
     systemd.services.proxmox-backup-homes = {
       description = "Proxmox Backup Home Directories";
       wants = [ "network-online.target" "sops-nix.service" ];
       after = [ "network-online.target" "sops-nix.service" ];
+      requires = [ "network-online.target" ];  # Fail if network not available
       serviceConfig = {
         Type = "oneshot";
         User = "root";
