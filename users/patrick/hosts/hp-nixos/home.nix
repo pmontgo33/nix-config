@@ -6,8 +6,18 @@
   home.packages = with pkgs; [
     kdePackages.kate
     signal-desktop
-    vscodium
     #cowsay
     anytype
   ];
+
+  programs.vscode = {
+    enable = true;
+    package = pkgs.vscodium;
+    profiles.default.extensions = with pkgs.vscode-extensions; [
+      jnoortheen.nix-ide
+      redhat.ansible
+      ms-python.python # dependency for redhat.ansible
+      samuelcolvin.jinjahtml
+    ];
+  };
 }
