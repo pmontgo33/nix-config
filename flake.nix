@@ -16,7 +16,7 @@
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, home-manager, sops-nix, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, sops-nix, ... }: {
     
     ## hp-nixos ##
     nixosConfigurations.hp-nixos = nixpkgs.lib.nixosSystem {
@@ -31,6 +31,7 @@
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
 
           home-manager.users.patrick = import ./users/patrick/hosts/hp-nixos/home.nix;
           home-manager.users.lina = import ./users/lina/hosts/hp-nixos/home.nix;
@@ -53,6 +54,7 @@
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
 
           home-manager.users.patrick = import ./users/patrick/hosts/hp-nixos/home.nix;
 
@@ -75,6 +77,7 @@
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
 
    #       home-manager.users.patrick = import ./users/patrick/home.nix;
 

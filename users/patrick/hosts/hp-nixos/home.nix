@@ -5,7 +5,7 @@
 
   home.packages = with pkgs; [
     kdePackages.kate
-    signal-desktop
+    inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.signal-desktop
     #cowsay
     anytype
   ];
