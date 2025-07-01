@@ -7,7 +7,7 @@
     kdePackages.kate
     inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.signal-desktop
     #cowsay
-    anytype
+    obsidian
   ];
 
   programs.vscode = {
