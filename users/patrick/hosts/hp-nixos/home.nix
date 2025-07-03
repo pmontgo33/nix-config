@@ -8,7 +8,7 @@
     inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.signal-desktop
     #cowsay
     obsidian
-    notesnook
+    # notesnook
   ];
 
   programs.vscode = {
