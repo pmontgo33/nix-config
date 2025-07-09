@@ -197,6 +197,7 @@ in {
               --exclude=/home/*/.local/share/Trash \
               --exclude=/home/*/.thumbnails \
               --exclude=/home/*/Downloads \
+              --exclude=/home/*/Nextcloud \
               --exclude='*.tmp' \
               --exclude='node_modules' \
               --exclude='.git' \
