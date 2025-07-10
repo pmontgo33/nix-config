@@ -8,7 +8,7 @@
     inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.signal-desktop
     #cowsay
     obsidian
-    notesnook
+    # inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.notesnook ##installed via flatpak to get latest version
     nextcloud-client
   ];
 
