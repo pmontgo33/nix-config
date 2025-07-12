@@ -32,10 +32,12 @@ in {
   #    interfaceName = "userspace-networking";
       openFirewall = true;
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
+      useRoutingFeatures = "both";
       extraUpFlags = [
         "--force-reauth"
         "--reset"
         "--ssh"
+        "--accept-routes"
   #      "--accept-dns=false"
       ];
     };
@@ -43,5 +45,13 @@ in {
   #  networking.nameservers = [ "100.100.100.100"];
     networking.nameservers = [ "100.100.100.100" "1.1.1.1" "1.0.0.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
+    networking.firewall.allowedUDPPorts = [ 41641 ];
+
+    # networking.localCommands = ''
+    #   ip rule add to 192.168.86.0/24 priority 2500 lookup main
+    # '';
+  
   };
+
+  
 }
