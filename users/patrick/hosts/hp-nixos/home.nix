@@ -5,6 +5,7 @@
 
   home.packages = with pkgs; [
     kdePackages.kate
+    google-chrome
     inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.signal-desktop
     #cowsay
     obsidian
