@@ -90,7 +90,21 @@
   };
 
   # Enable CUPS to print documents.
-  services.printing.enable = true;
+  #services.printing.enable = true;
+
+  services.printing = {
+    enable = true;
+    drivers = [ pkgs.canon-cups-ufr2 ]; # UFR II covers many Canon color lasers
+    browsing = true;
+  };
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    publish.enable = true;
+    publish.workstation = true;
+    publish.addresses = true;
+  };
+
 
   # Enable sound with pipewire.
   services.pulseaudio.enable = false;
