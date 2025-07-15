@@ -10,7 +10,7 @@
     #cowsay
     obsidian
     # inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.notesnook ##installed via flatpak to get latest version
-    nextcloud-client
+    # nextcloud-client
   ];
 
   programs.vscode = {

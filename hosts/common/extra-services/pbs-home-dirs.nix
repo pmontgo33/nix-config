@@ -198,6 +198,7 @@ in {
               --exclude=/home/*/.thumbnails \
               --exclude=/home/*/Downloads \
               --exclude=/home/*/Nextcloud \
+              --exclude=/home/*/mnt \
               --exclude='*.tmp' \
               --exclude='node_modules' \
               --exclude='.git' \
