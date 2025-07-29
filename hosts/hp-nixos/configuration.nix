@@ -28,6 +28,7 @@
     terraform
     sshpass
     vlc
+    jq
   ];
 
 
