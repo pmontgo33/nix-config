@@ -12,7 +12,7 @@
 		
   ];
 
-  
+  users.users.root.hashedPassword = "$6$fu.ra7ConU15mC8P$kMM7PcKtpo3ruRpqncC47lbRKYK3/f2z4shsK8pewbxohu6OjpxdJP/NYLLvEg4NjN29BSt3zPq6UwSxK1Zn90";
 
   # List services that you want to enable:
 

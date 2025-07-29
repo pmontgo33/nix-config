@@ -11,6 +11,7 @@
     obsidian
     # inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.notesnook ##installed via flatpak to get latest version
     # nextcloud-client
+    nixos-generators
   ];
 
   programs.vscode = {
