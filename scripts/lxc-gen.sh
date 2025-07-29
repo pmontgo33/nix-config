@@ -7,48 +7,73 @@ clear
 echo "This script will create a NixOS LXC container based on a host from your flake.nix"
 echo "Press Enter to continue..."
 read
+echo
+
+# Select branch to use in repo
+read -p "Enter Branch to use in Repository [master]: " branch
+echo
+# Set default branch to master if empty
+if [ -z "$branch" ]; then
+    branch="master"
+fi
 
 # Fetch available hostnames from flake
 echo "Fetching available hostnames from flake..."
 echo
 
 # Get the flake outputs and extract nixosConfigurations
-available_hosts=$(nix flake show --json git+https://git.montycasa.net/patrick/nix-config.git 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
+available_hosts=$(nix flake show --json git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
 
 if [ -n "$available_hosts" ]; then
     echo "Available hostnames:"
     echo "$available_hosts" | nl -w2 -s'. '
     echo
-    echo "You can enter one of the above hostnames or type a custom one."
-    echo
 fi
 
 # Prompt for hostname
-read -p "Enter the container hostname: " hostname
+read -p "Select a host by number or hostname: " selection
 
-# Validate hostname is not empty
-if [ -z "$hostname" ]; then
+# Validate selection is not empty
+if [ -z "$selection" ]; then
     echo "Error: Hostname cannot be empty"
     exit 1
 fi
 
-# Get cluster nodes
-cluster_nodes=$(ssh "root@stark" "pvecm nodes 2>/dev/null | grep -v 'Membership info' | grep -v '^$' | awk 'NR>2 {print \$3}'" 2>/dev/null)
+# Check if the input is a number (matches a line number)
+if [[ "$selection" =~ ^[0-9]+$ ]]; then
+    # Extract the corresponding hostname based on the number
+    hostname=$(echo "$available_hosts" | sed -n "${selection}p")
+else
+    # Assume input is the hostname itself
+    hostname="$selection"
+fi
+# Check if the hostname actually exists in the list
+if ! echo "$available_hosts" | grep -Fxq "$hostname"; then
+    echo "Invalid selection."
+    exit 1
+fi
+
+echo "You selected host $hostname."
+echo
+
 # Get next available VMID
 next_vmid=$(ssh "root@stark" "pvesh get /cluster/nextid 2>/dev/null" 2>/dev/null)
 
 # Additional prompts
-read -p "Enter Proxmox VE host: " pve_host
+read -p "Enter Proxmox VE hostname or IP: " pve_host
 read -p "Enter VMID [$next_vmid]: " vmid
-read -p "Enter Memory (MB): " memory
-read -p "Enter Cores: " cores
-read -p "Enter Disk Size (GB): " disk_size
-read -p "Enter IPv4 CIDR Address (e.g. 192.168.86.50/24) [default: dhcp]: " ip_address
-echo
+
 # Set VMID to next_vmid if empty
 if [ -z "$vmid" ]; then
     vmid="$next_vmid"
 fi
+
+read -p "Enter Memory (MB): " memory
+read -p "Enter Cores: " cores
+read -p "Enter Disk Size (GB): " disk_size
+read -p "Enter IPv4 CIDR Address (e.g. 192.168.86.$vmid/24) [default: dhcp]: " ip_address
+echo
+
 # Set default IP to dhcp if empty
 if [ -z "$ip_address" ]; then
     ip_address="dhcp"
@@ -64,7 +89,7 @@ fi
 echo "Generating NixOS LXC template for hostname: $hostname (this may take several minutes)..."
 output_dir=~/lxc-templates/$hostname-$(date +%Y%m%d)
 nixos-generate -f proxmox-lxc \
-  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$hostname#$hostname" \
+  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#$hostname" \
   -o "$output_dir"
 echo
 echo "NixOS LXC template generation complete!"
