@@ -13,7 +13,6 @@
     vim
     just
     fail2ban
-    iproute2
   ];
 
   # Set Timezone
