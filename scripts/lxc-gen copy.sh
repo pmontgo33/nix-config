@@ -86,13 +86,13 @@ if [[ "$ip_address" != "dhcp" && "$ip_address" != "DHCP" ]]; then
 fi
 
 # Run nixos-generate command with the provided hostname
-echo "Generating NixOS LXC Base template (this may take several minutes)..."
-output_dir=~/lxc-templates/lxc-base-$(date +%Y%m%d)
+echo "Generating NixOS LXC Base template for hostname: $hostname (this may take several minutes)..."
+output_dir=~/lxc-templates/$hostname-$(date +%Y%m%d)
 nixos-generate -f proxmox-lxc \
-  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#lxc-base" \
+  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#$hostname" \
   -o "$output_dir"
 echo
-echo "NixOS LXC Base template generation complete!"
+echo "NixOS LXC template generation complete!"
 echo
 
 # Find the template filename
@@ -105,7 +105,7 @@ fi
 
 # Copy template to Proxmox host
 echo "Copying template to Proxmox host..."
-scp "$output_dir/tarball/$template_filename" "root@$pve_host:/var/lib/vz/template/cache/lxc-base-$template_filename"
+scp "$output_dir/tarball/$template_filename" "root@$pve_host:/var/lib/vz/template/cache/$hostname-$template_filename"
 echo
 
 # Build network configuration
@@ -116,16 +116,12 @@ fi
 
 # Create the container
 echo "Creating container on Proxmox host..."
-ssh "root@$pve_host" "pct create $vmid /var/lib/vz/template/cache/lxc-base-$template_filename --hostname $hostname --memory $memory --cores $cores --rootfs local-zfs:$disk_size --unprivileged 1 --features nesting=1 --onboot 1 --tags nixos --net0 $net_config"
+ssh "root@$pve_host" "pct create $vmid /var/lib/vz/template/cache/$hostname-$template_filename --hostname $hostname --memory $memory --cores $cores --rootfs local-zfs:$disk_size --unprivileged 1 --features nesting=1 --onboot 1 --tags nixos --net0 $net_config"
 echo
 
 # Add TUN device configuration
 echo "Configuring TUN device access..."
 ssh "root@$pve_host" "grep -q 'lxc.cgroup2.devices.allow: c 10:200 rwm' /etc/pve/lxc/$vmid.conf || echo 'lxc.cgroup2.devices.allow: c 10:200 rwm' >> /etc/pve/lxc/$vmid.conf; grep -q 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' /etc/pve/lxc/$vmid.conf || echo 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' >> /etc/pve/lxc/$vmid.conf"
-echo
-
-# Rebuild LXC with hostname configuration
-echo "This is where it would rebuild with the hostname configuration"
 echo
 
 echo "NixOS LXC container setup complete!"
