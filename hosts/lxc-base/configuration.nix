@@ -7,7 +7,7 @@
   ];
 	
   environment.systemPackages = with pkgs; [
-		iproute2
+		
   ];
 
   users.users.root = {

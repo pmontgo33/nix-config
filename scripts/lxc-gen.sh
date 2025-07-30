@@ -148,7 +148,7 @@ echo
 # Get the container's IP address for nixos-rebuild target
 if [[ "$ip_address" == "dhcp" || "$ip_address" == "DHCP" ]]; then
     # For DHCP, we need to get the assigned IP from Proxmox
-        container_ip=$(ssh "root@$pve_host" "pct config $vmid | grep -E '^net0:' | grep -oE 'ip=([0-9]{1,3}\.){3}[0-9]{1,3}' | cut -d'=' -f2" 2>/dev/null)
+    container_ip=$(ssh "root@$pve_host" "pct exec $vmid -- ip route get 1 | awk '{print \$7; exit}'")
     if [ -z "$container_ip" ]; then
         echo "Warning: Could not determine container IP. You may need to check manually."
         container_ip="UNKNOWN"
