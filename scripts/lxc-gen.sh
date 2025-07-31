@@ -23,7 +23,7 @@ echo "Fetching available hostnames from flake..."
 echo
 
 # Get the flake outputs and extract nixosConfigurations
-available_hosts=$(nix flake show --json git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
+available_hosts=$(nix flake show --json git+https://github.com/pmontgo33/nix-config.git?ref=$branch 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
 
 if [ -n "$available_hosts" ]; then
     echo "Available hostnames:"
@@ -93,6 +93,7 @@ nixos-generate -f proxmox-lxc \
   --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#lxc-base" \
   -o "$output_dir"
 echo
+sleep 5
 echo "NixOS LXC Base template generation complete!"
 echo
 
@@ -163,8 +164,8 @@ echo "Container IP: $container_ip"
 echo
 
 echo "Copying SOPS key to container..."
-ssh "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
-scp ~/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /home/patrick/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
 
 # Run nixos-rebuild in background and monitor with dinosay check
 run_nixos_rebuild() {
@@ -176,6 +177,7 @@ run_nixos_rebuild() {
         --target-host "root@$container_ip" \
         --impure \
         --option connect-timeout 60 \
+        --option ssh-config-options "StrictHostKeyChecking=no UserKnownHostsFile=/dev/null" \
         --show-trace &
     
     rebuild_pid=$!
@@ -317,3 +319,4 @@ else
     echo "You can try accessing it with: ssh root@$container_ip"
     echo "Or check via Proxmox: ssh root@$pve_host 'pct enter $vmid'"
 fi
+exit 1
