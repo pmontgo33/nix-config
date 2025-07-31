@@ -16,7 +16,8 @@ echo
 if [ -z "$branch" ]; then
     branch="master"
 fi
-
+echo "Branch $branch"
+echo
 # Fetch available hostnames from flake
 echo "Fetching available hostnames from flake..."
 echo
@@ -85,14 +86,14 @@ if [[ "$ip_address" != "dhcp" && "$ip_address" != "DHCP" ]]; then
     read -p "Enter Gateway: " gateway
 fi
 
-# Run nixos-generate command with the provided hostname
-echo "Generating NixOS LXC Base template for hostname: $hostname (this may take several minutes)..."
-output_dir=~/lxc-templates/$hostname-$(date +%Y%m%d)
+# Run nixos-generate command with the base template
+echo "Generating NixOS LXC Base template (this may take several minutes)..."
+output_dir=~/lxc-templates/lxc-base-$(date +%Y%m%d)
 nixos-generate -f proxmox-lxc \
-  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#$hostname" \
+  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#lxc-base" \
   -o "$output_dir"
 echo
-echo "NixOS LXC template generation complete!"
+echo "NixOS LXC Base template generation complete!"
 echo
 
 # Find the template filename
@@ -105,7 +106,7 @@ fi
 
 # Copy template to Proxmox host
 echo "Copying template to Proxmox host..."
-scp "$output_dir/tarball/$template_filename" "root@$pve_host:/var/lib/vz/template/cache/$hostname-$template_filename"
+scp "$output_dir/tarball/$template_filename" "root@$pve_host:/var/lib/vz/template/cache/lxc-base-$template_filename"
 echo
 
 # Build network configuration
@@ -116,13 +117,73 @@ fi
 
 # Create the container
 echo "Creating container on Proxmox host..."
-ssh "root@$pve_host" "pct create $vmid /var/lib/vz/template/cache/$hostname-$template_filename --hostname $hostname --memory $memory --cores $cores --rootfs local-zfs:$disk_size --unprivileged 1 --features nesting=1 --onboot 1 --tags nixos --net0 $net_config"
+ssh "root@$pve_host" "pct create $vmid /var/lib/vz/template/cache/lxc-base-$template_filename --hostname $hostname --memory $memory --cores $cores --rootfs local-zfs:$disk_size --unprivileged 1 --features nesting=1 --onboot 1 --tags nixos --net0 $net_config"
 echo
 
 # Add TUN device configuration
 echo "Configuring TUN device access..."
 ssh "root@$pve_host" "grep -q 'lxc.cgroup2.devices.allow: c 10:200 rwm' /etc/pve/lxc/$vmid.conf || echo 'lxc.cgroup2.devices.allow: c 10:200 rwm' >> /etc/pve/lxc/$vmid.conf; grep -q 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' /etc/pve/lxc/$vmid.conf || echo 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' >> /etc/pve/lxc/$vmid.conf"
 echo
+
+# Start NixOS LXC Base container
+echo "Starting LXC container for configuration phase..."
+ssh "root@$pve_host" "pct start $vmid"
+echo
+
+# Wait for container to be ready
+echo "Waiting for container to start..."
+sleep 10
+echo
+
+# Check if container is running
+while ! ssh "root@$pve_host" "pct status $vmid | grep -q running"; do
+    echo "Waiting for container to be ready..."
+    echo
+    sleep 5
+done
+
+echo "Container is running. Beginning rebuild with hostname configuration..."
+echo
+
+# Get the container's IP address for nixos-rebuild target
+if [[ "$ip_address" == "dhcp" || "$ip_address" == "DHCP" ]]; then
+    # For DHCP, we need to get the assigned IP from Proxmox
+    container_ip=$(ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/ip -4 addr show eth0" | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    if [ -z "$container_ip" ]; then
+        echo "Warning: Could not determine container IP. You may need to check manually."
+        container_ip="UNKNOWN"
+        exit 1
+    fi
+else
+    # Extract IP from CIDR notation (remove /XX)
+    container_ip=$(echo "$ip_address" | cut -d'/' -f1)
+fi
+
+echo "Container IP: $container_ip"
+echo
+
+echo "Copying SOPS key to container..."
+ssh "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
+scp ~/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
+
+# Run nixos-rebuild locally targeting the remote container
+echo "Rebuilding container with $hostname configuration..."
+nixos-rebuild switch \
+  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#$hostname" \
+  --target-host "root@$container_ip" \
+  --impure
+echo
+
+echo "Rebuild complete! The container should now be configured with $hostname."
+echo
+
+# Verify the container is still running
+if ssh "root@$pve_host" "pct status $vmid | grep -q running"; then
+    echo "Container successfully rebuilt with $hostname configuration!"
+    echo "You can access it at: ssh root@$container_ip"
+else
+    echo "Warning: Container may not be running properly after rebuild."
+fi
 
 echo "NixOS LXC container setup complete!"
 echo "Container ID: $vmid"
