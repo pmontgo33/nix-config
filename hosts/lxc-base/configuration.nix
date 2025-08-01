@@ -7,7 +7,7 @@
   ];
 	
   environment.systemPackages = with pkgs; [
-		dinosay
+		kittysay
   ];
 
   users.users.root = {

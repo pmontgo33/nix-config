@@ -167,7 +167,7 @@ echo "Copying SOPS key to container..."
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
 scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /home/patrick/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
 
-# Run nixos-rebuild in background and monitor with dinosay check
+# Run nixos-rebuild in background and monitor with kittysay check
 run_nixos_rebuild() {
     echo "Starting nixos-rebuild in background..."
     
@@ -195,11 +195,11 @@ run_nixos_rebuild() {
         if ssh -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 "root@$container_ip" "echo 'Container is up'" >/dev/null 2>&1; then
             echo "Container is responsive, checking if rebuild completed..."
             
-            # Check if dinosay package is NOT installed (indicates successful rebuild)
-            if ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q dinosay" 2>/dev/null; then
-                echo "dinosay package found - rebuild still in progress or base template active"
+            # Check if kittysay package is NOT installed (indicates successful rebuild)
+            if ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
+                echo "kittysay package found - rebuild still in progress or base template active"
             else
-                echo "dinosay package NOT found - this indicates successful rebuild!"
+                echo "kittysay package NOT found - this indicates successful rebuild!"
                 
                 # Double-check that the system is actually ready
                 if ssh -o ConnectTimeout=10 "root@$container_ip" "systemctl is-system-running --wait" >/dev/null 2>&1; then
@@ -230,8 +230,8 @@ run_nixos_rebuild() {
             # Even if the process exited, do a final check
             sleep 5
             if ssh -o ConnectTimeout=15 "root@$container_ip" "echo 'Final check'" >/dev/null 2>&1; then
-                if ! ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q dinosay" 2>/dev/null; then
-                    echo "Final verification: dinosay not found - rebuild successful!"
+                if ! ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
+                    echo "Final verification: kittysay not found - rebuild successful!"
                     return 0
                 fi
             fi
@@ -258,8 +258,8 @@ run_nixos_rebuild() {
     echo "Performing final verification..."
     sleep 5
     if ssh -o ConnectTimeout=15 "root@$container_ip" "echo 'Final check'" >/dev/null 2>&1; then
-        if ! ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q dinosay" 2>/dev/null; then
-            echo "Final verification: dinosay not found - rebuild appears to have completed despite timeout!"
+        if ! ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
+            echo "Final verification: kittysay not found - rebuild appears to have completed despite timeout!"
             return 0
         fi
     fi
