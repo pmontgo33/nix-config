@@ -23,7 +23,7 @@ echo "Fetching available hostnames from flake..."
 echo
 
 # Get the flake outputs and extract nixosConfigurations
-available_hosts=$(nix flake show --json git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
+available_hosts=$(nix flake show --json git+https://github.com/pmontgo33/nix-config.git?ref=$branch 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
 
 if [ -n "$available_hosts" ]; then
     echo "Available hostnames:"
@@ -93,6 +93,7 @@ nixos-generate -f proxmox-lxc \
   --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#lxc-base" \
   -o "$output_dir"
 echo
+sleep 5
 echo "NixOS LXC Base template generation complete!"
 echo
 
@@ -163,29 +164,159 @@ echo "Container IP: $container_ip"
 echo
 
 echo "Copying SOPS key to container..."
-ssh "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
-scp ~/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /home/patrick/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
 
-# Run nixos-rebuild locally targeting the remote container
-echo "Rebuilding container with $hostname configuration..."
-nixos-rebuild switch \
-  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#$hostname" \
-  --target-host "root@$container_ip" \
-  --impure
-echo
+# Run nixos-rebuild in background and monitor with kittysay check
+run_nixos_rebuild() {
+    echo "Starting nixos-rebuild in background..."
+    
+    # Run nixos-rebuild in background
+    nixos-rebuild switch \
+        --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#$hostname" \
+        --target-host "root@$container_ip" \
+        --impure \
+        --option connect-timeout 60 \
+        --option ssh-config-options "StrictHostKeyChecking=no UserKnownHostsFile=/dev/null" \
+        --show-trace &
+    
+    rebuild_pid=$!
+    echo "Rebuild process started with PID: $rebuild_pid"
+    
+    # Monitor the rebuild process
+    local timeout=900  # 15 minutes
+    local elapsed=0
+    local check_interval=20
+    
+    while [ $elapsed -lt $timeout ]; do
+        echo "Checking container status... (${elapsed}s elapsed)"
+        
+        # Check if container is responsive
+        if ssh -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 "root@$container_ip" "echo 'Container is up'" >/dev/null 2>&1; then
+            echo "Container is responsive, checking if rebuild completed..."
+            
+            # Check if nix generation has been incremented
+            if ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
+                echo "kittysay package found - rebuild still in progress or base template active"
+            else
+                echo "kittysay package NOT found - this indicates successful rebuild!"
+                
+                # Double-check that the system is actually ready
+                if ssh -o ConnectTimeout=10 "root@$container_ip" "systemctl is-system-running --wait" >/dev/null 2>&1; then
+                    echo "System is fully operational - rebuild completed successfully!"
+                    
+                    # Kill the background process if it's still running
+                    if kill -0 $rebuild_pid 2>/dev/null; then
+                        echo "Terminating background rebuild process..."
+                        kill $rebuild_pid 2>/dev/null
+                        wait $rebuild_pid 2>/dev/null
+                    fi
+                    
+                    return 0
+                else
+                    echo "System not fully ready yet, continuing to monitor..."
+                fi
+            fi
+        else
+            echo "Container not responding (likely restarting during rebuild)"
+        fi
+        
+        # Check if rebuild process is still running
+        if ! kill -0 $rebuild_pid 2>/dev/null; then
+            echo "Background rebuild process has finished"
+            wait $rebuild_pid 2>/dev/null
+            local exit_code=$?
+            
+            # Even if the process exited, do a final check
+            sleep 5
+            if ssh -o ConnectTimeout=15 "root@$container_ip" "echo 'Final check'" >/dev/null 2>&1; then
+                if ! ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
+                    echo "Final verification: kittysay not found - rebuild successful!"
+                    return 0
+                fi
+            fi
+            
+            echo "Rebuild process exited with code $exit_code"
+            return $exit_code
+        fi
+        
+        sleep $check_interval
+        elapsed=$((elapsed + check_interval))
+    done
+    
+    # Timeout reached
+    echo "Rebuild timeout reached after $timeout seconds"
+    
+    # Kill the background process
+    if kill -0 $rebuild_pid 2>/dev/null; then
+        echo "Terminating rebuild process..."
+        kill $rebuild_pid 2>/dev/null
+        wait $rebuild_pid 2>/dev/null
+    fi
+    
+    # Final attempt to check if it actually completed
+    echo "Performing final verification..."
+    sleep 5
+    if ssh -o ConnectTimeout=15 "root@$container_ip" "echo 'Final check'" >/dev/null 2>&1; then
+        if ! ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
+            echo "Final verification: kittysay not found - rebuild appears to have completed despite timeout!"
+            return 0
+        fi
+    fi
+    
+    echo "Rebuild timed out and verification failed."
+    return 124
+}
 
-echo "Rebuild complete! The container should now be configured with $hostname."
-echo
-
-# Verify the container is still running
-if ssh "root@$pve_host" "pct status $vmid | grep -q running"; then
-    echo "Container successfully rebuilt with $hostname configuration!"
-    echo "You can access it at: ssh root@$container_ip"
+# Run the rebuild
+if run_nixos_rebuild; then
+    rebuild_success=true
 else
-    echo "Warning: Container may not be running properly after rebuild."
+    rebuild_success=false
 fi
 
-echo "NixOS LXC container setup complete!"
-echo "Container ID: $vmid"
-echo "Hostname: $hostname"
-echo "Template: $template_filename"
+echo
+
+# Final verification
+echo "Performing final verification..."
+if ssh -o ConnectTimeout=15 "root@$container_ip" "systemctl is-system-running" 2>/dev/null; then
+    system_status=$(ssh -o ConnectTimeout=15 "root@$container_ip" "systemctl is-system-running" 2>/dev/null)
+    echo "System status: $system_status"
+fi
+
+if ssh -o ConnectTimeout=15 "root@$container_ip" "hostname" 2>/dev/null | grep -q "$hostname"; then
+    echo "✓ Hostname verification successful"
+    final_success=true
+else
+    echo "✗ Hostname verification failed"
+    final_success=false
+fi
+
+# Verify the container is still running on Proxmox
+if ssh "root@$pve_host" "pct status $vmid | grep -q running"; then
+    echo "✓ Container is running on Proxmox"
+else
+    echo "✗ Warning: Container may not be running properly"
+    final_success=false
+fi
+
+echo
+if [ "$final_success" = true ]; then
+    echo "🎉 NixOS LXC container setup completed successfully!"
+    echo "Container ID: $vmid"
+    echo "Hostname: $hostname"
+    echo "IP Address: $container_ip"
+    echo "Template: $template_filename"
+    echo
+    echo "You can access it with: ssh root@$container_ip"
+else
+    echo "⚠️  Container setup completed with warnings."
+    echo "Please check the container manually:"
+    echo "Container ID: $vmid"
+    echo "Expected hostname: $hostname"
+    echo "IP Address: $container_ip"
+    echo
+    echo "You can try accessing it with: ssh root@$container_ip"
+    echo "Or check via Proxmox: ssh root@$pve_host 'pct enter $vmid'"
+fi
+exit 1
