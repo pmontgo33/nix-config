@@ -198,10 +198,11 @@ run_nixos_rebuild() {
     fi
     
     # Run nixos-rebuild in background
-    export NIX_SSHOPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60"
+    export NIX_SSHOPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
     nixos-rebuild switch \
         --flake "$flake_base_url#$hostname" \
         --target-host "root@$container_ip" \
+        --fast \
         --impure \
         --option connect-timeout 60 \
         --show-trace &

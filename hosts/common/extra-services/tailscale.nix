@@ -46,7 +46,7 @@ in {
     networking.nameservers = [ "100.100.100.100" "1.1.1.1" "1.0.0.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
     networking.firewall.allowedUDPPorts = [ 41641 ];
-    networking.firewall.trustedInterfaces = [ "tailscale0" ];
+    # networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
     # networking.localCommands = ''
     #   ip rule add to 192.168.86.0/24 priority 2500 lookup main
