@@ -48,9 +48,9 @@ in {
     networking.firewall.allowedUDPPorts = [ 41641 ];
     networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
-    # networking.localCommands = ''
-    #   ip rule add to 192.168.86.0/24 priority 2500 lookup main
-    # '';
+    networking.localCommands = ''
+      ip rule add to 192.168.86.0/24 priority 2500 lookup main
+    '';
   
   };
 
