@@ -181,92 +181,48 @@ echo
 echo "Copying SOPS key to container..."
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
 scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /home/patrick/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
+echo
 
-# Run nixos-rebuild in background and monitor with generation check
-run_nixos_rebuild() {
-    echo "Starting nixos-rebuild in background..."
-    
-    # Get current generation number before rebuild
-    echo "Getting current generation number..."
-    initial_generation=$(ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "readlink /nix/var/nix/profiles/system | grep -o '[0-9]*'" 2>/dev/null)
-    
-    if [ -z "$initial_generation" ]; then
-        echo "Warning: Could not determine initial generation number"
-        initial_generation=0
-    else
-        echo "Initial generation: $initial_generation"
-    fi
-    
-    # Run nixos-rebuild in background
-    export NIX_SSHOPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
-    nixos-rebuild switch \
-        --flake "$flake_base_url#$hostname" \
-        --target-host "root@$container_ip" \
-        --fast \
-        --impure \
-        --option connect-timeout 60 \
-        --show-trace &
-    
-    rebuild_pid=$!
-    echo "Rebuild process started with PID: $rebuild_pid"
-    echo "Monitoring generation changes every 20 seconds..."
-    echo
-    
-    # Monitor the rebuild process
-    check_count=0
-    max_checks=30  # 10 minutes max (30 * 20 seconds)
-    
-    while kill -0 $rebuild_pid 2>/dev/null; do
-        sleep 20
-        check_count=$((check_count + 1))
-        
-        # Get current generation
-        current_generation=$(ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "readlink /nix/var/nix/profiles/system | grep -o '[0-9]*'" 2>/dev/null)
-        
-        if [ -n "$current_generation" ] && [ "$current_generation" -gt "$initial_generation" ]; then
-            echo "✓ Generation changed from $initial_generation to $current_generation - rebuild likely completed"
-            break
-        elif [ -n "$current_generation" ]; then
-            echo "Generation check $check_count: Still at generation $current_generation (waiting for change from $initial_generation)"
-        else
-            echo "Generation check $check_count: Could not read generation (container may be rebooting)"
-        fi
-        
-        # Safety timeout
-        if [ $check_count -ge $max_checks ]; then
-            echo "Warning: Reached maximum monitoring time (10 minutes)"
-            break
-        fi
-    done
-    
-    # Wait for the background process to complete and get exit status
-    wait $rebuild_pid
-    return $?
-}
+# Get current generation number before rebuild
+initial_generation=$(ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/readlink /nix/var/nix/profiles/system | grep -o '[0-9]*'" 2>/dev/null)
+echo "Initial Nix Configurtion Generation: $initial_generation"
+echo
 
-# Run the rebuild
-if run_nixos_rebuild; then
-    rebuild_success=true
+# Run nixos-rebuild
+echo "Running nixos-rebuild switch on new host $hostname"
+ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/bash -c 'export PATH=\"/run/current-system/sw/bin:/nix/var/nix/profiles/system/sw/bin:\$PATH\" && nixos-rebuild switch --flake \"$flake_base_url#$hostname\" --impure --show-trace'"
+# ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/source /etc/set-environment && nixos-rebuild switch --flake '$flake_base_url#$hostname' --impure --show-trace"
+# pct exec 128 -- /run/current-system/sw/bin/nixos-rebuild switch --flake 'git+https://git.montycasa.net/patrick/nix-config.git#$omnitools' --impure --show-trace --option extra-sandbox-paths '/run/current-system/sw'
+# pct exec 128 -- /run/current-system/sw/bin/bash -c 'export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/system/sw/bin:$PATH" && nixos-rebuild switch --flake "git+https://git.montycasa.net/patrick/nix-config.git#omnitools" --impure --show-trace'
+echo
+
+# Get current generation
+current_generation=$(ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/readlink /nix/var/nix/profiles/system | grep -o '[0-9]*'" 2>/dev/null)
+if [ -n "$current_generation" ] && [ "$current_generation" -gt "$initial_generation" ]; then
+    echo "✓ Generation changed from $initial_generation to $current_generation - rebuild likely completed"
+elif [ -n "$current_generation" ]; then
+    echo "Generation check $check_count: Still at generation $current_generation (waiting for change from $initial_generation)"
 else
-    rebuild_success=false
+    echo "Generation check $check_count: Could not read generation"
 fi
-
 echo
 
 # Final verification
 echo "Performing final verification..."
-if ssh -o ConnectTimeout=15 "root@$container_ip" "systemctl is-system-running" 2>/dev/null; then
-    system_status=$(ssh -o ConnectTimeout=15 "root@$container_ip" "systemctl is-system-running" 2>/dev/null)
+if ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/systemctl is-system-running" 2>/dev/null; then
+    system_status=$(ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/systemctl is-system-running" 2>/dev/null)
     echo "System status: $system_status"
+    echo
 fi
 
-if ssh -o ConnectTimeout=15 "root@$container_ip" "hostname" 2>/dev/null | grep -q "$hostname"; then
+if ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/hostname" 2>/dev/null | grep -q "$hostname"; then
     echo "✓ Hostname verification successful"
     final_success=true
 else
     echo "✗ Hostname verification failed"
     final_success=false
 fi
+echo
 
 # Verify the container is still running on Proxmox
 if ssh "root@$pve_host" "pct status $vmid | grep -q running"; then
@@ -275,8 +231,8 @@ else
     echo "✗ Warning: Container may not be running properly"
     final_success=false
 fi
-
 echo
+
 if [ "$final_success" = true ]; then
     echo "🎉 NixOS LXC container setup completed successfully!"
     echo "Container ID: $vmid"
@@ -284,7 +240,6 @@ if [ "$final_success" = true ]; then
     echo "IP Address: $container_ip"
     echo "Template: $template_filename"
     echo
-    echo "You can access it with: ssh root@$container_ip"
 else
     echo "⚠️  Container setup completed with warnings."
     echo "Please check the container manually:"
@@ -292,7 +247,8 @@ else
     echo "Expected hostname: $hostname"
     echo "IP Address: $container_ip"
     echo
-    echo "You can try accessing it with: ssh root@$container_ip"
-    echo "Or check via Proxmox: ssh root@$pve_host 'pct enter $vmid'"
 fi
+echo
+echo "======================================================================"
+echo
 exit 1

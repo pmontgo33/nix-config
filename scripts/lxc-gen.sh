@@ -136,10 +136,22 @@ echo "Creating container on Proxmox host..."
 ssh "root@$pve_host" "pct create $vmid /var/lib/vz/template/cache/lxc-base-$template_filename --hostname $hostname --memory $memory --cores $cores --rootfs local-zfs:$disk_size --unprivileged 1 --features nesting=1 --onboot 1 --tags nixos --net0 $net_config"
 echo
 
-# Add TUN device configuration
-echo "Configuring TUN device access..."
-ssh "root@$pve_host" "grep -q 'lxc.cgroup2.devices.allow: c 10:200 rwm' /etc/pve/lxc/$vmid.conf || echo 'lxc.cgroup2.devices.allow: c 10:200 rwm' >> /etc/pve/lxc/$vmid.conf; grep -q 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' /etc/pve/lxc/$vmid.conf || echo 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' >> /etc/pve/lxc/$vmid.conf"
+echo "Checking if $hostname has Tailscale enabled..."
+    
+tailscale_check=$(nix eval --json "$flake_base_url#nixosConfigurations.$hostname.config.services.tailscale.enable" 2>/dev/null || echo "false")
+# nix eval --json "git+https://git.montycasa.net/patrick/nix-config.git?rev=99c002a69b9b4a68cfea021fc82c93be72665e87#nixosConfigurations.omnitools.config.services.tailscale.enable"
+
+if [ "$tailscale_check" = "true" ]; then
+    echo "✓ Tailscale is enabled for $hostname"
+    # Add TUN device configuration
+    echo "Configuring TUN device access..."
+    ssh "root@$pve_host" "grep -q 'lxc.cgroup2.devices.allow: c 10:200 rwm' /etc/pve/lxc/$vmid.conf || echo 'lxc.cgroup2.devices.allow: c 10:200 rwm' >> /etc/pve/lxc/$vmid.conf; grep -q 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' /etc/pve/lxc/$vmid.conf || echo 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' >> /etc/pve/lxc/$vmid.conf"
+else
+    echo "✗ Tailscale is not enabled for $hostname"
+    echo "Skipping TUN device passthrough"
+fi
 echo
+
 
 # Start NixOS LXC Base container
 echo "Starting LXC container for configuration phase..."
