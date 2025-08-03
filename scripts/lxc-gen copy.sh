@@ -18,12 +18,27 @@ if [ -z "$branch" ]; then
 fi
 echo "Branch $branch"
 echo
+
+# Get the latest commit hash to ensure the latest is pulled by nix
+echo "Fetching latest commit hash for branch $branch..."
+latest_commit=$(git ls-remote https://git.montycasa.net/patrick/nix-config.git "refs/heads/$branch" | cut -f1)
+echo
+
+if [ -z "$latest_commit" ]; then
+    echo "Error: Could not fetch latest commit for branch $branch"
+    exit 1
+fi
+
+echo "Using commit: $latest_commit"
+flake_base_url="git+https://git.montycasa.net/patrick/nix-config.git?rev=$latest_commit"
+echo
+
 # Fetch available hostnames from flake
 echo "Fetching available hostnames from flake..."
 echo
 
 # Get the flake outputs and extract nixosConfigurations
-available_hosts=$(nix flake show --json git+https://github.com/pmontgo33/nix-config.git?ref=$branch 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
+available_hosts=$(nix flake show --json $flake_base_url 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
 
 if [ -n "$available_hosts" ]; then
     echo "Available hostnames:"
@@ -90,7 +105,7 @@ fi
 echo "Generating NixOS LXC Base template (this may take several minutes)..."
 output_dir=~/lxc-templates/lxc-base-$(date +%Y%m%d)
 nixos-generate -f proxmox-lxc \
-  --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#lxc-base" \
+  --flake "$flake_base_url#lxc-base" \
   -o "$output_dir"
 echo
 sleep 5
@@ -167,105 +182,66 @@ echo "Copying SOPS key to container..."
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
 scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /home/patrick/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
 
-# Run nixos-rebuild in background and monitor with kittysay check
+# Run nixos-rebuild in background and monitor with generation check
 run_nixos_rebuild() {
     echo "Starting nixos-rebuild in background..."
     
+    # Get current generation number before rebuild
+    echo "Getting current generation number..."
+    initial_generation=$(ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "readlink /nix/var/nix/profiles/system | grep -o '[0-9]*'" 2>/dev/null)
+    
+    if [ -z "$initial_generation" ]; then
+        echo "Warning: Could not determine initial generation number"
+        initial_generation=0
+    else
+        echo "Initial generation: $initial_generation"
+    fi
+    
     # Run nixos-rebuild in background
+    export NIX_SSHOPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=60 -o ServerAliveInterval=60 -o ServerAliveCountMax=3"
     nixos-rebuild switch \
-        --flake "git+https://git.montycasa.net/patrick/nix-config.git?ref=$branch#$hostname" \
+        --flake "$flake_base_url#$hostname" \
         --target-host "root@$container_ip" \
+        --fast \
         --impure \
         --option connect-timeout 60 \
-        --option ssh-config-options "StrictHostKeyChecking=no UserKnownHostsFile=/dev/null" \
         --show-trace &
     
     rebuild_pid=$!
     echo "Rebuild process started with PID: $rebuild_pid"
+    echo "Monitoring generation changes every 20 seconds..."
+    echo
     
     # Monitor the rebuild process
-    local timeout=900  # 15 minutes
-    local elapsed=0
-    local check_interval=20
+    check_count=0
+    max_checks=30  # 10 minutes max (30 * 20 seconds)
     
-    while [ $elapsed -lt $timeout ]; do
-        echo "Checking container status... (${elapsed}s elapsed)"
+    while kill -0 $rebuild_pid 2>/dev/null; do
+        sleep 20
+        check_count=$((check_count + 1))
         
-        # Check if container is responsive
-        if ssh -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 "root@$container_ip" "echo 'Container is up'" >/dev/null 2>&1; then
-            echo "Container is responsive, checking if rebuild completed..."
-            
-            # Check if nix generation has been incremented
-            if ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
-                echo "kittysay package found - rebuild still in progress or base template active"
-            else
-                echo "kittysay package NOT found - this indicates successful rebuild!"
-                
-                # Double-check that the system is actually ready
-                if ssh -o ConnectTimeout=10 "root@$container_ip" "systemctl is-system-running --wait" >/dev/null 2>&1; then
-                    echo "System is fully operational - rebuild completed successfully!"
-                    
-                    # Kill the background process if it's still running
-                    if kill -0 $rebuild_pid 2>/dev/null; then
-                        echo "Terminating background rebuild process..."
-                        kill $rebuild_pid 2>/dev/null
-                        wait $rebuild_pid 2>/dev/null
-                    fi
-                    
-                    return 0
-                else
-                    echo "System not fully ready yet, continuing to monitor..."
-                fi
-            fi
+        # Get current generation
+        current_generation=$(ssh -o ConnectTimeout=15 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "readlink /nix/var/nix/profiles/system | grep -o '[0-9]*'" 2>/dev/null)
+        
+        if [ -n "$current_generation" ] && [ "$current_generation" -gt "$initial_generation" ]; then
+            echo "✓ Generation changed from $initial_generation to $current_generation - rebuild likely completed"
+            break
+        elif [ -n "$current_generation" ]; then
+            echo "Generation check $check_count: Still at generation $current_generation (waiting for change from $initial_generation)"
         else
-            echo "Container not responding (likely restarting during rebuild)"
+            echo "Generation check $check_count: Could not read generation (container may be rebooting)"
         fi
         
-        # Check if rebuild process is still running
-        if ! kill -0 $rebuild_pid 2>/dev/null; then
-            echo "Background rebuild process has finished"
-            wait $rebuild_pid 2>/dev/null
-            local exit_code=$?
-            
-            # Even if the process exited, do a final check
-            sleep 5
-            if ssh -o ConnectTimeout=15 "root@$container_ip" "echo 'Final check'" >/dev/null 2>&1; then
-                if ! ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
-                    echo "Final verification: kittysay not found - rebuild successful!"
-                    return 0
-                fi
-            fi
-            
-            echo "Rebuild process exited with code $exit_code"
-            return $exit_code
+        # Safety timeout
+        if [ $check_count -ge $max_checks ]; then
+            echo "Warning: Reached maximum monitoring time (10 minutes)"
+            break
         fi
-        
-        sleep $check_interval
-        elapsed=$((elapsed + check_interval))
     done
     
-    # Timeout reached
-    echo "Rebuild timeout reached after $timeout seconds"
-    
-    # Kill the background process
-    if kill -0 $rebuild_pid 2>/dev/null; then
-        echo "Terminating rebuild process..."
-        kill $rebuild_pid 2>/dev/null
-        wait $rebuild_pid 2>/dev/null
-    fi
-    
-    # Final attempt to check if it actually completed
-    echo "Performing final verification..."
-    sleep 5
-    if ssh -o ConnectTimeout=15 "root@$container_ip" "echo 'Final check'" >/dev/null 2>&1; then
-        if ! ssh -o ConnectTimeout=10 "root@$container_ip" "nix-env -q | grep -q kittysay" 2>/dev/null; then
-            echo "Final verification: kittysay not found - rebuild appears to have completed despite timeout!"
-            return 0
-        fi
-    fi
-    
-    echo "Rebuild timed out and verification failed."
-    return 124
+    # Wait for the background process to complete and get exit status
+    wait $rebuild_pid
+    return $?
 }
 
 # Run the rebuild

@@ -32,18 +32,17 @@ in {
   #    interfaceName = "userspace-networking";
       openFirewall = true;
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
-      useRoutingFeatures = "both";
+      useRoutingFeatures = "client";
       extraUpFlags = [
         "--force-reauth"
         "--reset"
-        "--ssh"
+        # "--ssh"
         "--accept-routes"
-  #      "--accept-dns=false"
+       "--accept-dns=false"
       ];
     };
 
-  #  networking.nameservers = [ "100.100.100.100"];
-    networking.nameservers = [ "100.100.100.100" "1.1.1.1" "1.0.0.1" ];
+    networking.nameservers = [ "100.100.100.100" "1.1.1.1" "1.0.0.1" "192.168.86.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
     networking.firewall.allowedUDPPorts = [ 41641 ];
     networking.firewall.trustedInterfaces = [ "tailscale0" ];
