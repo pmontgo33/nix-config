@@ -11,12 +11,62 @@
 		
   ];
 
-  # List services that you want to enable:
-
   extra-services.tailscale.enable = true;
-
-  # Enable the OpenSSH daemon.
   services.openssh.enable = true;
+
+  # Enable OCI containers with Podman backend
+  virtualisation.oci-containers = {
+    backend = "podman";
+    containers = {
+      omni-tools = {
+        image = "iib0011/omni-tools:latest";
+        autoStart = true;
+        
+        # Port mapping: host:container
+        ports = [
+          "8080:80"
+        ];
+        
+        # Container options
+        extraOptions = [
+          "--restart=unless-stopped"
+          "--name=omni-tools"
+          # Optional: Add health check
+          "--health-cmd=curl -f http://localhost:80 || exit 1"
+          "--health-interval=30s"
+          "--health-timeout=10s"
+          "--health-retries=3"
+        ];
+        
+        # Optional: Environment variables (if needed)
+        environment = {
+          # Add any environment variables here if required
+          # EXAMPLE_VAR = "value";
+        };
+        
+        # Optional: Volume mounts for persistent data
+        volumes = [
+          # Uncomment and modify if you need persistent storage
+          # "/var/lib/omni-tools:/app/data:rw"
+        ];
+      };
+    };
+  };
+
+  # Enable container runtime support
+  virtualisation.containers.enable = true;
+  
+  # Enable Podman
+  virtualisation.podman = {
+    enable = true;
+    # Enable Docker compatibility layer (optional)
+    dockerCompat = true;
+    # Required for container networking
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
+  # Open firewall port for web access
+  networking.firewall.allowedTCPPorts = [ 8080 ];
 
   system.stateVersion = "25.05";
 }

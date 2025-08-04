@@ -83,6 +83,25 @@
       ];
     };
 
+    ## lxc-tailscale ##
+    nixosConfigurations.lxc-tailscale = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = { inherit inputs; };
+      modules = [
+        ./hosts/lxc-tailscale
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
     ## nix-fury ##
     nixosConfigurations.nix-fury = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
