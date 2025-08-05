@@ -36,12 +36,15 @@ echo
 # Fetch available hostnames from flake
 echo "Fetching available hostnames from flake..."
 echo
+echo "================================================================"
+echo
 
 # Get the flake outputs and extract nixosConfigurations
 available_hosts=$(nix flake show --json $flake_base_url 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
 
 if [ -n "$available_hosts" ]; then
     echo "Available hostnames:"
+    echo "-------------------------"
     echo "$available_hosts" | nl -w2 -s'. '
     echo
 fi
@@ -71,12 +74,17 @@ fi
 
 echo "You selected host $hostname."
 echo
+echo "================================================================"
+echo
+
+
+# LXC Basics
+echo "LXC Basic Configuration Options:"
+echo "-------------------------------------"
+read -p "Enter Proxmox VE hostname or IP: " pve_host
 
 # Get next available VMID
-next_vmid=$(ssh "root@stark" "pvesh get /cluster/nextid 2>/dev/null" 2>/dev/null)
-
-# Additional prompts
-read -p "Enter Proxmox VE hostname or IP: " pve_host
+next_vmid=$(ssh "root@$pve_host" "pvesh get /cluster/nextid 2>/dev/null" 2>/dev/null)
 read -p "Enter VMID [$next_vmid]: " vmid
 
 # Set VMID to next_vmid if empty
@@ -87,19 +95,77 @@ fi
 read -p "Enter Memory (MB): " memory
 read -p "Enter Cores: " cores
 read -p "Enter Disk Size (GB): " disk_size
-read -p "Enter IPv4 CIDR Address (e.g. 192.168.86.$vmid/24) [default: dhcp]: " ip_address
+echo
+echo "================================================================"
 echo
 
-# Set default IP to dhcp if empty
-if [ -z "$ip_address" ]; then
-    ip_address="dhcp"
-fi
+# Function to validate CIDR format
+validate_cidr() {
+    local ip="$1"
+    # Check if it matches basic CIDR format (IP/prefix)
+    if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$ ]]; then
+        # Extract IP and prefix
+        local ip_part=$(echo "$ip" | cut -d'/' -f1)
+        local prefix=$(echo "$ip" | cut -d'/' -f2)
+        
+        # Validate IP octets (0-255)
+        IFS='.' read -ra octets <<< "$ip_part"
+        for octet in "${octets[@]}"; do
+            if [[ $octet -lt 0 || $octet -gt 255 ]]; then
+                return 1
+            fi
+        done
+        
+        # Validate prefix (0-32)
+        if [[ $prefix -lt 0 || $prefix -gt 32 ]]; then
+            return 1
+        fi
+        
+        return 0
+    else
+        return 1
+    fi
+}
 
-# Prompt for gateway if IP is not dhcp
-gateway=""
-if [[ "$ip_address" != "dhcp" && "$ip_address" != "DHCP" ]]; then
-    read -p "Enter Gateway: " gateway
-fi
+while true; do
+    # IP Address selection with options
+    echo "Network Configuration:"
+    echo "---------------------------"
+    echo "1) Static IP 192.168.86.$vmid/24 (Gateway: 192.168.86.1)"
+    echo "2) DHCP"
+    echo "Other enter custom Static IP address"
+    echo
+    read -p "Select network option (1, 2) or enter custom IP address (e.g., 192.168.86.$vmid/24): " ip_selection
+    
+    case "$ip_selection" in
+        1)
+            ip_address="192.168.86.$vmid/24"
+            gateway="192.168.86.1"
+            break
+            ;;
+        2)
+            ip_address="dhcp"
+            gateway=""
+            break
+            ;;
+        *)
+            # Check if it's a custom IP address
+            if validate_cidr "$ip_selection"; then
+                ip_address="$ip_selection"
+                # Prompt for gateway for custom IP
+                read -p "Enter Gateway: " gateway
+                break
+            else
+                echo "Invalid selection or IP format. Please enter 1, 2, or a valid CIDR address (e.g., 192.168.86.$vmid/24)"
+                echo
+            fi
+            ;;
+    esac
+done
+
+echo
+echo "================================================================"
+echo
 
 # Run nixos-generate command with the base template
 echo "Generating NixOS LXC Base template (this may take several minutes)..."
@@ -121,7 +187,7 @@ if [ -z "$template_filename" ]; then
 fi
 
 # Copy template to Proxmox host
-echo "Copying template to Proxmox host..."
+echo "Copying template to Proxmox host $pve_host..."
 scp "$output_dir/tarball/$template_filename" "root@$pve_host:/var/lib/vz/template/cache/lxc-base-$template_filename"
 echo
 
@@ -132,14 +198,13 @@ if [[ "$ip_address" != "dhcp" && "$ip_address" != "DHCP" && -n "$gateway" ]]; th
 fi
 
 # Create the container
-echo "Creating container on Proxmox host..."
+echo "Creating container on Proxmox host $pve_host..."
 ssh "root@$pve_host" "pct create $vmid /var/lib/vz/template/cache/lxc-base-$template_filename --hostname $hostname --memory $memory --cores $cores --rootfs local-zfs:$disk_size --unprivileged 1 --features nesting=1 --onboot 1 --tags nixos --net0 $net_config"
 echo
 
 echo "Checking if $hostname has Tailscale enabled..."
     
 tailscale_check=$(nix eval --json "$flake_base_url#nixosConfigurations.$hostname.config.services.tailscale.enable" 2>/dev/null || echo "false")
-# nix eval --json "git+https://git.montycasa.net/patrick/nix-config.git?rev=99c002a69b9b4a68cfea021fc82c93be72665e87#nixosConfigurations.omnitools.config.services.tailscale.enable"
 
 if [ "$tailscale_check" = "true" ]; then
     echo "✓ Tailscale is enabled for $hostname"
@@ -150,6 +215,8 @@ else
     echo "✗ Tailscale is not enabled for $hostname"
     echo "Skipping TUN device passthrough"
 fi
+echo
+echo "================================================================"
 echo
 
 
@@ -170,10 +237,10 @@ while ! ssh "root@$pve_host" "pct status $vmid | grep -q running"; do
     sleep 5
 done
 
-echo "Container is running. Beginning rebuild with hostname configuration..."
+echo "Container is running. Beginning rebuild with $hostname configuration..."
 echo
 
-# Get the container's IP address for nixos-rebuild target
+# Get the container's IP address
 if [[ "$ip_address" == "dhcp" || "$ip_address" == "DHCP" ]]; then
     # For DHCP, we need to get the assigned IP from Proxmox
     container_ip=$(ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/ip -4 addr show eth0" | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
@@ -191,8 +258,10 @@ echo "Container IP: $container_ip"
 echo
 
 echo "Copying SOPS key to container..."
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
-scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /home/patrick/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
+ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/mkdir -p /etc/sops/age"
+#ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
+cat /etc/sops/age/keys.txt | ssh root@$pve_host "pct exec $vmid -- /run/current-system/sw/bin/tee /etc/sops/age/keys.txt > /dev/null"
+#scp -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /home/patrick/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
 echo
 
 # Get current generation number before rebuild
@@ -207,16 +276,7 @@ ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/bash -c 'expo
 # pct exec 128 -- /run/current-system/sw/bin/nixos-rebuild switch --flake 'git+https://git.montycasa.net/patrick/nix-config.git#$omnitools' --impure --show-trace --option extra-sandbox-paths '/run/current-system/sw'
 # pct exec 128 -- /run/current-system/sw/bin/bash -c 'export PATH="/run/current-system/sw/bin:/nix/var/nix/profiles/system/sw/bin:$PATH" && nixos-rebuild switch --flake "git+https://git.montycasa.net/patrick/nix-config.git#omnitools" --impure --show-trace'
 echo
-
-# Get current generation
-current_generation=$(ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/readlink /nix/var/nix/profiles/system | grep -o '[0-9]*'" 2>/dev/null)
-if [ -n "$current_generation" ] && [ "$current_generation" -gt "$initial_generation" ]; then
-    echo "✓ Generation changed from $initial_generation to $current_generation - rebuild likely completed"
-elif [ -n "$current_generation" ]; then
-    echo "Generation check $check_count: Still at generation $current_generation (waiting for change from $initial_generation)"
-else
-    echo "Generation check $check_count: Could not read generation"
-fi
+echo "================================================================"
 echo
 
 # Final verification
@@ -234,7 +294,17 @@ else
     echo "✗ Hostname verification failed"
     final_success=false
 fi
-echo
+
+# Get current generation
+current_generation=$(ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/readlink /nix/var/nix/profiles/system | grep -o '[0-9]*'" 2>/dev/null)
+if [ -n "$current_generation" ] && [ "$current_generation" -gt "$initial_generation" ]; then
+    echo "✓ Generation changed from $initial_generation to $current_generation - rebuild successful"
+elif [ -n "$current_generation" ]; then
+    echo "Generation check $check_count: Still at generation $current_generation (waiting for change from $initial_generation)"
+    final_success=false
+else
+    echo "Generation check $check_count: Could not read generation"
+fi
 
 # Verify the container is still running on Proxmox
 if ssh "root@$pve_host" "pct status $vmid | grep -q running"; then
@@ -243,6 +313,8 @@ else
     echo "✗ Warning: Container may not be running properly"
     final_success=false
 fi
+echo
+echo "================================================================"
 echo
 
 if [ "$final_success" = true ]; then
