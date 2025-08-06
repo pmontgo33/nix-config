@@ -7,10 +7,51 @@ clear
 echo "This script will create a NixOS LXC container based on a host from your flake.nix"
 echo "Press Enter to continue..."
 read
+echo "Define flake repository..."
+echo
+echo "================================================================"
 echo
 
+remote_name=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | cut -d'/' -f1)
+if [ -z "$remote_name" ]; then
+    echo "No repository found in current working directory"
+    echo
+    echo "Enter full url for nix flake git repository (example: https://github.com/user-name/nix-config.git)"
+    read -p ": " repo_url
+
+else
+    remote_url=$(git config --get remote.$remote_name.url)
+
+    if [[ $remote_url == https://* ]]; then
+        # Already https, leave as is
+        https_url=$remote_url
+    elif [[ $remote_url == ssh://git@* ]]; then
+        # Convert ssh://git@host/path to https://host/path
+        https_url=$(echo "$remote_url" | sed -E 's#^ssh://git@([^/]+)(/.+)#https://\1\2#')
+    else
+        echo "Error: Remote URL is not https or ssh://git@ format" >&2
+        exit 1
+    fi
+
+    echo "Repository with remote $https_url found in current working directory"
+    echo
+    echo "Press Enter to use this repo, or enter full url for the nix flake repository you would like to use"
+    echo "  (example: https://github.com/user-name/nix-config.git)"
+    read -p ": " repo_url
+    
+    # Set flake url to remote url if nothing entered
+    if [ -z "$repo_url" ]; then
+        repo_url=$https_url
+    fi
+fi
+echo
+echo "Using flake repository $repo_url"
+echo
+
+
+
 # Select branch to use in repo
-read -p "Enter Branch to use in Repository [master]: " branch
+read -p "Enter Branch to use in repository [master]: " branch
 echo
 # Set default branch to master if empty
 if [ -z "$branch" ]; then
@@ -21,7 +62,9 @@ echo
 
 # Get the latest commit hash to ensure the latest is pulled by nix
 echo "Fetching latest commit hash for branch $branch..."
-latest_commit=$(git ls-remote https://git.montycasa.net/patrick/nix-config.git "refs/heads/$branch" | cut -f1)
+latest_commit=$(git ls-remote $repo_url "refs/heads/$branch" | cut -f1)
+# latest_commit=$(git ls-remote "$repo_url" "refs/heads/$branch" | cut -f1)
+
 echo
 
 if [ -z "$latest_commit" ]; then
@@ -30,7 +73,7 @@ if [ -z "$latest_commit" ]; then
 fi
 
 echo "Using commit: $latest_commit"
-flake_base_url="git+https://git.montycasa.net/patrick/nix-config.git?rev=$latest_commit"
+flake_base_url="git+$repo_url?rev=$latest_commit"
 echo
 
 # Fetch available hostnames from flake

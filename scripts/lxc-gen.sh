@@ -7,62 +7,139 @@ clear
 echo "This script will create a NixOS LXC container based on a host from your flake.nix"
 echo "Press Enter to continue..."
 read
-echo "Define flake repository..."
-echo
 echo "================================================================"
 echo
 
-remote_name=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | cut -d'/' -f1)
-if [ -z "$remote_name" ]; then
-    echo "No repository found in current working directory"
-    echo
-    echo "Enter full url for nix flake git repository (example: https://github.com/user-name/nix-config.git)"
-    read -p ": " repo_url
-
-else
-    remote_url=$(git config --get remote.$remote_name.url)
-
-    if [[ $remote_url == https://* ]]; then
-        # Already https, leave as is
-        https_url=$remote_url
-    elif [[ $remote_url == ssh://git@* ]]; then
-        # Convert ssh://git@host/path to https://host/path
-        https_url=$(echo "$remote_url" | sed -E 's#^ssh://git@([^/]+)(/.+)#https://\1\2#')
+# Function to load .env file
+load_env_file() {
+    # Get the directory where the script is located
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local env_file="$script_dir/.env"
+    if [ -f "$env_file" ]; then
+        # Source the .env file, but only export specific variables we care about
+        while IFS='=' read -r key value; do
+            # Skip empty lines and comments
+            [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+            
+            # Trim whitespace from key
+            key=$(echo "$key" | xargs)
+            
+            # Remove quotes from value if present and trim whitespace
+            value=$(echo "$value" | xargs)
+            value=$(echo "$value" | sed 's/^"\(.*\)"$/\1/' | sed "s/^'\(.*\)'$/\1/")
+            
+            case "$key" in
+                "REPOSITORY_URL")
+                    ENV_REPOSITORY_URL="$value"
+                    ;;
+                "BRANCH")
+                    ENV_BRANCH="$value"
+                    ;;
+                "PVE_HOST")
+                    ENV_PVE_HOST="$value"
+                    ;;
+                "DEFAULT_MEMORY")
+                    ENV_DEFAULT_MEMORY="$value"
+                    ;;
+                "DEFAULT_CORES")
+                    ENV_DEFAULT_CORES="$value"
+                    ;;
+                "DEFAULT_DISK_SIZE")
+                    ENV_DEFAULT_DISK_SIZE="$value"
+                    ;;
+                "DEFAULT_NETWORK_OPTION")
+                    ENV_DEFAULT_NETWORK_OPTION="$value"
+                    ;;
+                "DEFAULT_GATEWAY")
+                    ENV_DEFAULT_GATEWAY="$value"
+                    ;;
+                "SOPS_KEY_PATH")
+                    ENV_SOPS_KEY_PATH="$value"
+                    ;;
+            esac
+        done < "$env_file"
+        return 0
     else
-        echo "Error: Remote URL is not https or ssh://git@ format" >&2
-        exit 1
+        return 1
     fi
+}
 
-    echo "Repository with remote $https_url found in current working directory"
+# Load environment variables from .env file
+if load_env_file; then
+    echo "Found .env file, checking for configuration..."
     echo
-    echo "Press Enter to use this repo, or enter full url for the nix flake repository you would like to use"
-    echo "  (example: https://github.com/user-name/nix-config.git)"
-    read -p ": " repo_url
-    
-    # Set flake url to remote url if nothing entered
-    if [ -z "$repo_url" ]; then
-        repo_url=$https_url
+else
+    echo "No .env file found in current directory, continuing with user prompts..."
+    echo
+fi
+echo "================================================================"
+echo
+echo "Define Flake Repository"
+echo "-------------------------"
+
+# Handle repository URL
+if [ -n "$ENV_REPOSITORY_URL" ]; then
+    repo_url="$ENV_REPOSITORY_URL"
+    echo "Using repository URL from .env file: $repo_url"
+    echo
+else
+    # Fallback to git repository detection
+    remote_name=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | cut -d'/' -f1)
+    if [ -z "$remote_name" ]; then
+        echo "No repository found in current working directory or .env file"
+        echo
+        echo "Enter full url for nix flake git repository (example: https://github.com/user-name/nix-config.git)"
+        read -p ": " repo_url
+    else
+        remote_url=$(git config --get remote.$remote_name.url)
+
+        if [[ $remote_url == https://* ]]; then
+            # Already https, leave as is
+            https_url=$remote_url
+        elif [[ $remote_url == ssh://git@* ]]; then
+            # Convert ssh://git@host/path to https://host/path
+            https_url=$(echo "$remote_url" | sed -E 's#^ssh://git@([^/]+)(/.+)#https://\1\2#')
+        else
+            echo "Error: Remote URL is not https or ssh://git@ format" >&2
+            exit 1
+        fi
+
+        echo "Repository with remote $https_url found in current working directory"
+        echo
+        echo "Press Enter to use this repo, or enter full url for the nix flake repository you would like to use"
+        echo "  (example: https://github.com/user-name/nix-config.git)"
+        read -p ": " repo_url
+        
+        # Set flake url to remote url if nothing entered
+        if [ -z "$repo_url" ]; then
+            repo_url=$https_url
+        fi
     fi
+    echo "Using flake repository $repo_url"
+    echo
 fi
-echo
-echo "Using flake repository $repo_url"
-echo
 
 
-
-# Select branch to use in repo
-read -p "Enter Branch to use in repository [master]: " branch
-echo
-# Set default branch to master if empty
-if [ -z "$branch" ]; then
-    branch="master"
+# Handle branch selection
+if [ -n "$ENV_BRANCH" ]; then
+    branch="$ENV_BRANCH"
+    echo "Using branch from .env file: $branch"
+    echo
+else
+    # Select branch to use in repo
+    read -p "Enter Branch to use in repository [master]: " branch
+    echo
+    # Set default branch to master if empty
+    if [ -z "$branch" ]; then
+        branch="master"
+    fi
+    echo "Branch $branch"
+    echo
 fi
-echo "Branch $branch"
-echo
 
 # Get the latest commit hash to ensure the latest is pulled by nix
 echo "Fetching latest commit hash for branch $branch..."
-latest_commit=$(git ls-remote https://git.montycasa.net/patrick/nix-config.git "refs/heads/$branch" | cut -f1)
+latest_commit=$(git ls-remote $repo_url "refs/heads/$branch" | cut -f1)
 # latest_commit=$(git ls-remote "$repo_url" "refs/heads/$branch" | cut -f1)
 
 echo
@@ -124,7 +201,14 @@ echo
 # LXC Basics
 echo "LXC Basic Configuration Options:"
 echo "-------------------------------------"
-read -p "Enter Proxmox VE hostname or IP: " pve_host
+
+# Handle Proxmox host
+if [ -n "$ENV_PVE_HOST" ]; then
+    pve_host="$ENV_PVE_HOST"
+    echo "Using Proxmox host from .env file: $pve_host"
+else
+    read -p "Enter Proxmox VE hostname or IP: " pve_host
+fi
 
 # Get next available VMID
 next_vmid=$(ssh "root@$pve_host" "pvesh get /cluster/nextid 2>/dev/null" 2>/dev/null)
@@ -135,9 +219,38 @@ if [ -z "$vmid" ]; then
     vmid="$next_vmid"
 fi
 
-read -p "Enter Memory (MB): " memory
-read -p "Enter Cores: " cores
-read -p "Enter Disk Size (GB): " disk_size
+# Handle Memory
+if [ -n "$ENV_DEFAULT_MEMORY" ]; then
+    read -p "Enter Memory (MB) [$ENV_DEFAULT_MEMORY]: " memory
+    if [ -z "$memory" ]; then
+        memory="$ENV_DEFAULT_MEMORY"
+        echo "$memory MB"
+    fi
+else
+    read -p "Enter Memory (MB): " memory
+fi
+
+# Handle Cores
+if [ -n "$ENV_DEFAULT_CORES" ]; then
+    read -p "Enter Cores [$ENV_DEFAULT_CORES]: " cores
+    if [ -z "$cores" ]; then
+        cores="$ENV_DEFAULT_CORES"
+        echo "$cores cores"
+    fi
+else
+    read -p "Enter Cores: " cores
+fi
+
+# Handle Disk Size
+if [ -n "$ENV_DEFAULT_DISK_SIZE" ]; then
+    read -p "Enter Disk Size (GB) [$ENV_DEFAULT_DISK_SIZE]: " disk_size
+    if [ -z "$disk_size" ]; then
+        disk_size="$ENV_DEFAULT_DISK_SIZE"
+        echo "$disk_size GB"
+    fi
+else
+    read -p "Enter Disk Size (GB): " disk_size
+fi
 echo
 echo "================================================================"
 echo
@@ -178,8 +291,18 @@ while true; do
     echo "2) DHCP"
     echo "Other enter custom Static IP address"
     echo
-    read -p "Select network option (1, 2) or enter custom IP address (e.g., 192.168.86.$vmid/24): " ip_selection
     
+    # Handle default network option from .env
+    if [ -n "$ENV_DEFAULT_NETWORK_OPTION" ]; then
+        read -p "Select network option (1, 2) or enter custom IP address (e.g., 192.168.86.$vmid/24) [$ENV_DEFAULT_NETWORK_OPTION]: " ip_selection
+        if [ -z "$ip_selection" ]; then
+            ip_selection="$ENV_DEFAULT_NETWORK_OPTION"
+            echo "Using default network option from .env: $ip_selection"
+        fi
+    else
+        read -p "Select network option (1, 2) or enter custom IP address (e.g., 192.168.86.$vmid/24): " ip_selection
+    fi
+
     case "$ip_selection" in
         1)
             ip_address="192.168.86.$vmid/24"
@@ -302,9 +425,16 @@ echo
 
 echo "Copying SOPS key to container..."
 ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/mkdir -p /etc/sops/age"
-#ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "root@$container_ip" "mkdir -p /home/patrick/.config/sops/age"
-cat /etc/sops/age/keys.txt | ssh root@$pve_host "pct exec $vmid -- /run/current-system/sw/bin/tee /etc/sops/age/keys.txt > /dev/null"
-#scp -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /home/patrick/.config/sops/age/keys.txt "root@$container_ip:/home/patrick/.config/sops/age/keys.txt"
+
+# Use SOPS key path from .env or default
+if [ -n "$ENV_SOPS_KEY_PATH" ]; then
+    sops_key_path="$ENV_SOPS_KEY_PATH"
+    echo "Using SOPS key path from .env: $sops_key_path"
+else
+    sops_key_path="/etc/sops/age/keys.txt"
+fi
+
+cat "$sops_key_path" | ssh root@$pve_host "pct exec $vmid -- /run/current-system/sw/bin/tee /etc/sops/age/keys.txt > /dev/null"
 echo
 
 # Get current generation number before rebuild
