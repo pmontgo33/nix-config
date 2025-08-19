@@ -29,6 +29,7 @@
     sshpass
     vlc
     jq
+    
   ];
 
 
