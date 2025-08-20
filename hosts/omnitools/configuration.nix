@@ -38,9 +38,9 @@
         ports = [
           "8080:80"
         ];
-        # Simplified extraOptions - some options may not be supported in NixOS format
+        # Remove restart policy from extraOptions as it conflicts with NixOS's --rm flag
+        # The autoStart = true already handles restarting the container
         extraOptions = [
-          "--restart=unless-stopped"
           "--pull=always"  # Ensure latest image is pulled
         ];
         # Optional: Environment variables (if needed)
