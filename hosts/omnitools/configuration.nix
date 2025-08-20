@@ -57,6 +57,12 @@
     };
   };
 
+  # Create the persistent storage directory with proper permissions
+  systemd.tmpfiles.rules = [
+    "d /var/lib/omni-tools 0755 root root - -"
+  ];
+
+
   # Open firewall port for web access
   networking.firewall.allowedTCPPorts = [ 8080 ];
 
