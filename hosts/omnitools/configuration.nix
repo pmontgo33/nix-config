@@ -51,7 +51,7 @@
         # Optional: Volume mounts for persistent data
         volumes = [
           # Uncomment and modify if you need persistent storage
-          # "/var/lib/omni-tools:/app/data:rw"
+          "/var/lib/omni-tools:/app/data:rw"
         ];
       };
     };
