@@ -342,11 +342,11 @@ echo
 echo "Generating NXC Base template (this may take several minutes)..."
 output_dir=~/nxc-templates/nxc-base-$(date +%Y%m%d)
 nixos-generate -f proxmox-lxc \
-  --flake "$flake_base_url#lxc-base" \
+  --flake "$flake_base_url#nxc-base" \
   -o "$output_dir"
 echo
 sleep 5
-echo "NixOS LXC Base template generation complete!"
+echo "NXC Base template generation complete!"
 echo
 
 # Find the template filename
