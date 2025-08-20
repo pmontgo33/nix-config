@@ -339,8 +339,8 @@ echo "================================================================"
 echo
 
 # Run nixos-generate command with the base template
-echo "Generating NixOS LXC Base template (this may take several minutes)..."
-output_dir=~/lxc-templates/lxc-base-$(date +%Y%m%d)
+echo "Generating NXC Base template (this may take several minutes)..."
+output_dir=~/nxc-templates/nxc-base-$(date +%Y%m%d)
 nixos-generate -f proxmox-lxc \
   --flake "$flake_base_url#lxc-base" \
   -o "$output_dir"
