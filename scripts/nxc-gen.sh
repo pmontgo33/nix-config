@@ -158,8 +158,8 @@ echo "Using commit: $latest_commit"
 flake_base_url="git+$repo_url?rev=$latest_commit"
 echo
 
-# Fetch available hostnames from flake
-echo "Fetching available hostnames from flake..."
+# Fetch available hosts from flake
+echo "Fetching available hosts from flake..."
 echo
 echo "================================================================"
 echo
@@ -168,7 +168,7 @@ echo
 available_hosts=$(nix flake show --json $flake_base_url 2>/dev/null | jq -r '.nixosConfigurations | keys[]' 2>/dev/null)
 
 if [ -n "$available_hosts" ]; then
-    echo "Available hostnames:"
+    echo "Available hosts:"
     echo "-------------------------"
     echo "$available_hosts" | nl -w2 -s'. '
     echo
@@ -179,7 +179,7 @@ read -p "Select a host by number or hostname: " selection
 
 # Validate selection is not empty
 if [ -z "$selection" ]; then
-    echo "Error: Hostname cannot be empty"
+    echo "Error: Host cannot be empty"
     exit 1
 fi
 
@@ -215,6 +215,13 @@ else
     read -p "Enter Proxmox VE hostname or IP: " pve_host
 fi
 
+# Prompt for hostname
+read -p "Enter NXC Hostname [$hostname]: " nxc_hostname
+# Set nxc_hostname to flake hostname if empty
+if [ -z "$nxc_hostname" ]; then
+    nxc_hostname="$hostname"
+fi
+
 # Get next available VMID
 next_vmid=$(ssh "root@$pve_host" "pvesh get /cluster/nextid 2>/dev/null" 2>/dev/null)
 read -p "Enter VMID [$next_vmid]: " vmid
@@ -224,7 +231,7 @@ if [ -z "$vmid" ]; then
     vmid="$next_vmid"
 fi
 
-# Handle Memory
+# Prompt for Memory
 if [ -n "$ENV_DEFAULT_MEMORY" ]; then
     read -p "Enter Memory (MB) [$ENV_DEFAULT_MEMORY]: " memory
     if [ -z "$memory" ]; then
@@ -235,7 +242,7 @@ else
     read -p "Enter Memory (MB): " memory
 fi
 
-# Handle Cores
+# Prompt for Cores
 if [ -n "$ENV_DEFAULT_CORES" ]; then
     read -p "Enter Cores [$ENV_DEFAULT_CORES]: " cores
     if [ -z "$cores" ]; then
@@ -246,7 +253,7 @@ else
     read -p "Enter Cores: " cores
 fi
 
-# Handle Disk Size
+# Prompt for Disk Size
 if [ -n "$ENV_DEFAULT_DISK_SIZE" ]; then
     read -p "Enter Disk Size (GB) [$ENV_DEFAULT_DISK_SIZE]: " disk_size
     if [ -z "$disk_size" ]; then
@@ -338,29 +345,63 @@ echo
 echo "================================================================"
 echo
 
-# Run nixos-generate command with the base template
-echo "Generating NXC Base template (this may take several minutes)..."
-output_dir=~/nxc-templates/nxc-base-$(date +%Y%m%d)
-nixos-generate -f proxmox-lxc \
-  --flake "$flake_base_url#nxc-base" \
-  -o "$output_dir"
-echo
-sleep 5
-echo "NXC Base template generation complete!"
-echo
-
-# Find the template filename
-template_filename=$(find "$output_dir/tarball" -name "*.tar.xz" -exec basename {} \; 2>/dev/null | head -n1)
-
-if [ -z "$template_filename" ]; then
-    echo "Error: Could not find template file in $output_dir/tarball"
-    exit 1
+# Check for existing NXC Templates on PVE Host
+echo "Checking PVE Host $pve_host for existing NXC base templates..."
+nxc_templates=$(ssh "root@$pve_host" "pveam list local | grep nxc-base" | awk '{print $1}' | sed 's|.*:vztmpl/||')
+if [ -n "$nxc_templates" ]; then
+    echo "Available NXC base templates on $pve_host:"
+    echo "----------------------------------------------"
+    echo "$nxc_templates" | nl -w2 -s'. '
+    echo
 fi
+# Prompt for template
+read -p "Select an existing NXC base template by number or press enter to generate new: " selection
 
-# Copy template to Proxmox host
-echo "Copying template to Proxmox host $pve_host..."
-scp "$output_dir/tarball/$template_filename" "root@$pve_host:/var/lib/vz/template/cache/lxc-base-$template_filename"
-echo
+# If Blank, generate new NXC base template
+if [ -z "$selection" ]; then
+    # Run nixos-generate command with the base template
+    echo "Generating new NXC Base template (this may take several minutes)..."
+    output_dir=~/nxc-templates/nxc-base-$(date +%Y%m%d)
+    nixos-generate -f proxmox-lxc \
+    --flake "$flake_base_url#nxc-base" \
+    -o "$output_dir"
+    echo
+    sleep 5
+    echo "New NXC Base template generation complete!"
+    echo
+
+    # Find the template filename
+    template_filename=$(find "$output_dir/tarball" -name "*.tar.xz" -exec basename {} \; 2>/dev/null | head -n1)
+
+    if [ -z "$template_filename" ]; then
+        echo "Error: Could not find template file in $output_dir/tarball"
+        exit 1
+    fi
+    template_path="/var/lib/vz/template/cache/nxc-base-$template_filename"
+
+    # Copy template to Proxmox host
+    echo "Copying template to Proxmox host $pve_host..."
+    scp "$output_dir/tarball/$template_filename" "root@$pve_host:$template_path"
+    echo
+else
+    # Check if the input is a number (matches a line number)
+    if [[ "$selection" =~ ^[0-9]+$ ]]; then
+        # Extract the corresponding template based on the number
+        template_filename=$(echo "$nxc_templates" | sed -n "${selection}p")
+    fi
+    # Check if the template actually exists in the list
+    if ! echo "$nxc_templates" | grep -Fxq "$template_filename"; then
+        echo "Invalid selection."
+        exit 1
+    fi
+
+    echo "You selected template $template_filename."
+    echo
+    echo "================================================================"
+    echo
+    
+    template_path="/var/lib/vz/template/cache/$template_filename"
+fi
 
 # Build network configuration
 net_config="name=eth0,bridge=vmbr0,ip=$ip_address"
@@ -370,7 +411,7 @@ fi
 
 # Create the container
 echo "Creating container on Proxmox host $pve_host..."
-ssh "root@$pve_host" "pct create $vmid /var/lib/vz/template/cache/lxc-base-$template_filename --hostname $hostname --memory $memory --cores $cores --rootfs local-zfs:$disk_size --unprivileged 1 --features nesting=1 --onboot 1 --tags nixos --net0 $net_config"
+ssh "root@$pve_host" "pct create $vmid $template_path --hostname $nxc_hostname --memory $memory --cores $cores --rootfs local-zfs:$disk_size --unprivileged 1 --features nesting=1 --onboot 1 --tags nixos --net0 $net_config"
 echo
 
 echo "Checking if $hostname has Tailscale enabled..."
@@ -448,7 +489,7 @@ echo "Initial Nix Configurtion Generation: $initial_generation"
 echo
 
 # Run nixos-rebuild
-echo "Running nixos-rebuild switch on new host $hostname"
+echo "Running nixos-rebuild switch on new host $nxc_hostname"
 ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/bash -c 'export PATH=\"/run/current-system/sw/bin:/nix/var/nix/profiles/system/sw/bin:\$PATH\" && nixos-rebuild switch --flake \"$flake_base_url#$hostname\" --impure --show-trace'"
 # ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/source /etc/set-environment && nixos-rebuild switch --flake '$flake_base_url#$hostname' --impure --show-trace"
 # pct exec 128 -- /run/current-system/sw/bin/nixos-rebuild switch --flake 'git+https://git.montycasa.net/patrick/nix-config.git#$omnitools' --impure --show-trace --option extra-sandbox-paths '/run/current-system/sw'
@@ -465,7 +506,7 @@ if ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/systemctl 
     echo
 fi
 
-if ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/hostname" 2>/dev/null | grep -q "$hostname"; then
+if ssh "root@$pve_host" "pct exec $vmid -- /run/current-system/sw/bin/hostname" 2>/dev/null | grep -q "$nxc_hostname"; then
     echo "✓ Hostname verification successful"
     final_success=true
 else
@@ -498,7 +539,7 @@ echo
 if [ "$final_success" = true ]; then
     echo "🎉 NixOS LXC container setup completed successfully!"
     echo "Container ID: $vmid"
-    echo "Hostname: $hostname"
+    echo "Hostname: $nxc_hostname"
     echo "IP Address: $container_ip"
     echo "Template: $template_filename"
     echo
@@ -506,7 +547,7 @@ else
     echo "⚠️  Container setup completed with warnings."
     echo "Please check the container manually:"
     echo "Container ID: $vmid"
-    echo "Expected hostname: $hostname"
+    echo "Expected hostname: $nxc_hostname"
     echo "IP Address: $container_ip"
     echo
 fi
