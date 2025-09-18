@@ -6,7 +6,8 @@
   home.packages = with pkgs; [
     kdePackages.kate
     google-chrome
-    inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.signal-desktop
+    signal-desktop
+    # inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.signal-desktop
     #cowsay
     obsidian
     # inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.notesnook ##installed via flatpak to get latest version
