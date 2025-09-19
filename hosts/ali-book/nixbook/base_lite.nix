@@ -82,11 +82,11 @@ in
     system-config-printer
   ];
 
-  nix.gc = {
-    automatic = true;
-    dates = "Mon 3:40";
-    options = "--delete-older-than 14d";
-  };
+  # nix.gc = {
+  #   automatic = true;
+  #   dates = "Mon 3:40";
+  #   options = "--delete-older-than 14d";
+  # };
   
   # Auto update config and channel
   systemd.timers."auto-update-config" = {
