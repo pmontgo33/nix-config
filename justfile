@@ -32,5 +32,5 @@ git-rpull remote:
   ssh root@{{remote}} "cd /etc/nixos && git pull https://github.com/pmontgo33/nixos-config.git"
 
 # this is a comment
-another-recipe:
-  @echo 'This is another recipe.'
+#another-recipe:
+#  @echo 'This is another recipe.'

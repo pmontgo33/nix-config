@@ -41,6 +41,26 @@
       ];
     };
 
+    ## ali-book ##
+    nixosConfigurations.ali-book = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = { inherit inputs; };
+      modules = [
+        ./hosts/ali-book
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
     ## plasma-vm-nixos ##
     nixosConfigurations.plasma-vm-nixos = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
