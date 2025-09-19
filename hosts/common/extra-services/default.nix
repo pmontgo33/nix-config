@@ -1,5 +1,6 @@
 {
   imports = [
+    ./auto-upgrade.nix
     ./desktop.nix
     ./tailscale.nix
     ./mount_home_media.nix
