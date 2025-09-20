@@ -31,8 +31,8 @@ in {
         ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.nixos-rebuild}/bin/nixos-rebuild boot --flake github:pmontgo33/nix-config/nixbooks#$(${pkgs.nettools}/bin/hostnamectl hostname) --refresh'";
       };
       
-      after = [ "network-online.target" "graphical.target" ];
-      wants = [ "network-online.target" ];
+      # after = [ "network-online.target" "graphical.target" ];
+      # wants = [ "network-online.target" ];
       
       wantedBy = [ "multi-user.target" ];
     };
