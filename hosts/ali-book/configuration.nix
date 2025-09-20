@@ -6,11 +6,6 @@
 
 {
 
-  systemd.services."auto-upgrade" = {
-    enable = false;
-    # You may need to add minimal config to make it valid
-  };
-
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
