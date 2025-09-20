@@ -12,7 +12,11 @@
       # ./nixbook/base_lite.nix
     ];
 
-  extra-services.auto-upgrade.enable = true;
+  # extra-services.auto-upgrade.enable = true;
+
+  # Enable services for removable media support
+  services.udisks2.enable = true;
+  services.gvfs.enable = true;
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
@@ -75,7 +79,7 @@
   users.users.aleandra = {
     isNormalUser = true;
     description = "Aleandra";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "storage" ];
     packages = with pkgs; [
     #  thunderbird
       simplex-chat-desktop
