@@ -10,8 +10,22 @@
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "ehci_pci" "usb_storage" "sd_mod" "rtsx_usb_sdmmc" ];
   boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-amd" ];
   boot.extraModulePackages = [ ];
+
+  # Ensure SD card reader support
+  boot.kernelModules = [ 
+    "kvm-amd"
+    "mmc_core" 
+    "mmc_block" 
+    "sdhci" 
+    "sdhci-pci" 
+    "sdhci-acpi"
+    "rtsx_pci_sdmmc"  # For Realtek readers
+    "rtsx_usb_sdmmc"  # For USB Realtek readers
+  ];
+  
+  # Enable additional firmware if needed
+  hardware.enableRedistributableFirmware = true;
 
   fileSystems."/" =
     { device = "/dev/disk/by-uuid/cd235fe2-498c-4d12-bacb-32ce622927b9";
