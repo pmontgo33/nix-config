@@ -6,12 +6,6 @@
 
 {
 
-  system.autoUpgrade = {
-    enable = false;
-    # You may need to add minimal config to make it valid
-    flake = "github:pmontgo33/nix-config";
-  };
-
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
