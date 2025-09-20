@@ -8,7 +8,7 @@
   imports =
     [ # Include the results of the hardware scan.
       ./hardware-configuration.nix
-      ./nixbook/base_lite.nix
+      # ./nixbook/base_lite.nix
     ];
 
   # Bootloader.
@@ -49,9 +49,6 @@
     variant = "";
   };
 
-  # Enable CUPS to print documents.
-  services.printing.enable = true;
-
   # Enable sound with pipewire.
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
@@ -91,8 +88,15 @@
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
-  #  vim # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-  #  wget
+    git
+    firefox
+    libnotify
+    gawk
+    sudo
+    gnome-calculator
+    gnome-calendar
+    gnome-screenshot
+    system-config-printer
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
@@ -107,6 +111,36 @@
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
+
+  zramSwap.enable = true;
+  zramSwap.memoryPercent = 100;
+  systemd.extraConfig = ''
+    DefaultTimeoutStopSec=10s
+  '';
+
+  # Enable the X11 windowing system.
+  services.xserver.enable = true;
+  nixpkgs.config.allowUnfree = true;
+  hardware.bluetooth.enable = true;
+
+  # Enable the Cinnamon Desktop Environment.
+  services.xserver.displayManager.lightdm.enable = true;
+  services.xserver.desktopManager.cinnamon.enable = true;
+  xdg.portal.enable = true;
+
+  # Enable Printing
+  services.printing.enable = true;
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    openFirewall = true;
+  };
+  
+  # Fix for the pesky "insecure" broadcom
+  nixpkgs.config.allowInsecurePredicate = pkg:
+    builtins.elem (lib.getName pkg) [
+    "broadcom-sta" # aka “wl”
+  ];
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
