@@ -15,8 +15,8 @@
   # extra-services.auto-upgrade.enable = true;
 
   # Enable services for removable media support
-  services.udisks2.enable = true;
-  services.gvfs.enable = true;
+  # services.udisks2.enable = true;
+  # services.gvfs.enable = true;
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
@@ -74,6 +74,13 @@
 
   # Enable touchpad support (enabled default in most desktopManager).
   # services.xserver.libinput.enable = true;
+
+  # Filesystem configuration
+  fileSystems."/home" = {
+    device = "/dev/disk/by-uuid/your-uuid-here";
+    fsType = "ext4";
+    options = [ "defaults" "user_xattr" "acl" ];
+  };
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.aleandra = {
