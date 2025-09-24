@@ -114,7 +114,7 @@
     gawk
     sudo
     gnome-calculator
-    gnome-calendar
+    # gnome-calendar
     gnome-screenshot
     system-config-printer
   ];
