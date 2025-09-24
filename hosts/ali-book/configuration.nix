@@ -77,7 +77,7 @@
 
   # Filesystem configuration
   fileSystems."/home" = {
-    device = "/dev/disk/by-uuid/your-uuid-here";
+    device = "/dev/disk/by-uuid/fcf87905-cdb2-48d3-bf33-7e47d50e33f4";
     fsType = "ext4";
     options = [ "defaults" "user_xattr" "acl" ];
   };
