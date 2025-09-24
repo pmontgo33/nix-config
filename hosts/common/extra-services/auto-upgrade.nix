@@ -28,10 +28,10 @@ in {
         CPUWeight = "20";
         IOWeight = "20";
         MemoryHigh = "500M";
-        ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.nixos-rebuild}/bin/nixos-rebuild boot --flake github:pmontgo33/nix-config/nixbooks#$(${pkgs.nettools}/bin/hostname) --refresh'";
+        ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.nixos-rebuild}/bin/nixos-rebuild boot --flake github:pmontgo33/nix-config/$(${pkgs.nettools}/bin/hostname) --refresh'";
       };
       
-      # after = [ "network-online.target" "graphical.target" ];
+      after = [ "network-online.target" "graphical.target" ];
       wants = [ "network-online.target" ];
       
       wantedBy = [ "multi-user.target" ];
