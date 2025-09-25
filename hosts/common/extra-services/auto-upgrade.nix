@@ -28,7 +28,19 @@ in {
         CPUWeight = "20";
         IOWeight = "20";
         MemoryHigh = "500M";
-        ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.nixos-rebuild}/bin/nixos-rebuild boot --flake github:pmontgo33/nix-config$$(${pkgs.nettools}/bin/hostname) --refresh'";
+        ExecStart = pkgs.writeShellScript "auto-upgrade" ''
+          set -euo pipefail
+          
+          echo "Starting auto-upgrade for hostname: $(hostname)"
+          
+          # Run nixos-rebuild boot with the current hostname
+          nixos-rebuild boot --flake github:pmontgo33/nix-config/#$(hostname) --refresh
+          
+          # Run the curl command
+          
+          
+          echo "Auto-upgrade completed successfully"
+        '';
       };
       
       after = [ "network-online.target" "graphical.target" ];
