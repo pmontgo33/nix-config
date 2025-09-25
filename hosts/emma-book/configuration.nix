@@ -22,7 +22,7 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  networking.hostName = "ali-book"; # Define your hostname.
+  networking.hostName = "emma-book"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
   # Configure network proxy if necessary
@@ -76,22 +76,22 @@
   # services.xserver.libinput.enable = true;
 
   # Filesystem configuration
-  fileSystems."/home" = {
-    device = "/dev/disk/by-uuid/fcf87905-cdb2-48d3-bf33-7e47d50e33f4";
-    fsType = "ext4";
-    options = [ 
-      "defaults" 
-      "user_xattr" 
-      "acl" 
-      "noatime"        # Reduce write operations
-      "commit=60"      # Commit changes every 60 seconds
-    ];
-  };
+  # fileSystems."/home" = {
+  #   device = "/dev/disk/by-uuid/fcf87905-cdb2-48d3-bf33-7e47d50e33f4";
+  #   fsType = "ext4";
+  #   options = [ 
+  #     "defaults" 
+  #     "user_xattr" 
+  #     "acl" 
+  #     "noatime"        # Reduce write operations
+  #     "commit=60"      # Commit changes every 60 seconds
+  #   ];
+  # };
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
-  users.users.aleandra = {
+  users.users.emma = {
     isNormalUser = true;
-    description = "Aleandra";
+    description = "Emma";
     extraGroups = [ "networkmanager" "wheel" "storage" ];
     packages = with pkgs; [
     #  thunderbird
