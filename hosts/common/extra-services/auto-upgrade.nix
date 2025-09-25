@@ -31,14 +31,16 @@ in {
         ExecStart = pkgs.writeShellScript "auto-upgrade" ''
           set -euo pipefail
           
-          echo "Starting auto-upgrade for hostname: $(hostname)"
+          # Explicitly set PATH to include necessary binaries
+          export PATH="${lib.makeBinPath [ pkgs.nixos-rebuild pkgs.nettools pkgs.nix pkgs.git ]}:$PATH"
+          
+          echo "Starting auto-upgrade for hostname: $(${pkgs.nettools}/bin/hostname)"
           
           # Run nixos-rebuild boot with the current hostname
-          nixos-rebuild boot --flake github:pmontgo33/nix-config/#$(hostname) --refresh
+          ${pkgs.nixos-rebuild}/bin/nixos-rebuild boot --flake github:pmontgo33/nix-config/#$(${pkgs.nettools}/bin/hostname) --refresh
           
           # Run the curl command
-          
-          
+
           echo "Auto-upgrade completed successfully"
         '';
       };

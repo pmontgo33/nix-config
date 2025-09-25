@@ -19,6 +19,7 @@
 #   extra-services.tmux.enable = true;
   extra-services.mount_home_media.enable = true;
   extra-services.pbs-home-dirs.enable = true;
+  extra-services.auto-upgrade.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
