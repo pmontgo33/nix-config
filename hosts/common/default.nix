@@ -41,20 +41,6 @@
     options = "--delete-older-than 14d";
   };
 
-  system.autoUpgrade = {
-    enable = true;
-    flake = inputs.self.outPath;
-    flags = [
-      "--update-input" "nixpkgs"
-      "--update-input" "nixpkgs-unstable"
-      "--update-input" "home-manager"
-      "--commit-lock-file"
-      "-L" # print build logs
-    ];
-    dates = "weekly";
-    randomizedDelaySec = "45min";
-    persistent = true;
-    operation = "boot";
-  };
+  
 
 }
