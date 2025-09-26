@@ -76,17 +76,17 @@
   # services.xserver.libinput.enable = true;
 
   # Filesystem configuration
-  # fileSystems."/home" = {
-  #   device = "/dev/disk/by-uuid/fcf87905-cdb2-48d3-bf33-7e47d50e33f4";
-  #   fsType = "ext4";
-  #   options = [ 
-  #     "defaults" 
-  #     "user_xattr" 
-  #     "acl" 
-  #     "noatime"        # Reduce write operations
-  #     "commit=60"      # Commit changes every 60 seconds
-  #   ];
-  # };
+  fileSystems."/home" = {
+    device = "/dev/disk/by-uuid/0f2ce08a-5508-4532-b82e-c9007e22776d";
+    fsType = "ext4";
+    options = [ 
+      "defaults" 
+      "user_xattr" 
+      "acl" 
+      "noatime"        # Reduce write operations
+      "commit=60"      # Commit changes every 60 seconds
+    ];
+  };
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.emma = {
