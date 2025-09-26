@@ -12,7 +12,7 @@
       # ./nixbook/base_lite.nix
     ];
 
-  # extra-services.auto-upgrade.enable = true;
+  extra-services.auto-upgrade.enable = true;
 
   # Enable services for removable media support
   # services.udisks2.enable = true;
