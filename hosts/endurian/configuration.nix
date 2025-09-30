@@ -27,23 +27,16 @@
     "d /var/lib/endurain/uploads 0755 root root -"
   ];
 
-    sops = {
-      defaultSopsFile = ../../../secrets/secrets.yaml;
-      secrets = {
-        "endurain-db-password" = {};
-      };
-    };
-
   # sops secrets configuration
   sops.secrets = {
     endurain-db-password = {
-      sopsFile = ../../../secrets/secrets.yaml;
+      sopsFile = ../../secrets/secrets.yaml;
       owner = "root";
       group = "root";
       mode = "0400";
     };
     endurain-secret-key = {
-      sopsFile = ../../../secrets/secrets.yaml;
+      sopsFile = ../../secrets/secrets.yaml;
       owner = "root";
       group = "root";
       mode = "0400";
