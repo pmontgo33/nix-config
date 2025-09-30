@@ -1,5 +1,4 @@
-# endurain.nix
-{ config, pkgs, ... }:
+{ config, pkgs, modulesPath, inputs, outputs, ... }:
 
 {
 
