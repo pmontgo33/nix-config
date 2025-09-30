@@ -127,4 +127,8 @@
   systemd.services.podman-endurain-db.after = [ "init-endurain-network.service" ];
   systemd.services.podman-endurain-api.after = [ "init-endurain-network.service" ];
   systemd.services.podman-endurain-redis.after = [ "init-endurain-network.service" ];
+
+  networking.firewall.allowedTCPPorts = [ 8000 ];
+  
+  system.stateVersion = "25.05";
 }
