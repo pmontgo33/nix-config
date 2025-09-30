@@ -120,7 +120,7 @@
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.podman}/bin/podman network exists endurain-net || ${pkgs.podman}/bin/podman network create endurain-net";
+      ExecStart = "${pkgs.bash}/bin/bash -c '${pkgs.podman}/bin/podman network inspect endurain-net >/dev/null 2>&1 || ${pkgs.podman}/bin/podman network create endurain-net'";
     };
   };
 
