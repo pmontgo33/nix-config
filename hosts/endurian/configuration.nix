@@ -29,47 +29,29 @@ in
   systemd.tmpfiles.rules = [
     "d /var/lib/endurain 0755 root root -"
     "d /var/lib/endurain/postgresql 0755 70 70 -"
-    "d /var/lib/endurain/uploads 0755 root root -"
-    "d /var/lib/endurain/strava_tmp 0755 root root -"
+    "d /var/lib/endurain/backend/logs 0755 root root -"
+    "d /var/lib/endurain/backend/data 0755 root root -"
   ];
 
   # sops secrets configuration
-  sops.secrets = {
-    endurain-db-password = {
-      sopsFile = ../../secrets/secrets.yaml;
-      owner = "root";
-      group = "root";
-      mode = "0400";
-    };
-    endurain-first-user-email = {
-      sopsFile = ../../secrets/secrets.yaml;
-      owner = "root";
-      group = "root";
-      mode = "0400";
-    };
-    endurain-first-user-password = {
-      sopsFile = ../../secrets/secrets.yaml;
-      owner = "root";
-      group = "root";
-      mode = "0400";
-    };
+  sops.secrets."endurian-env" = {
+    sopsFile = ../../secrets/secrets.yaml;
+    owner = "root";
+    group = "root";
+    mode = "0400";
   };
 
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {
       endurain-db = {
-        image = "docker.io/library/postgres:16-alpine";
+        image = "docker.io/postgres:17.5";
         autoStart = true;
-        environment = {
-          POSTGRES_DB = "endurain";
-          POSTGRES_USER = "endurain";
-          POSTGRES_PASSWORD_FILE = "/run/secrets/db-password";
-          PGDATA = "/var/lib/postgresql/data/pgdata";
-        };
+        environmentFiles = [
+          config.sops.secrets."endurian-env".path
+        ];
         volumes = [
           "/var/lib/endurain/postgresql:/var/lib/postgresql/data"
-          "${config.sops.secrets.endurain-db-password.path}:/run/secrets/db-password:ro"
         ];
         extraOptions = [
           "--network=endurain-net"
@@ -87,35 +69,15 @@ in
         ports = [
           "8080:8080"
         ];
-        environment = {
-          TZ = "America/New_York";
-          # Database settings
-          ENDURAIN_DATABASE_HOST = "endurain-db";
-          ENDURAIN_DATABASE_PORT = "5432";
-          ENDURAIN_DATABASE_NAME = "endurain";
-          ENDURAIN_DATABASE_USER = "endurain";
-          # UID/GID
-          UID = "1000";
-          GID = "1000";
-        };
         environmentFiles = [
-          config.sops.secrets.endurain-db-password.path
-          config.sops.secrets.endurain-first-user-email.path
-          config.sops.secrets.endurain-first-user-password.path
-          # Optional: Add Strava secrets
-          # config.sops.secrets.endurain-strava-client-id.path
-          # config.sops.secrets.endurain-strava-client-secret.path
+          config.sops.secrets."endurian-env".path
         ];
         volumes = [
-          "/var/lib/endurain/uploads:/app/uploads"
-          "/var/lib/endurain/strava_tmp:/app/strava_tmp"
+          "/var/lib/endurain/backend/data:/app/backend/data"
+          "/var/lib/endurain/backend/logs:/app/backend/logs"
         ];
         extraOptions = [
           "--network=endurain-net"
-          "--health-cmd=curl -f http://localhost:8080/api/health || exit 1"
-          "--health-interval=30s"
-          "--health-timeout=10s"
-          "--health-retries=3"
         ];
       };
     };
@@ -133,7 +95,10 @@ in
   };
 
   systemd.services.podman-endurain-db.after = [ "init-endurain-network.service" ];
-  systemd.services.podman-endurain.after = [ "init-endurain-network.service" ];
+  systemd.services.your-app = {
+    after = [ "init-endurain-network.service" "postgresql.service" ];
+    requires = [ "postgresql.service" ];
+  };
 
   networking.firewall.allowedTCPPorts = [ 8080 ];
 
