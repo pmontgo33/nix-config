@@ -65,7 +65,7 @@ in
       endurain = {
         image = "ghcr.io/joaovitoriasilva/endurain:latest";
         autoStart = true;
-        dependsOn = [ "endurain-db" ];
+        # dependsOn = [ "endurain-db" ];
         ports = [
           "8080:8080"
         ];
