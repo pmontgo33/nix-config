@@ -34,7 +34,7 @@ in
   ];
 
   # sops secrets configuration
-  sops.secrets."endurian-env" = {
+  sops.secrets."endurain-env" = {
     sopsFile = ../../secrets/secrets.yaml;
     owner = "root";
     group = "root";
@@ -48,7 +48,7 @@ in
         image = "docker.io/postgres:17.5";
         autoStart = true;
         environmentFiles = [
-          config.sops.secrets."endurian-env".path
+          config.sops.secrets."endurain-env".path
         ];
         volumes = [
           "/var/lib/endurain/postgresql:/var/lib/postgresql/data"
@@ -70,7 +70,7 @@ in
           "8080:8080"
         ];
         environmentFiles = [
-          config.sops.secrets."endurian-env".path
+          config.sops.secrets."endurain-env".path
         ];
         volumes = [
           "/var/lib/endurain/backend/data:/app/backend/data"
