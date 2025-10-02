@@ -11,12 +11,14 @@
   */
 
 {config, lib, ...}:
+
 with lib; let
   cfg = config.extra-services.tailscale;
 in {
   options.extra-services.tailscale.enable = mkEnableOption "enable tailscale config";
-  
+
   config = mkIf cfg.enable {
+
     # sops secrets configuration
     sops = {
       defaultSopsFile = ../../../secrets/secrets.yaml;
@@ -24,9 +26,10 @@ in {
         "tailscale_auth_key" = {};
       };
     };
-    
+
     services.tailscale = {
       enable = true;
+  #    interfaceName = "userspace-networking";
       openFirewall = true;
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
       useRoutingFeatures = "client";
@@ -35,19 +38,20 @@ in {
         "--reset"
         "--ssh"
         "--accept-routes"
-        "--accept-dns=true"
+      #  "--accept-dns=false"
       ];
     };
-    
-    services.resolved.enable = false;
-        
+
+    networking.nameservers = [ "100.100.100.100" "1.1.1.1" "1.0.0.1" "192.168.86.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
-    
     networking.firewall.allowedUDPPorts = [ 41641 ];
     networking.firewall.trustedInterfaces = [ "tailscale0" ];
-    
+
     networking.localCommands = ''
       ip rule add to 192.168.86.0/24 priority 2500 lookup main
     '';
+  
   };
+
+  
 }
