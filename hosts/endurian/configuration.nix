@@ -23,9 +23,9 @@
   systemd.tmpfiles.rules = [
     "d /var/lib/endurain 0755 root root -"
     "d /var/lib/endurain/postgresql 0700 999 999 -"
-    "d /var/lib/endurain/backend 0755 root root -"
-    "d /var/lib/endurain/backend/logs 0755 root root -"
-    "d /var/lib/endurain/backend/data 0755 root root -"
+    "d /var/lib/endurain/backend 0755 1000 1000 -"
+    "d /var/lib/endurain/backend/logs 0755 1000 1000 -"
+    "d /var/lib/endurain/backend/data 0755 1000 1000 -"
   ];
 
   # sops secrets configuration
