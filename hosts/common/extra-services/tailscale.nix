@@ -44,6 +44,6 @@ in {
     networking.search = [ "skink-galaxy.ts.net" ];
     
     # networking.firewall.allowedUDPPorts = [ 41641 ];
-    # networking.firewall.trustedInterfaces = [ "tailscale0" "eth0" ];
+    networking.firewall.trustedInterfaces = [ "tailscale0" "eth0" ];
   };
 }
