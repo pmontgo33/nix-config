@@ -28,6 +28,7 @@ in {
     services.tailscale = {
       enable = true;
       openFirewall = true;
+      interfaceName = "userspace-networking";
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
       # useRoutingFeatures = "client";
       extraUpFlags = [
@@ -44,7 +45,7 @@ in {
     networking.search = [ "skink-galaxy.ts.net" ];
     
     # networking.firewall.allowedUDPPorts = [ 41641 ];
-    networking.firewall.trustedInterfaces = [ "eth0" ];
+    # networking.firewall.trustedInterfaces = [ "tailscale0" "eth0" ];
 
     # boot.kernel.sysctl = {
     #   "net.ipv4.conf.all.rp_filter" = 0;
@@ -56,5 +57,5 @@ in {
     #   ip rule add from 192.168.86.0/24 table main priority 100
     #   ip rule add to 192.168.86.0/24 table main priority 100
     # '';
-  };
+    #   };
 }
