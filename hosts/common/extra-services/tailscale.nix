@@ -49,7 +49,12 @@ in {
     boot.kernel.sysctl = {
       "net.ipv4.conf.all.rp_filter" = 0;
       "net.ipv4.conf.default.rp_filter" = 0;
-      "net.ipv4.conf.eth0.rp_filter" = 0;
     };
-  };
+
+    networking.localCommands = ''
+      # Force local subnet traffic to use main routing table
+      ip rule add from 192.168.86.0/24 table main priority 100
+      ip rule add to 192.168.86.0/24 table main priority 100
+    '';
+      };
 }
