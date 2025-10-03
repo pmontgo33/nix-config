@@ -22,6 +22,10 @@ in {
     };
 
   };
+  
+  imports = [
+    ../../../secrets
+  ];
 
   config = mkIf cfg.enable {
     # sops secrets configuration
