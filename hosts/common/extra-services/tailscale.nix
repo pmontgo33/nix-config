@@ -12,14 +12,21 @@ with lib; let
   cfg = config.extra-services.tailscale;
 in {
   options.extra-services.tailscale = {
+    
     enable = mkEnableOption "enable tailscale config";
+    
     lxc = mkOption {
       type = types.bool;
       default = false;
       description = "Enable LXC mode (userspace networking)";
     };
+
   };
   
+  imports = [
+    ../../../secrets
+  ];
+
   config = mkIf cfg.enable {
     # sops secrets configuration
     sops = {
