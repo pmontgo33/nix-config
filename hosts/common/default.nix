@@ -34,10 +34,10 @@
       ];
   };
 
-  systemd.tmpfiles.rules = [
-    "r /root/justfile"
-    "C /root/justfile 0644 root root - ${./.dotfiles/justfile}"
-  ];
+  system.activationScripts.copyJustfile = ''
+    cp -f ${./.dotfiles/justfile} /root/justfile
+    chmod 644 /root/justfile
+  '';
 
   # Automatic Garbage Collection
   nix.gc = {
