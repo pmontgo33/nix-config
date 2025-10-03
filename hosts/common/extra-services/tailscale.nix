@@ -10,28 +10,17 @@
 {config, lib, ...}:
 with lib; let
   cfg = config.extra-services.tailscale;
-  
-  # Detect if running in LXC container
-  detectIsLXC = builtins.pathExists "/run/systemd/container" && 
-                (builtins.readFile "/run/systemd/container") == "lxc\n" ||
-                builtins.pathExists "/proc/1/cgroup" && 
-                builtins.match ".*lxc.*" (builtins.readFile "/proc/1/cgroup") != null;
 in {
   options.extra-services.tailscale = {
     enable = mkEnableOption "enable tailscale config";
     lxc = mkOption {
       type = types.bool;
-      default = detectIsLXC;
-      description = "Enable LXC mode (userspace networking). Auto-detected by default.";
+      default = false;
+      description = "Enable LXC mode (userspace networking)";
     };
   };
   
-  
   config = mkIf cfg.enable {
-    warnings = [ 
-      "Tailscale detectIsLXC: ${if detectIsLXC then "true" else "false"}"
-      "Tailscale cfg.lxc: ${if cfg.lxc then "true" else "false"}"
-    ];
     # sops secrets configuration
     sops = {
       # defaultSopsFile = ../../../secrets/secrets.yaml;
