@@ -25,6 +25,10 @@ in {
       description = "Enable LXC mode (userspace networking). Auto-detected by default.";
     };
   };
+  warnings = [ 
+    "Tailscale detectIsLXC: ${builtins.toString detectIsLXC}"
+    "Tailscale cfg.lxc: ${builtins.toString cfg.lxc}"
+  ];
   
   config = mkIf cfg.enable {
     # sops secrets configuration
