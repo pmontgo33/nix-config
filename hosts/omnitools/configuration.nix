@@ -6,10 +6,14 @@
   ];
 
   environment.systemPackages = with pkgs; [
-    podman
-    podman-compose
+    
   ];
 
+  extra-services.tailscale = {
+    enable = true;
+    lxc = true;
+  };
+  
   services.openssh.enable = true;
 
   virtualisation.containers.enable = true;
