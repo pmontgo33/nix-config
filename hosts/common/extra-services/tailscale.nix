@@ -30,12 +30,12 @@ in {
       openFirewall = true;
       interfaceName = "userspace-networking";
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
-      # useRoutingFeatures = "client";
+      useRoutingFeatures = "client";
       extraUpFlags = [
         "--force-reauth"
         "--reset"
         "--ssh"
-        # "--accept-routes"
+        "--accept-routes"
         "--accept-dns=false"
       ];
     };
@@ -44,18 +44,5 @@ in {
     networking.nameservers = [ "100.100.100.100" "192.168.86.1" "1.1.1.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
     
-    # networking.firewall.allowedUDPPorts = [ 41641 ];
-    # networking.firewall.trustedInterfaces = [ "tailscale0" "eth0" ];
-
-    # boot.kernel.sysctl = {
-    #   "net.ipv4.conf.all.rp_filter" = 0;
-    #   "net.ipv4.conf.default.rp_filter" = 0;
-    # };
-
-    # networking.localCommands = ''
-    #   # Force local subnet traffic to use main routing table
-    #   ip rule add from 192.168.86.0/24 table main priority 100
-    #   ip rule add to 192.168.86.0/24 table main priority 100
-    # '';
   };
 }
