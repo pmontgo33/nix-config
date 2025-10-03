@@ -29,12 +29,12 @@ in {
       enable = true;
       openFirewall = true;
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
-      useRoutingFeatures = "client";
+      # useRoutingFeatures = "client";
       extraUpFlags = [
         "--force-reauth"
         "--reset"
         "--ssh"
-        "--accept-routes"
+        # "--accept-routes"
         "--accept-dns=true"
       ];
     };
