@@ -35,7 +35,7 @@
   };
 
   systemd.tmpfiles.rules = [
-    "C+ /root/justfile - - - - ${./.dotfiles/justfile}"
+    "C+ /root/justfile 0644 root root - ${./.dotfiles/justfile}"
   ];
 
   # Automatic Garbage Collection
