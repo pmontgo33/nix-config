@@ -39,8 +39,13 @@ in {
       ];
     };
     
-    services.resolved.enable = false;
-    
+    # services.resolved.enable = false;
+    services.resolved = {
+      enable = true;
+      dnssec = "allow-downgrade";
+      fallbackDns = [ "1.1.1.1" "1.0.0.1" ];
+    };
+
     networking.nameservers = [ "100.100.100.100" "192.168.86.1" "1.1.1.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
     
