@@ -13,7 +13,7 @@
     ];
 
   extra-services.desktop.enable = true;
-  extra-services.tailscale.enable = true;
+  # extra-services.tailscale.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
