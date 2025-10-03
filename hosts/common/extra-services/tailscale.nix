@@ -29,8 +29,8 @@ in {
   
   config = mkIf cfg.enable {
     warnings = [ 
-      "Tailscale detectIsLXC: ${builtins.toString detectIsLXC}"
-      "Tailscale cfg.lxc: ${builtins.toString cfg.lxc}"
+      "Tailscale detectIsLXC: ${if detectIsLXC then "true" else "false"}"
+      "Tailscale cfg.lxc: ${if cfg.lxc then "true" else "false"}"
     ];
     # sops secrets configuration
     sops = {
