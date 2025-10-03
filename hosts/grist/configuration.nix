@@ -7,7 +7,10 @@
     ../../secrets
   ];
 
-  extra-services.tailscale.enable = true;
+  extra-services.tailscale = {
+    enable = true;
+    lxc = true;
+  };
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
