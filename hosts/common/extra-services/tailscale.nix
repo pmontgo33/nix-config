@@ -57,5 +57,5 @@ in {
     #   ip rule add from 192.168.86.0/24 table main priority 100
     #   ip rule add to 192.168.86.0/24 table main priority 100
     # '';
-    #   };
+  };
 }
