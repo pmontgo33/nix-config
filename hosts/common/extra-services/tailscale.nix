@@ -22,15 +22,11 @@ in {
     };
 
   };
-  
-  imports = [
-    ../../../secrets
-  ];
 
   config = mkIf cfg.enable {
     # sops secrets configuration
     sops = {
-      defaultSopsFile = ../../../secrets/secrets.yaml;
+      # defaultSopsFile = ../../../secrets/secrets.yaml;
       secrets = {
         "tailscale_auth_key" = {};
       };
