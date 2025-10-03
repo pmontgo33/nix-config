@@ -37,10 +37,6 @@
   systemd.tmpfiles.rules = [
     "C /root/justfile - - - - ${./.dotfiles/justfile}"
   ];
-  system.activationScripts.debugPath = ''
-    echo "Source path: ${./.dotfiles/justfile}"
-    ls -la ${./.dotfiles/justfile}
-  '';
 
   # Automatic Garbage Collection
   nix.gc = {

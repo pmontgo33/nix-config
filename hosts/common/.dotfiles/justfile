@@ -1,5 +1,5 @@
 nrs host="$HOSTNAME":
-  sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}}
+  sudo nixos-rebuild switch --flake github:pmontgo33/nix-config#{{host}} --refresh
 
 nrs-wtf host="$HOSTNAME":
-  sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --show-trace --print-build-logs --verbose
+  sudo nixos-rebuild switch --flake github:pmontgo33/nix-config#{{host}} --refresh --show-trace --print-build-logs --verbose
