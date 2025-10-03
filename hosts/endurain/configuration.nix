@@ -7,7 +7,7 @@
     ../../secrets
   ];
 
-  extra-services.tailscale.enable = true;
+  # extra-services.tailscale.enable = true;
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
@@ -98,7 +98,7 @@
     };
   };
 
-  #networking.firewall.allowedTCPPorts = [ 8080 ];
-  networking.firewall.enable = false;
+  networking.firewall.allowedTCPPorts = [ 8080 ];
+
   system.stateVersion = "25.05";
 }
