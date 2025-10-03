@@ -46,9 +46,10 @@ in {
     # networking.firewall.allowedUDPPorts = [ 41641 ];
     networking.firewall.trustedInterfaces = [ "tailscale0" "eth0" ];
 
-    networking.localCommands = ''
-      ip rule add from 192.168.86.0/24 priority 2500 lookup main
-      ip rule add to 192.168.86.0/24 priority 2500 lookup main
-    '';
+    boot.kernel.sysctl = {
+      "net.ipv4.conf.all.rp_filter" = 0;
+      "net.ipv4.conf.default.rp_filter" = 0;
+      "net.ipv4.conf.eth0.rp_filter" = 0;
+    };
   };
 }
