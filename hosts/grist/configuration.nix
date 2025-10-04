@@ -15,7 +15,7 @@
   sops = {
       # defaultSopsFile = ../../../secrets/secrets.yaml;
       secrets = {
-        "grist_email" = {};
+        "grist-env" = {};
       };
     };
 
