@@ -67,6 +67,17 @@
         autoStart = true;
         environmentFiles = [
           config.sops.secrets."endurain-env".path
+          # DB_HOST
+          # DB_PASSWORD
+          # POSTGRES_PASSWORD
+          # SECRET_KEY
+          # FERNET_KEY
+          # TZ=
+          # ENDURAIN_HOST
+          # BEHIND_PROXY
+          # POSTGRES_DB
+          # POSTGRES_USER
+          # PGDATA
         ];
         volumes = [
           "/var/lib/endurain/postgresql:/var/lib/postgresql/data"
