@@ -12,6 +12,13 @@
     lxc = true;
   };
 
+  sops = {
+      # defaultSopsFile = ../../../secrets/secrets.yaml;
+      secrets = {
+        "grist_email" = {};
+      };
+    };
+
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
@@ -32,7 +39,7 @@
     backend = "podman";
     containers = {
       grist = {
-        image = "gristlabs/grist-oss:latest";
+        image = "gristlabs/grist:latest";
         autoStart = true;
         ports = [
           "8484:8484"
@@ -43,9 +50,11 @@
         volumes = [
           "/var/lib/grist/persist:/persist"
         ];
-        environment = {
-          
-        };
+        environmentFiles = [
+          config.sops.secrets."grist-env".path
+          # GRIST_DEFAULT_EMAIL
+          # GRIST_SESSION_SECRET
+        ];
       };
     };
   };
