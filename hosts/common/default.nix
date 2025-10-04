@@ -4,7 +4,7 @@
 
   imports =
     [
-      ./extra-services
+      ../../modules
     ];
 
   environment.systemPackages = with pkgs; [
