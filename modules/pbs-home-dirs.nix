@@ -9,7 +9,7 @@ in {
 
     # sops secrets configuration
     sops = {
-      defaultSopsFile = ../../../secrets/secrets.yaml;
+      # defaultSopsFile = ../secrets/secrets.yaml;
       secrets = {
         "pbs-password" = {};
         "pbs-fingerprint" = {};

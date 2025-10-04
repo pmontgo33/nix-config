@@ -1,6 +1,6 @@
 { config, pkgs, inputs, ... }: {
 
-  imports = [ ../../../hosts/common/extra-services ];
+  imports = [ ];
 
   users.users.patrick = {
     isNormalUser = true;

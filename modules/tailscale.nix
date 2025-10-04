@@ -24,7 +24,7 @@ in {
   };
   
   imports = [
-    ../../../secrets
+    ../secrets
   ];
 
   config = mkIf cfg.enable {
