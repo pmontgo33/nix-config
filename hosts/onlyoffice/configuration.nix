@@ -38,8 +38,8 @@
     # postgresHost = "localhost"; 
   };
 
-  # networking.firewall.allowedTCPPorts = [ 8000 ];
-  networking.firewall.enable = false;
+  networking.firewall.allowedTCPPorts = [ 8000 ];
+  
 
   system.stateVersion = "25.05";
 }
