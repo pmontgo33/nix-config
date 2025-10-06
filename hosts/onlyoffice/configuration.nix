@@ -9,7 +9,11 @@
   sops = {
       # defaultSopsFile = ../../../secrets/secrets.yaml;
       secrets = {
-        "onlyoffice-jwt-secret" = {};
+        "onlyoffice-jwt-secret" = {
+          owner = "onlyoffice";
+          group = "onlyoffice";
+          mode = "0400";
+        };
       };
     };
 
