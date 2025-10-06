@@ -38,6 +38,10 @@
     # postgresHost = "localhost"; 
   };
 
+  systemd.services.onlyoffice-docservice.environment = {
+    NODE_ENV = "production";
+  };
+
   networking.firewall.allowedTCPPorts = [ 8000 ];
 
   system.stateVersion = "25.05";
