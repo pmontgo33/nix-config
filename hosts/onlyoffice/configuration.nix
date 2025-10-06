@@ -35,6 +35,7 @@
     enable = true;
     hostname = "theoffice.montycasa.com";
     jwtSecretFile = config.sops.secrets."onlyoffice-jwt-secret".path;
+    postgresHost = "localhost"; 
   };
 
   networking.firewall.allowedTCPPorts = [ 8000 ];
