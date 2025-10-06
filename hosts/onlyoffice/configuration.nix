@@ -13,6 +13,9 @@
           owner = "onlyoffice";
           group = "onlyoffice";
           mode = "0400";
+          
+          # Restart the service when the secret changes
+          restartUnits = [ "onlyoffice-docservice.service" ];
         };
       };
     };
