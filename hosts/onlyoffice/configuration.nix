@@ -38,11 +38,31 @@
     # postgresHost = "localhost"; 
   };
 
-  systemd.services.onlyoffice-docservice.environment = {
-    NODE_ENV = "production";
+  services.nginx = {
+    enable = true;
+    recommendedProxySettings = true;
+    
+    virtualHosts."theoffice.montycasa.com" = {
+      locations."/" = {
+        proxyPass = "http://localhost:8000";
+        proxyWebsockets = true;
+        extraConfig = ''
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+          proxy_set_header Host $http_host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Host $http_host;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        '';
+      };
+    };
   };
+  
+  networking.firewall.allowedTCPPorts = [ 80 443 8000 ];
 
-  networking.firewall.allowedTCPPorts = [ 8000 ];
+  # networking.firewall.allowedTCPPorts = [ 8000 ];
 
   system.stateVersion = "25.05";
 }
