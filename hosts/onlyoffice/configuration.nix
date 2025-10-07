@@ -39,6 +39,7 @@
   };
 
   networking.firewall.allowedTCPPorts = [ 8000 ];
+  
 
   system.stateVersion = "25.05";
 }
