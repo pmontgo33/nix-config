@@ -28,7 +28,7 @@
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.immich;
     host = "0.0.0.0";
     port = 2283;
-    mediaLocation = "/mnt/home_media/immich";
+    #mediaLocation = "/mnt/home_media/immich";
     accelerationDevices = null;
     environment = {
       TZ = "America/New_York";
