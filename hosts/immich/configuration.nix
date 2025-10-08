@@ -52,9 +52,28 @@
     database = {
       enable = true;
       createDB = true;
-      # name = "immich";
-      # user = "postgres";
     };
+  };
+
+  # Fix permissions on existing database
+  systemd.services.immich-fix-db-permissions = {
+    description = "Fix Immich database permissions";
+    after = [ "postgresql.service" ];
+    before = [ "immich-server.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      User = "postgres";
+    };
+    script = ''
+      # Grant all privileges to immich user on existing database
+      ${pkgs.postgresql}/bin/psql -d immich -c "GRANT ALL PRIVILEGES ON DATABASE immich TO immich;" || true
+      ${pkgs.postgresql}/bin/psql -d immich -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO immich;" || true
+      ${pkgs.postgresql}/bin/psql -d immich -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO immich;" || true
+      ${pkgs.postgresql}/bin/psql -d immich -c "ALTER DATABASE immich OWNER TO immich;" || true
+      ${pkgs.postgresql}/bin/psql -d immich -c "ALTER SCHEMA public OWNER TO immich;" || true
+    '';
   };
 
   # Add immich user to video and render groups for hardware acceleration
