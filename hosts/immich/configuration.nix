@@ -19,14 +19,15 @@
 
   # Create necessary directories
   systemd.tmpfiles.rules = [
-    "d /mnt/home_media 0750 immich immich -"
+    "d /mnt/home_media 0755 root root -"
+    "d /mnt/home_media/immich 0750 immich immich -"
   ];
 
   # Immich service configuration
   services.immich = {
     enable = true;
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.immich;
-    # host = "0.0.0.0";
+    host = "0.0.0.0";
     port = 2283;
     openFirewall = true;
     mediaLocation = "/mnt/home_media/immich";
@@ -38,12 +39,11 @@
       #server.externalDomain = "";
       newVersionCheck.enabled = true;
     };
-  };
 
-  # PostgreSQL database configuration (automatically managed by the module)
-  services.immich.database = {
-    enable = true;
-    createDB = true;
+    database = {
+      enable = true;
+      createDB = true;
+    };
   };
 
   # Add immich user to video and render groups for hardware acceleration
