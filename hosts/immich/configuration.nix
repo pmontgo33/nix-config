@@ -19,7 +19,7 @@
 
   # Create necessary directories
   systemd.tmpfiles.rules = [
-    "d /mnt/home_media 0755 immich immich -"
+    "d /mnt/home_media 0755 root root -"
     # "d /mnt/home_media/immich 0750 immich immich -"
   ];
 
