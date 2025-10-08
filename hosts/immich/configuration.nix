@@ -15,7 +15,7 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
-  extra-services.mount_home_media.enable = true;
+  # extra-services.mount_home_media.enable = true;
 
   # Create necessary directories
   systemd.tmpfiles.rules = [
@@ -29,7 +29,7 @@
     # host = "0.0.0.0";
     port = 2283;
     openFirewall = true;
-    #mediaLocation = "/mnt/home_media/immich";
+    mediaLocation = "/mnt/home_media/immich";
     accelerationDevices = null;
     environment = {
       TZ = "America/New_York";
