@@ -18,10 +18,10 @@
   extra-services.mount_home_media.enable = true;
 
   # # Create necessary directories
-  # systemd.tmpfiles.rules = [
-  #   "d /mnt/home_media 0755 root root -"
-  #   # "d /mnt/home_media/immich 0750 immich immich -"
-  # ];
+  systemd.tmpfiles.rules = [
+    "d /mnt/home_media 0755 root root -"
+    "Z /mnt/home_media/immich 0750 immich immich -"
+  ];
 
   # Immich service configuration
   services.immich = {
