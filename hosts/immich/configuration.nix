@@ -40,7 +40,7 @@
     openFirewall = true;
     mediaLocation = "/mnt/home_media/immich";
     accelerationDevices = null;
-    secretsFile = config.sops.secrets."immich-secrets".path;
+    # secretsFile = config.sops.secrets."immich-secrets".path;
     environment = {
       TZ = "America/New_York";
     };
