@@ -52,8 +52,8 @@
     database = {
       enable = true;
       createDB = true;
-      name = "immich";
-      user = "postgres";
+      # name = "immich";
+      # user = "postgres";
     };
   };
 
