@@ -23,7 +23,7 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
-  extra-services.mount_home_media.enable = true;
+  # extra-services.mount_home_media.enable = true;
 
   # # Create necessary directories
   systemd.tmpfiles.rules = [
@@ -35,10 +35,10 @@
   services.immich = {
     enable = true;
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.immich;
-    host = "0.0.0.0";
-    port = 2283;
+    # host = "0.0.0.0";
+    # port = 2283;
     openFirewall = true;
-    mediaLocation = "/mnt/home_media/immich";
+    # mediaLocation = "/mnt/home_media/immich";
     accelerationDevices = null;
     # secretsFile = config.sops.secrets."immich-secrets".path;
     environment = {
@@ -53,27 +53,6 @@
       enable = true;
       createDB = true;
     };
-  };
-
-  # Fix permissions on existing database
-  systemd.services.immich-fix-db-permissions = {
-    description = "Fix Immich database permissions";
-    after = [ "postgresql.service" ];
-    before = [ "immich-server.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      User = "postgres";
-    };
-    script = ''
-      # Grant all privileges to immich user on existing database
-      ${pkgs.postgresql}/bin/psql -d immich -c "GRANT ALL PRIVILEGES ON DATABASE immich TO immich;" || true
-      ${pkgs.postgresql}/bin/psql -d immich -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO immich;" || true
-      ${pkgs.postgresql}/bin/psql -d immich -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO immich;" || true
-      ${pkgs.postgresql}/bin/psql -d immich -c "ALTER DATABASE immich OWNER TO immich;" || true
-      ${pkgs.postgresql}/bin/psql -d immich -c "ALTER SCHEMA public OWNER TO immich;" || true
-    '';
   };
 
   # Add immich user to video and render groups for hardware acceleration
