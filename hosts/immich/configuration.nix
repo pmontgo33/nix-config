@@ -23,7 +23,7 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
-  # extra-services.mount_home_media.enable = true;
+  extra-services.mount_home_media.enable = true;
 
   # # Create necessary directories
   systemd.tmpfiles.rules = [
