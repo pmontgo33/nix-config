@@ -11,6 +11,8 @@
     gitAndTools.git-lfs
   ];
 
+  services.openssh.enable = true;
+
   services.forgejo = {
     enable = true;
     
