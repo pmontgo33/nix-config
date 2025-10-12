@@ -7,8 +7,8 @@
   ];
 	
   environment.systemPackages = with pkgs; [
-    git
-    gitAndTools.git-lfs
+    # git
+    # gitAndTools.git-lfs
   ];
 
   services.openssh.enable = true;
@@ -20,11 +20,6 @@
 
   services.forgejo = {
     enable = true;
-    
-    database = {
-      type = "mysql";
-      createDatabase = true;
-    };
     
     settings = {
       server = {
@@ -40,18 +35,6 @@
       
       # Add other settings from old app.ini here
     };
-  };
-
-  services.mysql = {
-    enable = true;
-    package = pkgs.mariadb;
-    ensureDatabases = [ "forgejo" ];
-    ensureUsers = [{
-      name = "forgejo";
-      ensurePermissions = {
-        "forgejo.*" = "ALL PRIVILEGES";
-      };
-    }];
   };
 
   networking.firewall.allowedTCPPorts = [ 3000 22 ];
