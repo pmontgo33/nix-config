@@ -21,9 +21,9 @@
   services.forgejo = {
     enable = true;
     
-    # Database configuration
     database = {
-      type = "postgres";
+      type = "mysql";
+      createDatabase = true;
     };
     
     settings = {
@@ -35,19 +35,22 @@
       };
       
       service = {
-        DISABLE_REGISTRATION = true;  # Set according to your needs
+        DISABLE_REGISTRATION = true;
       };
       
-      # Add other settings from your old app.ini here
+      # Add other settings from old app.ini here
     };
   };
 
-  services.postgresql = {
+  services.mysql = {
     enable = true;
+    package = pkgs.mariadb;
     ensureDatabases = [ "forgejo" ];
     ensureUsers = [{
       name = "forgejo";
-      ensureDBOwnership = true;
+      ensurePermissions = {
+        "forgejo.*" = "ALL PRIVILEGES";
+      };
     }];
   };
 
