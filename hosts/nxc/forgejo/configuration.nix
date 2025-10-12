@@ -13,6 +13,11 @@
 
   services.openssh.enable = true;
 
+  extra-services.tailscale = {
+    enable = true;
+    lxc = true;
+  };
+
   services.forgejo = {
     enable = true;
     
