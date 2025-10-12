@@ -23,7 +23,7 @@
     
     settings = {
 
-      APP_NAME = "Monty Git";
+      # APP_NAME = "Monty Git";
 
       server = {
         DOMAIN = "git.montycasa.net";
