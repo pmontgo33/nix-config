@@ -5,6 +5,7 @@
   imports =
     [
       ../../modules
+      ../../secrets
     ];
 
   environment.systemPackages = with pkgs; [
