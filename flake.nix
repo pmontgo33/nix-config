@@ -277,7 +277,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/omnitools
+        ./hosts/nxc/omnitools
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager

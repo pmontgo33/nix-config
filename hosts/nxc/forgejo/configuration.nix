@@ -22,6 +22,9 @@
     enable = true;
     
     settings = {
+
+      APP_NAME = "Monty Git";
+
       server = {
         DOMAIN = "git.montycasa.net";
         ROOT_URL = "https://git.montycasa.net/";
