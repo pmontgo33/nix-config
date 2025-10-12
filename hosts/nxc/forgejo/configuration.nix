@@ -7,7 +7,7 @@
   ];
 	
   environment.systemPackages = with pkgs; [
-    # git
+    git
     # gitAndTools.git-lfs
   ];
 
