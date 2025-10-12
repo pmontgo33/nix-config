@@ -170,7 +170,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/immich
+        ./hosts/dev/immich
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
@@ -233,7 +233,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/onlyoffice
+        ./hosts/dev/onlyoffice
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
