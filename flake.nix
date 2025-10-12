@@ -104,12 +104,12 @@
 
     };
 
-    ## lxc-base ##
+    ## nxc-base ##
     nixosConfigurations.nxc-base = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/nxc-base
+        ./hosts/nxc/nxc-base
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
@@ -147,7 +147,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/nix-fury
+        ./hosts/nxc/nix-fury
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
