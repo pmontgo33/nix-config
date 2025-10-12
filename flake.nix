@@ -128,7 +128,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/lxc-tailscale
+        ./hosts/nxc/lxc-tailscale
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
