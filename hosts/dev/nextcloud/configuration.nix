@@ -62,6 +62,8 @@
     settings = {
       overwriteProtocol = "https";
       default_phone_region = "US";
+      trusted_proxies = ["192.168.86.118"];
+      trusted_domains = ["192.168.86.136"];
     };
     config = {
       dbtype = "pgsql";
