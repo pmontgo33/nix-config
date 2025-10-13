@@ -75,7 +75,7 @@
     phpOptions."opcache.interned_strings_buffer" = "16";
   };
 
-  # networking.firewall.allowedTCPPorts = [ 2283 ];
+  networking.firewall.allowedTCPPorts = [ 80 ];
 
   system.stateVersion = "25.05";
 }
