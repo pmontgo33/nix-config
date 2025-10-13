@@ -53,6 +53,7 @@
   services.nextcloud = {
     enable = true;
     hostName = "drive.montycasa.net";
+    datadir = "/mnt/drive";
     # Need to manually increment with every major upgrade.
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.nextcloud32;
     # Let NixOS install and configure the database automatically.
@@ -87,9 +88,9 @@
     };
     config = {
       dbtype = "pgsql";
-      dbname = "nextcloud_db";
-      dbuser = "nextcloud_db_user";
-      dbpassFile = config.sops.secrets."nextcloud-db-password".path;
+      # dbname = "nextcloud_db";
+      # dbuser = "nextcloud_db_user";
+      # dbpassFile = config.sops.secrets."nextcloud-db-password".path;
       adminuser = "patrick";
       adminpassFile = config.sops.secrets."nextcloud-admin-password".path;
     };
@@ -97,14 +98,14 @@
     phpOptions."opcache.interned_strings_buffer" = "16";
   };
 
-  services.postgresql = {
-    enable = true;
-    ensureDatabases = [ "nextcloud_db" ];
-    ensureUsers = [{
-      name = "nextcloud_db_user";
-      ensureDBOwnership = false;
-    }];
-  };
+  # services.postgresql = {
+  #   enable = true;
+  #   ensureDatabases = [ "nextcloud_db" ];
+  #   ensureUsers = [{
+  #     name = "nextcloud_db_user";
+  #     ensureDBOwnership = false;
+  #   }];
+  # };
 
   networking.firewall.allowedTCPPorts = [ 80 ];
 
