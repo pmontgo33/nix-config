@@ -22,16 +22,16 @@
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
 
-  # extra-services.mount_home_media.enable = true;
+  # Create necessary directories
+  systemd.tmpfiles.rules = [
+    "d /mnt/drive 0750 nextcloud nextcloud -"
+  ];
 
-  # services.nginx.virtualHosts = {
-  #   "drive.montycasa.com" = {
-  #     forceSSL = false;
-  #     enableACME = false;
-  #     # Use DNS Challenege.
-  #     acmeRoot = null;
-  #   };
-  # };
+  fileSystems."/mnt/drive" = {
+      device = "192.168.86.99:/mnt/HDD-Mirror-01/drive";
+      fsType = "nfs";
+      options = [ "x-systemd.automount" ];
+    };
      
   services.nextcloud = {
     enable = true;
