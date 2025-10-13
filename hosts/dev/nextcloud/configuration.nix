@@ -13,7 +13,11 @@
 
   # sops secrets configuration
   sops.secrets."nextcloud-admin-password" = {
-    # sopsFile = ../../secrets/secrets.yaml;
+    owner = "nextcloud";
+    group = "nextcloud";
+    mode = "0400";
+  };
+  sops.secrets."nextcloud-secret-file" = {
     owner = "nextcloud";
     group = "nextcloud";
     mode = "0400";
@@ -71,8 +75,10 @@
       overwriteProtocol = "https";
       default_phone_region = "US";
       # overwritehost = "drive.montycasa.net";
-      # trusted_proxies = [ "192.168.86.0/24" ];
+      trusted_proxies = [ "147.182.139.226" ];
       # trusted_domains = ["192.168.86.136"];
+      secretsFile = config.sops.secrets."nextcloud-secrets-file".path;
+        # passwordsalt
     };
     config = {
       dbtype = "pgsql";
