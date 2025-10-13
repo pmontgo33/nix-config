@@ -71,14 +71,14 @@
       #   sha256 = "sha256-8XyOslMmzxmX2QsVzYzIJKNw6rVWJ7uDhU1jaKJ0Q8k=";
       # };
     };
+    secretFile = config.sops.secrets."nextcloud-secret-file".path;
+      # passwordsalt
     settings = {
       overwriteProtocol = "https";
       default_phone_region = "US";
       # overwritehost = "drive.montycasa.net";
       trusted_proxies = [ "147.182.139.226" ];
       # trusted_domains = ["192.168.86.136"];
-      secretsFile = config.sops.secrets."nextcloud-secret-file".path;
-        # passwordsalt
     };
     config = {
       dbtype = "pgsql";
