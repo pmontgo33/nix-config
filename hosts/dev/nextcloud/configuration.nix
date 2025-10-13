@@ -38,7 +38,6 @@
     hostName = "drive.montycasa.net";
     # Need to manually increment with every major upgrade.
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.nextcloud32;
-    nginx.enable = true;
     # Let NixOS install and configure the database automatically.
     database.createLocally = true;
     # Let NixOS install and configure Redis caching automatically.
