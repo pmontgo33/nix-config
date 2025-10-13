@@ -22,6 +22,11 @@
     group = "nextcloud";
     mode = "0400";
   };
+  sops.secrets."nextcloud-db-password" = {
+    owner = "nextcloud";
+    group = "nextcloud";
+    mode = "0400";
+  };
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
@@ -84,6 +89,7 @@
       dbtype = "pgsql";
       dbname = "nextcloud_db";
       dbuser = "nextcloud_db_user";
+      dbpassFile = config.sops.secrets."nextcloud-db-password".path;
       adminuser = "patrick";
       adminpassFile = config.sops.secrets."nextcloud-admin-password".path;
     };
