@@ -77,7 +77,7 @@
       # overwritehost = "drive.montycasa.net";
       trusted_proxies = [ "147.182.139.226" ];
       # trusted_domains = ["192.168.86.136"];
-      secretsFile = config.sops.secrets."nextcloud-secrets-file".path;
+      secretsFile = config.sops.secrets."nextcloud-secret-file".path;
         # passwordsalt
     };
     config = {
