@@ -62,9 +62,9 @@
     settings = {
       overwriteProtocol = "https";
       default_phone_region = "US";
-      overwritehost = "drive.montycasa.net";
-      trusted_proxies = [ "192.168.86.0/24" ];
-      trusted_domains = ["192.168.86.136"];
+      # overwritehost = "drive.montycasa.net";
+      # trusted_proxies = [ "192.168.86.0/24" ];
+      # trusted_domains = ["192.168.86.136"];
     };
     config = {
       dbtype = "pgsql";
