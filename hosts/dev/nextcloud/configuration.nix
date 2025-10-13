@@ -91,14 +91,14 @@
     phpOptions."opcache.interned_strings_buffer" = "16";
   };
 
-  services.postgresql = {
-    enable = true;
-    ensureDatabases = [ "nextcloud_db" ];
-    ensureUsers = [{
-      name = "nextcloud_db_user";
-      ensureDBOwnership = true;
-    }];
-  };
+  # services.postgresql = {
+  #   enable = true;
+  #   ensureDatabases = [ "nextcloud_db" ];
+  #   ensureUsers = [{
+  #     name = "nextcloud_db_user";
+  #     ensureDBOwnership = true;
+  #   }];
+  # };
 
   networking.firewall.allowedTCPPorts = [ 80 ];
 
