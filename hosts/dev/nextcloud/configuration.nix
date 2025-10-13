@@ -102,7 +102,7 @@
     ensureDatabases = [ "nextcloud_db" ];
     ensureUsers = [{
       name = "nextcloud_db_user";
-      ensureDBOwnership = true;
+      ensureDBOwnership = false;
     }];
   };
 
