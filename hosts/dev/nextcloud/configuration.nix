@@ -30,7 +30,20 @@
   fileSystems."/mnt/drive" = {
       device = "192.168.86.99:/mnt/HDD-Mirror-01/drive";
       fsType = "nfs";
-      options = [ "x-systemd.automount" ];
+      options = [
+        "x-systemd.automount"
+        "x-systemd.idle-timeout=600"
+        "x-systemd.requires=network-online.target"
+        "noatime"
+        "nodiratime"      # Don't update directory access times
+        "rsize=8192"
+        "wsize=8192"
+        "hard"            # Hard mount (recommended for data integrity)
+        "intr"            # Allow interrupting hung operations
+        "timeo=600"       # Timeout in deciseconds (60 seconds)
+        "retrans=2"       # Number of retransmissions
+        "_netdev"
+      ];
     };
      
   services.nextcloud = {
