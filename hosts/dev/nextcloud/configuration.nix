@@ -24,14 +24,14 @@
 
   # extra-services.mount_home_media.enable = true;
 
-  services.nginx.virtualHosts = {
-    "drive.montycasa.com" = {
-      forceSSL = false;
-      enableACME = false;
-      # Use DNS Challenege.
-      acmeRoot = null;
-    };
-  };
+  # services.nginx.virtualHosts = {
+  #   "drive.montycasa.com" = {
+  #     forceSSL = false;
+  #     enableACME = false;
+  #     # Use DNS Challenege.
+  #     acmeRoot = null;
+  #   };
+  # };
      
   services.nextcloud = {
     enable = true;
