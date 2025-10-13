@@ -44,7 +44,7 @@
     configureRedis = true;
     # Increase the maximum file upload size.
     maxUploadSize = "16G";
-    https = true;
+    https = false;
     autoUpdateApps.enable = true;
     extraAppsEnable = true;
     extraApps = with config.services.nextcloud.package.packages.apps; {
