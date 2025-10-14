@@ -17,16 +17,16 @@
     group = "nextcloud";
     mode = "0400";
   };
-  sops.secrets."nextcloud-secret-file" = {
-    owner = "nextcloud";
-    group = "nextcloud";
-    mode = "0400";
-  };
-  sops.secrets."nextcloud-db-password" = {
-    owner = "nextcloud";
-    group = "nextcloud";
-    mode = "0400";
-  };
+  # sops.secrets."nextcloud-secret-file" = {
+  #   owner = "nextcloud";
+  #   group = "nextcloud";
+  #   mode = "0400";
+  # };
+  # sops.secrets."nextcloud-db-password" = {
+  #   owner = "nextcloud";
+  #   group = "nextcloud";
+  #   mode = "0400";
+  # };
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
