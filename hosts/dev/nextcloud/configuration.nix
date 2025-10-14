@@ -51,7 +51,7 @@
   };
      
   services.nextcloud = {
-    enable = true;
+    enable = false;
     hostName = "drive.montycasa.net";
     datadir = "/mnt/drive";
     # Need to manually increment with every major upgrade.
