@@ -88,9 +88,9 @@
     };
     config = {
       dbtype = "pgsql";
-      dbname = "nextcloud_db";
-      dbuser = "nextcloud_db_user";
-      dbpassFile = config.sops.secrets."nextcloud-db-password".path;
+      # dbname = "nextcloud_db";
+      # dbuser = "nextcloud_db_user";
+      # dbpassFile = config.sops.secrets."nextcloud-db-password".path;
       adminuser = "patrick";
       adminpassFile = config.sops.secrets."nextcloud-admin-password".path;
     };
