@@ -77,20 +77,16 @@
       #   sha256 = "sha256-8XyOslMmzxmX2QsVzYzIJKNw6rVWJ7uDhU1jaKJ0Q8k=";
       # };
     };
-    secretFile = config.sops.secrets."nextcloud-secret-file".path;
-      # passwordsalt
+
     settings = {
       overwriteProtocol = "https";
       default_phone_region = "US";
-      # overwritehost = "drive.montycasa.net";
+      overwritehost = "drive.montycasa.net";
       trusted_proxies = [ "147.182.139.226" ];
       # trusted_domains = ["192.168.86.136"];
     };
     config = {
       dbtype = "pgsql";
-      # dbname = "nextcloud_db";
-      # dbuser = "nextcloud_db_user";
-      # dbpassFile = config.sops.secrets."nextcloud-db-password".path;
       adminuser = "patrick";
       adminpassFile = config.sops.secrets."nextcloud-admin-password".path;
     };
@@ -98,16 +94,7 @@
     phpOptions."opcache.interned_strings_buffer" = "16";
   };
 
-  # services.postgresql = {
-  #   enable = true;
-  #   ensureDatabases = [ "nextcloud_db" ];
-  #   ensureUsers = [{
-  #     name = "nextcloud_db_user";
-  #     ensureDBOwnership = false;
-  #   }];
-  # };
-
-  networking.firewall.allowedTCPPorts = [ 80 ];
+  networking.firewall.allowedTCPPorts = [ 80 443 ];
 
   system.stateVersion = "25.05";
 }
