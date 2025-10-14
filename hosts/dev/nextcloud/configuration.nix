@@ -77,7 +77,7 @@
       #   sha256 = "sha256-8XyOslMmzxmX2QsVzYzIJKNw6rVWJ7uDhU1jaKJ0Q8k=";
       # };
     };
-    # secretFile = config.sops.secrets."nextcloud-secret-file".path;
+    secretFile = config.sops.secrets."nextcloud-secret-file".path;
       # passwordsalt
     settings = {
       overwriteProtocol = "https";
