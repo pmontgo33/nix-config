@@ -64,19 +64,20 @@
     maxUploadSize = "16G";
     https = true;
     autoUpdateApps.enable = true;
-    # extraAppsEnable = true;
-    # extraApps = with config.services.nextcloud.package.packages.apps; {
-    #   # List of apps we want to install and are already packaged in
-    #   # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
-    #   inherit calendar contacts notes onlyoffice;
-    #   # Custom app example.
-    #   # socialsharing_telegram = pkgs.fetchNextcloudApp rec {
-    #   #   url =
-    #   #     "https://github.com/nextcloud-releases/socialsharing/releases/download/v3.0.1/socialsharing_telegram-v3.0.1.tar.gz";
-    #   #   license = "agpl3";
-    #   #   sha256 = "sha256-8XyOslMmzxmX2QsVzYzIJKNw6rVWJ7uDhU1jaKJ0Q8k=";
-    #   # };
-    # };
+    appstoreEnable = true;
+    extraAppsEnable = true;
+    extraApps = with config.services.nextcloud.package.packages.apps; {
+      # List of apps we want to install and are already packaged in
+      # https://github.com/NixOS/nixpkgs/blob/master/pkgs/servers/nextcloud/packages/nextcloud-apps.json
+      inherit calendar contacts notes onlyoffice;
+      # Custom app example.
+      # socialsharing_telegram = pkgs.fetchNextcloudApp rec {
+      #   url =
+      #     "https://github.com/nextcloud-releases/socialsharing/releases/download/v3.0.1/socialsharing_telegram-v3.0.1.tar.gz";
+      #   license = "agpl3";
+      #   sha256 = "sha256-8XyOslMmzxmX2QsVzYzIJKNw6rVWJ7uDhU1jaKJ0Q8k=";
+      # };
+    };
     secretFile = config.sops.secrets."nextcloud-secret-file".path;
       # passwordsalt
     settings = {
