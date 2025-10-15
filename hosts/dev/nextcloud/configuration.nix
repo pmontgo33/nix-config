@@ -17,16 +17,16 @@
     group = "nextcloud";
     mode = "0400";
   };
-  # sops.secrets."nextcloud-secret-file" = {
-  #   owner = "nextcloud";
-  #   group = "nextcloud";
-  #   mode = "0400";
-  # };
-  # sops.secrets."nextcloud-db-password" = {
-  #   owner = "nextcloud";
-  #   group = "nextcloud";
-  #   mode = "0400";
-  # };
+  sops.secrets."nextcloud-secret-file" = {
+    owner = "nextcloud";
+    group = "nextcloud";
+    mode = "0400";
+  };
+  sops.secrets."nextcloud-db-password" = {
+    owner = "nextcloud";
+    group = "nextcloud";
+    mode = "0400";
+  };
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
@@ -37,7 +37,7 @@
   ];
 
   # optional, but ensures rpc-statsd is running for on demand mounting
-  boot.supportedFilesystems = [ "nfs" ];
+  # boot.supportedFilesystems = [ "nfs" ];
 
   fileSystems."/mnt/drive" = {
     device = "192.168.86.99:/mnt/HDD-Mirror-01/drive";
@@ -77,7 +77,8 @@
       #   sha256 = "sha256-8XyOslMmzxmX2QsVzYzIJKNw6rVWJ7uDhU1jaKJ0Q8k=";
       # };
     };
-
+    secretFile = config.sops.secrets."nextcloud-secret-file".path;
+      # passwordsalt
     settings = {
       overwriteProtocol = "https";
       default_phone_region = "US";
@@ -94,7 +95,7 @@
     phpOptions."opcache.interned_strings_buffer" = "16";
   };
 
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
+  networking.firewall.allowedTCPPorts = [ 80 ];
 
   system.stateVersion = "25.05";
 }
