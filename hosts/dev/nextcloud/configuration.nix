@@ -52,7 +52,7 @@
      
   services.nextcloud = {
     enable = true;
-    hostName = "drive.montycasa.net";
+    hostName = "drive.montycasa.com";
     datadir = "/mnt/drive";
     # Need to manually increment with every major upgrade.
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.nextcloud32;
@@ -83,9 +83,9 @@
     settings = {
       overwriteProtocol = "https";
       default_phone_region = "US";
-      overwritehost = "drive.montycasa.net";
+      overwritehost = "drive.montycasa.com";
       trusted_proxies = [ "147.182.139.226" ];
-      overwrite.cli.url = "https://drive.montycasa.net";
+      overwrite.cli.url = "https://drive.montycasa.com";
       # trusted_domains = ["192.168.86.136"];
     };
     config = {
