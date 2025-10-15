@@ -88,7 +88,7 @@
     };
     config = {
       dbtype = "pgsql";
-      adminuser = "patrick";
+      adminuser = "admin";
       adminpassFile = config.sops.secrets."nextcloud-admin-password".path;
     };
     # Suggested by Nextcloud's health check.
