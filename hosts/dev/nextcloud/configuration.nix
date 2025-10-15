@@ -84,6 +84,7 @@
       default_phone_region = "US";
       overwritehost = "drive.montycasa.net";
       trusted_proxies = [ "147.182.139.226" ];
+      overwrite.cli.url = "https://drive.montycasa.net";
       # trusted_domains = ["192.168.86.136"];
     };
     config = {
