@@ -53,7 +53,7 @@
   services.nextcloud = {
     enable = true;
     hostName = "drive.montycasa.net";
-    datadir = "/mnt/drive";
+    # datadir = "/mnt/drive";
     # Need to manually increment with every major upgrade.
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.nextcloud32;
     # Let NixOS install and configure the database automatically.
