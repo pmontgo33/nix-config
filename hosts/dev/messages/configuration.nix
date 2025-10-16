@@ -34,7 +34,7 @@
     };
   };
 
-  networking.firewall.allowedTCPPorts = [ 80 ];
+  networking.firewall.allowedTCPPorts = [ 8080 ];
   
 
   system.stateVersion = "25.05";
