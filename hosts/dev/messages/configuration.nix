@@ -29,6 +29,9 @@
   services.gotify = {
     enable = true;
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.gotify-server;
+    environment = {
+      GOTIFY_SERVER_PORT = 8080;
+    };
   };
 
   networking.firewall.allowedTCPPorts = [ 80 ];
