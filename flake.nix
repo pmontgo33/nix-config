@@ -233,7 +233,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/dev/nextcloud
+        ./hosts/nextcloud
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
