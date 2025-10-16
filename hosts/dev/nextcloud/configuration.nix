@@ -97,7 +97,16 @@
     phpOptions."opcache.interned_strings_buffer" = "16";
   };
 
-  networking.firewall.allowedTCPPorts = [ 80 ];
+  # Enable podman w/ docker socket for AppAPI
+  virtualisation.podman = {
+    enable = true;
+    dockerCompat = true;
+    dockerSocket.enable = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+  users.users.nextcloud.extraGroups = [ "podman" ];
+
+  networking.firewall.allowedTCPPorts = [ 80 443 ];
 
   system.stateVersion = "25.05";
 }
