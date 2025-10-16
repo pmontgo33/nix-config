@@ -5,15 +5,15 @@
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
   ];
 
-  sops = {
-      secrets = {
-        "onlyoffice-jwt-secret" = {
-          owner = "onlyoffice";
-          group = "onlyoffice";
-          mode = "0400";
-        };
-      };
-    };
+  # sops = {
+  #     secrets = {
+  #       "onlyoffice-jwt-secret" = {
+  #         owner = "onlyoffice";
+  #         group = "onlyoffice";
+  #         mode = "0400";
+  #       };
+  #     };
+  #   };
 
   environment.systemPackages = with pkgs; [
     
