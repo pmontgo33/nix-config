@@ -36,7 +36,9 @@
     };
   };
 
-  networking.firewall.allowedTCPPorts = [ 8080 ];
+  services.uptime-kuma.enable = true;
+
+  networking.firewall.allowedTCPPorts = [ 8080 3001 ];
 
   system.stateVersion = "24.05";
 }
