@@ -21,25 +21,22 @@
     ]))
   ];
 
-  boot.initrd = { supportedFilesystems = [ "nfs" ];
-  kernelModules = [ "nfs" ];
-  };
-  nixpkgs.config.allowUnfree = true;
-
-  fileSystems."/mnt/home_media" = {
-    device = "192.168.86.99:/mnt/HDD-Mirror-01/home_media";
-    fsType = "nfs";
-  };
-
-  # List services that you want to enable:
-
   extra-services.tailscale = {
     enable = true;
     lxc = true;
   };
 
-  # Enable the OpenSSH daemon.
   services.openssh.enable = true;
+
+  services.gotify = {
+    enable = true;
+    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.gotify-server;
+    environment = {
+      GOTIFY_SERVER_PORT = 8080;
+    };
+  };
+
+  networking.firewall.allowedTCPPorts = [ 8080 ];
 
   system.stateVersion = "24.05";
 }
