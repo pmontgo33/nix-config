@@ -44,6 +44,11 @@
     };
   };
 
+  extra-services.simplexmq-relay = {
+    enable = true;
+    host = "smp.montycasa.com";
+  };
+
   networking.firewall.allowedTCPPorts = [ 8080 3001 ];
 
   system.stateVersion = "24.05";
