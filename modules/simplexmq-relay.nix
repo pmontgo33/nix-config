@@ -1,8 +1,6 @@
 { config, lib, pkgs, ... }:
 
-with lib;
-
-let
+with lib; let
   cfg = config.extra-services.simplexmq-relay;
   
   simplexConfig = pkgs.writeText "smp-server.ini" ''
@@ -37,7 +35,7 @@ let
   '';
 in
 {
-  options.services.simplexmq-relay = {
+  options.extra-services.simplexmq-relay = {
     enable = mkEnableOption "SimpleX MQ relay server";
     
     host = mkOption {
