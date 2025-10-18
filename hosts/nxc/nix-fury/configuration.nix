@@ -1,4 +1,4 @@
-{ pkgs, modulesPath, inputs, outputs, ... }:
+{ pkgs, config, modulesPath, inputs, outputs, ... }:
 
 {
   imports = [
@@ -21,6 +21,8 @@
     ]))
   ];
 
+  sops.secrets."simplex-smp-env" = {};
+
   extra-services.tailscale = {
     enable = true;
     lxc = true;
@@ -42,6 +44,11 @@
       HOST = "0.0.0.0";
       PORT = "3001";
     };
+  };
+
+  extra-services.simplex-smp-server = {
+    enable = true;
+    environmentFile = config.sops.secrets.simplex-smp-env.path;
   };
 
   # nixpkgs.config.allowBroken = true;

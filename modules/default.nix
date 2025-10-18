@@ -7,5 +7,6 @@
     ./mount_media.nix
     ./pbs-home-dirs.nix
     ./simplexmq-relay.nix
+    ./simplex-smp-server.nix
   ];
 }
