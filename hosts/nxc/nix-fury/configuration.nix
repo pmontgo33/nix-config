@@ -43,7 +43,8 @@
       PORT = "3001";
     };
   };
-
+  
+  nixpkgs.config.allowBroken = true;
   extra-services.simplexmq-relay = {
     enable = true;
     host = "smp.montycasa.com";
