@@ -19,7 +19,7 @@
 
   services.pocket-id = {
     enable = true;
-    # package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.pocket-id;
+    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.pocket-id;
     settings = {
       APP_URL = https://auth.montycasa.com;
       ANALYTICS_DISABLED = true;
