@@ -46,10 +46,10 @@
     };
   };
 
-  extra-services.simplex-smp-server = {
-    enable = true;
-    environmentFile = config.sops.secrets.simplex-smp-env.path;
-  };
+  # extra-services.simplex-smp-server = {
+  #   enable = true;
+  #   environmentFile = config.sops.secrets.simplex-smp-env.path;
+  # };
 
   # nixpkgs.config.allowBroken = true;
   # extra-services.simplexmq-relay = {
