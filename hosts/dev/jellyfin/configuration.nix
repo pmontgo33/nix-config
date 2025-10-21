@@ -33,6 +33,7 @@
   };
 
   users.users.jellyfin.extraGroups = [ "video" "render" ];
+  users.groups.render.gid = 104;
   # services.udev.extraRules = ''
   #   KERNEL=="renderD*", GROUP="render", MODE="0660"
   # '';
@@ -51,8 +52,8 @@
     extraPackages = with pkgs; [
       intel-ocl                      # Generic OpenCL support
       intel-media-driver             # VAAPI driver for Broadwell and newer (iHD)
-      # intel-vaapi-driver             # Legacy VAAPI driver for older CPUs (i965)
-      # libva-vdpau-driver             # Additional VAAPI support
+      intel-vaapi-driver             # Legacy VAAPI driver for older CPUs (i965)
+      libva-vdpau-driver             # Additional VAAPI support
       intel-compute-runtime          # OpenCL runtime for newer CPUs (13th gen+, but works on 12th)
       vpl-gpu-rt                     # Video Processing Library for 11th gen and newer
     ];
