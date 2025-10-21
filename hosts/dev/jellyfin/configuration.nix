@@ -33,7 +33,8 @@
   };
 
   users.users.jellyfin.extraGroups = [ "video" "render" ];
-  users.groups.render = {};
+  users.groups.render = { gid = 104; };
+  
 
   # Set the VAAPI driver to use the newer iHD driver
   systemd.services.jellyfin.environment.LIBVA_DRIVER_NAME = "iHD";
