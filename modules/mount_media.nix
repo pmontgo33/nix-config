@@ -8,7 +8,7 @@ in {
   config = mkIf cfg.enable {
 
     fileSystems."/mnt/media" = {
-      device = "truenas:/mnt/HDD-Mirror-01/media";
+      device = "192.168.86.99:/mnt/HDD-Mirror-01/media";
       fsType = "nfs";
       options = [ "x-systemd.automount" ];
     };

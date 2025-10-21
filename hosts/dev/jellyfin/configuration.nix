@@ -12,6 +12,11 @@
     pkgs.jellyfin-ffmpeg
   ];
 
+  # Create necessary directories
+  systemd.tmpfiles.rules = [
+    "d /mnt/media 0750 jellyfin jellyfin -"
+  ];
+
   extra-services.mount_media.enable = true;
 
   extra-services.tailscale = {
