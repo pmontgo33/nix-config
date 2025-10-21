@@ -32,6 +32,8 @@
     openFirewall = true;
   };
 
+  users.users.jellyfin.extraGroups = [ "video" "render" ];
+
   # Set the VAAPI driver to use the newer iHD driver
   systemd.services.jellyfin.environment.LIBVA_DRIVER_NAME = "iHD";
   environment.sessionVariables = { LIBVA_DRIVER_NAME = "iHD"; };
