@@ -7,7 +7,9 @@
   ];
 
   environment.systemPackages = with pkgs; [
-    
+    pkgs.jellyfin
+    pkgs.jellyfin-web
+    pkgs.jellyfin-ffmpeg
   ];
 
   extra-services.mount_media.enable = true;
@@ -25,7 +27,27 @@
     openFirewall = true;
   };
 
-  networking.firewall.allowedTCPPorts = [ 8000 ];
+  # Set the VAAPI driver to use the newer iHD driver
+  systemd.services.jellyfin.environment.LIBVA_DRIVER_NAME = "iHD";
+  environment.sessionVariables = { LIBVA_DRIVER_NAME = "iHD"; };
+  
+  # Enable hardware graphics support
+  hardware.graphics = {
+    enable = true;
+
+    extraPackages = with pkgs; [
+      intel-ocl                      # Generic OpenCL support
+      intel-media-driver             # VAAPI driver for Broadwell and newer (iHD)
+      intel-vaapi-driver             # Legacy VAAPI driver for older CPUs (i965)
+      libva-vdpau-driver             # Additional VAAPI support
+      intel-compute-runtime          # OpenCL runtime for newer CPUs (13th gen+, but works on 12th)
+      intel-compute-runtime-legacy1  # OpenCL runtime for older CPUs (8th gen)
+      vpl-gpu-rt                     # Video Processing Library for 11th gen and newer
+    ];
+  };
+
+  # Enable all firmware (important for GuC firmware on newer Intel CPUs)
+  hardware.enableAllFirmware = true;
   
 
   system.stateVersion = "25.05";
