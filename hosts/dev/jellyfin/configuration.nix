@@ -33,10 +33,13 @@
   };
 
   users.users.jellyfin.extraGroups = [ "video" "render" ];
-  services.udev.extraRules = ''
-    KERNEL=="renderD*", GROUP="render", MODE="0660"
-  '';
+  # services.udev.extraRules = ''
+  #   KERNEL=="renderD*", GROUP="render", MODE="0660"
+  # '';
 
+  nixpkgs.config.packageOverrides = pkgs: {  
+    intel-vaapi-driver = pkgs.intel-vaapi-driver.override { enableHybridCodec = true; };
+  };
   # Set the VAAPI driver to use the newer iHD driver
   systemd.services.jellyfin.environment.LIBVA_DRIVER_NAME = "iHD";
   environment.sessionVariables = { LIBVA_DRIVER_NAME = "iHD"; };
