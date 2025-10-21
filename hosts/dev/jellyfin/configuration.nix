@@ -46,7 +46,6 @@
       intel-vaapi-driver             # Legacy VAAPI driver for older CPUs (i965)
       libva-vdpau-driver             # Additional VAAPI support
       intel-compute-runtime          # OpenCL runtime for newer CPUs (13th gen+, but works on 12th)
-      intel-compute-runtime-legacy1  # OpenCL runtime for older CPUs (8th gen)
       vpl-gpu-rt                     # Video Processing Library for 11th gen and newer
     ];
   };
