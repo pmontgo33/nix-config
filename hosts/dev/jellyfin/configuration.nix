@@ -33,7 +33,10 @@
   };
 
   users.users.jellyfin.extraGroups = [ "video" "render" ];
-  users.groups.render.gid = 104;
+  users.groups.renderaccess = {
+    gid = 104;
+    members = [ "jellyfin" ];
+  };
   # services.udev.extraRules = ''
   #   KERNEL=="renderD*", GROUP="render", MODE="0660"
   # '';
