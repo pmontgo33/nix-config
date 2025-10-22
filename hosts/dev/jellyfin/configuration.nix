@@ -10,6 +10,7 @@
     pkgs.jellyfin
     pkgs.jellyfin-web
     pkgs.jellyfin-ffmpeg
+    intel-gpu-tools
   ];
 
   # Create necessary directories
@@ -65,6 +66,7 @@
   # Enable all firmware (important for GuC firmware on newer Intel CPUs)
   hardware.enableAllFirmware = true;
   
+  networking.firewall.allowedTCPPorts = [ 8096 ];
 
   system.stateVersion = "25.05";
 }
