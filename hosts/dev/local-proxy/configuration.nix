@@ -15,20 +15,7 @@
     lxc = true;
   };
   
-  services.openssh.enable = true;
-
-  services.pocket-id = {
-    enable = true;
-    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.pocket-id;
-    settings = {
-      APP_URL = https://auth.montycasa.com;
-      ANALYTICS_DISABLED = true;
-      PORT = "1411";
-    };
-  };
-
-  networking.firewall.allowedTCPPorts = [ 8000 ];
-  
+  services.openssh.enable = true;  
 
   system.stateVersion = "25.05";
 }
