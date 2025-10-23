@@ -37,7 +37,7 @@
     # host = "0.0.0.0";
     # port = 2283;
     openFirewall = true;
-    # mediaLocation = "/mnt/home_media/immich";
+    mediaLocation = "/mnt/home_media/immich";
     accelerationDevices = null;
     # secretsFile = config.sops.secrets."immich-secrets".path;
     environment = {

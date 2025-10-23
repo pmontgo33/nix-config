@@ -170,7 +170,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/dev/jellyfin
+        ./hosts/nxc/jellyfin
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
