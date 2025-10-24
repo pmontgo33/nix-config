@@ -17,7 +17,7 @@
   };
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, sops-nix, ... }: {
-    
+
     ## hp-nixos ##
     nixosConfigurations.hp-nixos = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
@@ -183,7 +183,7 @@
         }
       ];
     };
-    
+
     ## immich ##
     nixosConfigurations.immich = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
@@ -311,7 +311,10 @@
     ## forgejo ##
     nixosConfigurations.forgejo = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
-      specialArgs = { inherit inputs; };
+      specialArgs = {
+        inherit inputs;
+        nixosConfigurations = self.nixosConfigurations;
+      };
       modules = [
         ./hosts/nxc/forgejo
         sops-nix.nixosModules.sops

@@ -10,6 +10,26 @@
     
   ];
 
+  sops.secrets."caddy-acme-email" = {
+    owner = "caddy";
+    mode = "0400";
+  };
+  sops.secrets.cloudflare-api-token = {
+    owner = "caddy";
+    mode = "0400";
+  };
+
+  extra-services.caddy-proxy = {
+    enable = true;
+    tagMappings = { "local" = "montybeta.org"};
+    emailFile = config.sops.secrets.caddy-acme-email.path;
+    dnsProvider ={
+      name = "cloudflare";
+      credentialsFile = config.sops.secrets.cloudflare-api-token.path;
+    };
+    openFirewall = true;
+  };
+
   extra-services.tailscale = {
     enable = true;
     lxc = true;
