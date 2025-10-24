@@ -24,14 +24,16 @@
     cloudflareTokenFile = config.sops.secrets.cloudflare-api-token.path;
     
     services = {
+
+      "starlord.montybeta.org" = { 
+        protocol = "https"; 
+        upstream = "192.168.86.95:8006"; 
+      };
+      
       "git.montybeta.org" = { 
         protocol = "http"; 
         upstream = "192.168.86.120:3000"; 
       };
-      # "service2.example.com" = { 
-      #   protocol = "http"; 
-      #   upstream = "192.168.1.10:3001"; 
-      # };
     };
 
     layer4SniServices = {
