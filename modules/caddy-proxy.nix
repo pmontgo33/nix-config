@@ -5,12 +5,12 @@ with lib;
 let
   cfg = config.extra-services.caddy-proxy;
 
-  caddyWithPlugins = pkgs.callPackage "${pkgs.path}/pkgs/servers/caddy/default.nix" {
-    externalPlugins = [
-      { name = "cloudflare"; repo = "github.com/caddy-dns/cloudflare"; version = "89f16b99c18ef49c8bb470a82f895bce01cbaece"; }
-      { name = "l4"; repo = "github.com/mholt/caddy-l4"; version = "3ce88e9ac7aab29b18a511e1527c1c87e1f3d0e9"; }
+  caddyWithPlugins = pkgs.caddy.withPlugins {
+    plugins = [
+      "github.com/caddy-dns/cloudflare@v0.2.2"
+      "github.com/mholt/caddy-l4@v0.0.0-20250530154005-4d3c80e89c5f"
     ];
-    vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    hash = "sha256-mEowjWUEAKI/plIGxbZCzpSQ2zzi8exvjA6AEpEMlTk=";
   };
 
   cfTls = ''
