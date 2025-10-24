@@ -7,7 +7,7 @@ let
 
   caddyWithPlugins = pkgs.caddy.withPlugins {
     plugins = [
-      "github.com/caddy-dns/cloudflare@v1.3.0"
+      "github.com/caddy-dns/cloudflare@v0.2.2"
       "github.com/mholt/caddy-l4@v0.0.0-20250530154005-4d3c80e89c5f"
     ];
     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
