@@ -10,10 +10,10 @@
     
   ];
 
-  sops.secrets."caddy-acme-email" = {
-    owner = "caddy";
-    mode = "0400";
-  };
+  # sops.secrets."caddy-acme-email" = {
+  #   owner = "caddy";
+  #   mode = "0400";
+  # };
   sops.secrets.cloudflare-api-token = {
     owner = "caddy";
     mode = "0400";
@@ -21,13 +21,25 @@
 
   extra-services.caddy-proxy = {
     enable = true;
-    tagMappings = { "local" = "montybeta.org"};
-    emailFile = config.sops.secrets.caddy-acme-email.path;
-    dnsProvider ={
-      name = "cloudflare";
-      credentialsFile = config.sops.secrets.cloudflare-api-token.path;
+    cloudflareTokenFile = config.sops.secrets.cloudflare-api-token.path;
+    
+    services = {
+      "git.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.120:3000"; 
+      };
+      # "service2.example.com" = { 
+      #   protocol = "http"; 
+      #   upstream = "192.168.1.10:3001"; 
+      # };
     };
-    openFirewall = true;
+
+    layer4SniServices = {
+      "git.montybeta.org" = { 
+        protocol = "tcp"; 
+        upstream = "192.168.86.120:22"; 
+      };
+    };
   };
 
   extra-services.tailscale = {

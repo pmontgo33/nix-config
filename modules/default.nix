@@ -9,6 +9,6 @@
     ./simplexmq-relay.nix
     ./simplex-smp-server.nix
     ./caddy-proxy.nix
-    ./proxy-target.nix
+    # ./proxy-target.nix
   ];
 }
