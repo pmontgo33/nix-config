@@ -29,9 +29,9 @@
 
   
   sops.secrets."mollysocket-vapid" = {
-    # owner = "mollysocket";
-    # group = "mollysocket";
-    # mode = "0400";
+    owner = "mollysocket";
+    group = "mollysocket";
+    mode = "0400";
   };
 
   extra-services.tailscale = {
