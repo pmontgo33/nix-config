@@ -10,10 +10,6 @@
     
   ];
 
-  # sops.secrets."caddy-acme-email" = {
-  #   owner = "caddy";
-  #   mode = "0400";
-  # };
   sops.secrets.cloudflare-api-token = {
     owner = "caddy";
     mode = "0400";
