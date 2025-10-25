@@ -46,6 +46,17 @@
     };
   };
 
+  services.molly-socket = {
+    enable = true;
+    settings = { 
+      host = "0.0.0.0";
+      port = 8020;
+      allowed_endpoints = [ "*" ];
+      allowed_uuids = [ "*" ];
+      # log_level = "info";
+    };
+  };
+
   # extra-services.simplex-smp-server = {
   #   enable = true;
   #   environmentFile = config.sops.secrets.simplex-smp-env.path;
