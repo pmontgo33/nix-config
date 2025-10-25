@@ -25,112 +25,112 @@
     
     services = {
       
-      "stark.montybeta.org" = { 
+      "stark.montycasa.net" = { 
         protocol = "https"; 
         upstream = "192.168.86.93:8006"; 
       };
       
-      "starlord.montybeta.org" = { 
+      "starlord.montycasa.net" = { 
         protocol = "https"; 
         upstream = "192.168.86.95:8006"; 
       };
 
-      "loki.montybeta.org" = { 
+      "loki.montycasa.net" = { 
         protocol = "https"; 
         upstream = "192.168.86.97:8006"; 
       };
 
-      "pbs.montybeta.org" = { 
+      "pbs.montycasa.net" = { 
         protocol = "https"; 
         upstream = "192.168.86.102:8007"; 
       };
 
-      "truenas.montybeta.org" = { 
+      "truenas.montycasa.net" = { 
         protocol = "https"; 
         upstream = "192.168.86.99:443"; 
       };
 
-      "uptime.montybeta.org" = { 
+      "uptime.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.106:3001"; 
       };
 
-      "omada.montybeta.org" = { 
+      "omada.montycasa.net" = { 
         protocol = "https"; 
         upstream = "192.168.86.111:8043"; 
       };
 
-      "router.montybeta.org" = { 
+      "router.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.1:80"; 
       };
 
-      "blocker.montybeta.org" = { 
+      "blocker.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.1:3000"; 
       };
       
-      "git.montybeta.org" = { 
+      "git.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.120:3000"; 
       };
 
-      "qbittorrent.montybeta.org" = { 
+      "qbittorrent.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.114:8080"; 
       };
 
-      "radarr.montybeta.org" = { 
+      "radarr.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.114:7878"; 
       };
 
-      "sonarr.montybeta.org" = { 
+      "sonarr.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.114:8989"; 
       };
 
-      "bazarr.montybeta.org" = { 
+      "bazarr.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.114:6767"; 
       };
 
-      "prowlarr.montybeta.org" = { 
+      "prowlarr.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.114:9696"; 
       };
 
-      "frigate.montybeta.org" = { 
+      "frigate.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.116:5000"; 
       };
 
-      "dockge.montybeta.org" = { 
+      "dockge.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.112:5001"; 
       };
 
-      "homepage.montybeta.org" = { 
+      "homepage.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.121:3000"; 
       };
 
-      "paperless-ngx.montybeta.org" = { 
+      "paperless-ngx.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.126:8000"; 
       };
 
-      "myspeed.montybeta.org" = { 
+      "myspeed.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.125:5216"; 
       };
 
-      "grist.montybeta.org" = { 
+      "grist.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.132:8484"; 
       };
 
-      "syncthing.montybeta.org" = { 
+      "syncthing.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.99:20910"; 
       };
@@ -138,7 +138,7 @@
     };
 
     layer4SniServices = {
-      "git.montybeta.org" = { 
+      "git.montycasa.net" = { 
         protocol = "tcp"; 
         upstream = "192.168.86.120:22"; 
       };
