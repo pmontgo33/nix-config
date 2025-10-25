@@ -24,16 +24,117 @@
     cloudflareTokenFile = config.sops.secrets.cloudflare-api-token.path;
     
     services = {
-
+      
+      "stark.montybeta.org" = { 
+        protocol = "https"; 
+        upstream = "192.168.86.93:8006"; 
+      };
+      
       "starlord.montybeta.org" = { 
         protocol = "https"; 
         upstream = "192.168.86.95:8006"; 
+      };
+
+      "loki.montybeta.org" = { 
+        protocol = "https"; 
+        upstream = "192.168.86.97:8006"; 
+      };
+
+      "pbs.montybeta.org" = { 
+        protocol = "https"; 
+        upstream = "192.168.86.102:8007"; 
+      };
+
+      "truenas.montybeta.org" = { 
+        protocol = "https"; 
+        upstream = "192.168.86.99:443"; 
+      };
+
+      "uptime.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.106:3001"; 
+      };
+
+      "omada.montybeta.org" = { 
+        protocol = "https"; 
+        upstream = "192.168.86.111:8043"; 
+      };
+
+      "router.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.1:80"; 
+      };
+
+      "blocker.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.1:3000"; 
       };
       
       "git.montybeta.org" = { 
         protocol = "http"; 
         upstream = "192.168.86.120:3000"; 
       };
+
+      "qbittorrent.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.114:8080"; 
+      };
+
+      "radarr.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.114:7878"; 
+      };
+
+      "sonarr.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.114:8989"; 
+      };
+
+      "bazarr.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.114:6767"; 
+      };
+
+      "prowlarr.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.114:9696"; 
+      };
+
+      "frigate.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.116:5000"; 
+      };
+
+      "dockge.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.112:5001"; 
+      };
+
+      "homepage.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.121:3000"; 
+      };
+
+      "paperless-ngx.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.126:8000"; 
+      };
+
+      "myspeed.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.125:5216"; 
+      };
+
+      "grist.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.132:8484"; 
+      };
+
+      "syncthing.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.99:20910"; 
+      };
+
     };
 
     layer4SniServices = {
