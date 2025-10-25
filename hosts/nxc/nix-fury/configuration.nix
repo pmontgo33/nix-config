@@ -30,7 +30,7 @@
   
   sops.secrets."mollysocket-vapid" = {
     owner = "mollysocket";
-    group = "mollysocket";
+    # group = "mollysocket";
     mode = "0400";
   };
 
