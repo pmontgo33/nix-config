@@ -23,6 +23,7 @@
 
   sops.secrets."mollysocket-env" = {
     owner = "mollysocket";
+    group = "mollysocket";
     mode = "0400";
   };
 
