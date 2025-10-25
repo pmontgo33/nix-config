@@ -46,7 +46,7 @@
     };
   };
 
-  services.molly-socket = {
+  services.mollysocket = {
     enable = true;
     settings = { 
       host = "0.0.0.0";
