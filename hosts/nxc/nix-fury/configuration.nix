@@ -71,6 +71,11 @@
     };
   };
 
+  users.users.mollysocket = {
+    isNormalUser = true;
+    description = "Molly Socket";
+  };
+
   # extra-services.simplex-smp-server = {
   #   enable = true;
   #   environmentFile = config.sops.secrets.simplex-smp-env.path;
