@@ -22,10 +22,13 @@
   ];
 
   sops.secrets."mollysocket-env" = {
-    owner = "mollysocket";
-    group = "mollysocket";
-    mode = "0400";
+    # owner = "mollysocket";
+    # group = "mollysocket";
+    # mode = "0400";
   };
+
+  
+  sops.secrets."mollysocket-vapid" = {};
 
   extra-services.tailscale = {
     enable = true;
@@ -57,7 +60,8 @@
       port = 8020;
       allowed_endpoints = [ "*" ];
       allowed_uuids = [ "*" ];
-      environmentFile = config.sops.secrets.mollysocket-env.path;
+      vapid_privkey = config.sops.secrets.mollysocket-vapid.path;
+      # environmentFile = config.sops.secrets.mollysocket-env.path;
         # Contains MOLLY_VAPID_PRIVKEY
       # log_level = "info";
     };
