@@ -21,7 +21,10 @@
     ]))
   ];
 
-  sops.secrets."mollysocket-env" = {};
+  sops.secrets."mollysocket-env" = {
+    owner = "mollysocket";
+    mode = "0400";
+  };
 
   extra-services.tailscale = {
     enable = true;
