@@ -60,7 +60,7 @@
       port = 8020;
       allowed_endpoints = [ "*" ];
       allowed_uuids = [ "*" ];
-      vapid_privkey = config.sops.secrets.mollysocket-vapid.path;
+      vapid_key_file = config.sops.secrets.mollysocket-vapid.path;
       # environmentFile = config.sops.secrets.mollysocket-env.path;
         # Contains MOLLY_VAPID_PRIVKEY
       # log_level = "info";
