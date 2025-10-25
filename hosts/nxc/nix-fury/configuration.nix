@@ -21,7 +21,7 @@
     ]))
   ];
 
-  sops.secrets."simplex-smp-env" = {};
+  sops.secrets."mollysocket-env" = {};
 
   extra-services.tailscale = {
     enable = true;
@@ -53,6 +53,8 @@
       port = 8020;
       allowed_endpoints = [ "*" ];
       allowed_uuids = [ "*" ];
+      environmentFile = config.sops.secrets.mollysocket-env.path;
+        # Contains MOLLY_VAPID_PRIVKEY
       # log_level = "info";
     };
   };
