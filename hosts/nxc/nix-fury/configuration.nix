@@ -22,15 +22,13 @@
   ];
 
   sops.secrets."mollysocket-env" = {
-    # owner = "mollysocket";
-    # group = "mollysocket";
-    # mode = "0400";
+    owner = "mollysocket";
+    mode = "0400";
   };
 
   
   sops.secrets."mollysocket-vapid" = {
     owner = "mollysocket";
-    # group = "mollysocket";
     mode = "0400";
   };
 
@@ -63,8 +61,10 @@
       host = "0.0.0.0";
       port = 8020;
       allowed_endpoints = [ "https://drive.montycasa.com" ];
-      allowed_uuids = [ "*" ];
+      # allowed_uuids = [ "*" ];
       vapid_key_file = config.sops.secrets.mollysocket-vapid.path;
+      environmentFile = config.sops.secrets.mollysocket-env.path;
+        # Contains MOLLY_ALLOWED_UUIDS
       # log_level = "info";
     };
   };
