@@ -43,12 +43,12 @@
       
       "drive.montybeta.org" = { 
         protocol = "http"; 
-        upstream = "nextcloud:80"; 
+        upstream = "http://nextcloud:80"; 
       };
 
       "immich.montybeta.org" = { 
         protocol = "http"; 
-        upstream = "immich:2283"; 
+        upstream = "http://immich:2283"; 
       };
 
     # layer4SniServices = {
