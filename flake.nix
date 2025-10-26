@@ -165,13 +165,32 @@
 
     };
 
+    ## bifrost ##
+    nixosConfigurations.bifrost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = { inherit inputs; };
+      modules = [
+        ./hosts/bifrost
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
     ## local-proxy ##
     nixosConfigurations.local-proxy = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/dev/local-proxy
-sops-nix.nixosModules.sops
+        sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
         {
