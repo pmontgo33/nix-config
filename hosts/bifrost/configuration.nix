@@ -46,9 +46,64 @@
         upstream = "http://nextcloud:80"; 
       };
 
-      "immich.montybeta.org" = { 
+      "photos.montybeta.org" = { 
         protocol = "http"; 
         upstream = "http://immich:2283"; 
+      };
+
+      "audiobooks.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://audiobookshelf:13378"; 
+      };
+
+      "keep.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://karakeep:3000"; 
+      };
+
+      "mealie.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://mealie:9000"; 
+      };
+
+      "auth.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://pocketid:1411"; 
+      };
+
+      "office.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://onlyoffice:80"; 
+      };
+
+      "fit.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://endurain:8080"; 
+      };
+
+      "jellyfin.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://jellyfin:8096"; 
+      };
+
+      "watchit.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://jellyfin:8096"; 
+      };
+
+      "notify.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://nix-fury:8080"; 
+      };
+
+      "mollysocket.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "http://nix-fury:8020"; 
+      };
+
+      "ln.montybitcoin.com" = { 
+        protocol = "http"; 
+        upstream = "http://bitcoin:8080"; 
       };
 
     # layer4SniServices = {
