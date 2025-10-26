@@ -30,7 +30,41 @@
    #  permitRootLogin = "yes";
   };
   
-  services.tailscale.enable = true;
+  sops.secrets.cloudflare-api-token = {
+    owner = "caddy";
+    mode = "0400";
+  };
+
+  extra-services.caddy-proxy = {
+    enable = true;
+    cloudflareTokenFile = config.sops.secrets.cloudflare-api-token.path;
+    
+    services = {
+      
+      "drive.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "nextcloud:80"; 
+      };
+
+      "immich.montybeta.org" = { 
+        protocol = "http"; 
+        upstream = "immich:2283"; 
+      };
+
+    # layer4SniServices = {
+    #   "git.montycasa.net" = { 
+    #     protocol = "tcp"; 
+    #     upstream = "192.168.86.120:22"; 
+    #   };
+    # };
+  };
+
+  extra-services.tailscale = {
+    enable = true;
+    lxc = true;
+  };
+
+
 
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = true;
