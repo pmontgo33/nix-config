@@ -56,7 +56,7 @@
     #     protocol = "tcp"; 
     #     upstream = "192.168.86.120:22"; 
     #   };
-    # };
+    };
   };
 
   extra-services.tailscale = {
