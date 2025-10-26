@@ -41,62 +41,62 @@
     
     services = {
       
-      "drive.montybeta.org" = { 
+      "drive.montycasa.com" = {
         protocol = "http"; 
         upstream = "http://nextcloud:80"; 
       };
 
-      "photos.montybeta.org" = { 
+      "photos.montycasa.com" = {
         protocol = "http"; 
         upstream = "http://immich:2283"; 
       };
 
-      "audiobooks.montybeta.org" = { 
+      "audiobooks.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://audiobookshelf:13378"; 
       };
 
-      "keep.montybeta.org" = { 
+      "keep.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://karakeep:3000"; 
       };
 
-      "mealie.montybeta.org" = { 
+      "mealie.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://mealie:9000"; 
       };
 
-      "auth.montybeta.org" = { 
+      "auth.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://pocketid:1411"; 
       };
 
-      "office.montybeta.org" = { 
+      "office.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://onlyoffice:80"; 
       };
 
-      "fit.montybeta.org" = { 
+      "fit.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://endurain:8080"; 
       };
 
-      "jellyfin.montybeta.org" = { 
+      "jellyfin.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://jellyfin:8096"; 
       };
 
-      "watchit.montybeta.org" = { 
+      "watchit.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://jellyfin:8096"; 
       };
 
-      "notify.montybeta.org" = { 
+      "notify.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://nix-fury:8080"; 
       };
 
-      "mollysocket.montybeta.org" = { 
+      "mollysocket.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://nix-fury:8020"; 
       };
