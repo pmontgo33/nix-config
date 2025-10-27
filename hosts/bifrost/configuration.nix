@@ -81,7 +81,7 @@
         upstream = "http://endurain:8080"; 
       };
 
-      "endrain.montycasa.com" = { 
+      "endurain.montycasa.com" = { 
         protocol = "http";
         upstream = "http://endurain:8080"; 
       };
