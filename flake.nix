@@ -189,7 +189,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/dev/local-proxy
+        ./hosts/nxc/local-proxy
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
