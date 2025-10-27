@@ -76,7 +76,7 @@
         upstream = "http://onlyoffice:80"; 
       };
 
-      "fit.montycasa.com" = { 
+      "endurain.montycasa.com" = { 
         protocol = "http";
         upstream = "http://endurain:8080"; 
       };
