@@ -81,6 +81,11 @@
         upstream = "http://endurain:8080"; 
       };
 
+      "endrain.montycasa.com" = { 
+        protocol = "http";
+        upstream = "http://endurain:8080"; 
+      };
+
       "jellyfin.montycasa.com" = { 
         protocol = "http"; 
         upstream = "http://jellyfin:8096"; 
