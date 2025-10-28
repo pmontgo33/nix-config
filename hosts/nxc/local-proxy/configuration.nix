@@ -15,13 +15,6 @@
     mode = "0400";
   };
 
-  boot.kernel.sysctl = {
-    "net.core.rmem_max" = 7500000;      # Max receive buffer
-    "net.core.wmem_max" = 7500000;      # Max send buffer
-    "net.core.rmem_default" = 2500000;  # Default receive buffer
-    "net.core.wmem_default" = 2500000;  # Default send buffer
-  };
-
   extra-services.caddy-proxy = {
     enable = true;
     cloudflareTokenFile = config.sops.secrets.cloudflare-api-token.path;
@@ -139,12 +132,12 @@
       };
     };
 
-    layer4SniServices = {
-      "git.montycasa.net" = { 
-        protocol = "tcp"; 
-        upstream = "192.168.86.120:22"; 
-      };
-    };
+    # layer4SniServices = {
+    #   "git.montycasa.net" = { 
+    #     protocol = "tcp"; 
+    #     upstream = "192.168.86.120:22"; 
+    #   };
+    # };
   };
 
   extra-services.tailscale = {
