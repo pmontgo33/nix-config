@@ -7,18 +7,9 @@
   ];
 
   sops = {
-      # defaultSopsFile = ../../../secrets/secrets.yaml;
-      secrets = {
-        "onlyoffice-jwt-secret" = {
-          owner = "onlyoffice";
-          group = "onlyoffice";
-          mode = "0400";
-          
-          # Restart the service when the secret changes
-          restartUnits = [ "onlyoffice-docservice.service" ];
-        };
-      };
-    };
+    secrets = {
+      "homepage-dashboard-env" = {};
+  };
 
   environment.systemPackages = with pkgs; [
     
@@ -34,6 +25,8 @@
   services.homepage-dashboard = {
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.homepage-dashboard;
     allowedHosts = "homepage.montybeta.org,localhost:8082,127.0.0.1:8082";
+    environmentFile = config.sops.secrets."homepage-dashboard-env".path;
+    openFirewall = true;
     widgets = [
       {
         logo = {
