@@ -24,7 +24,7 @@
   services.openssh.enable = true;
   
   systemd.services.homepage-dashboard = {
-    environment.HOMEPAGE_CONFIG_DIR = "/var/lib/homepage-dashboard";
+    environment.HOMEPAGE_CONFIG_DIR = lib.mkForce "/var/lib/homepage-dashboard";
     serviceConfig = {
       WorkingDirectory = "/var/lib/homepage-dashboard";
       StateDirectory = "homepage-dashboard";
