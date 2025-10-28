@@ -16,10 +16,10 @@
     
   ];
 
-  extra-services.tailscale = {
-    enable = true;
-    lxc = true;
-  };
+  # extra-services.tailscale = {
+  #   enable = true;
+  #   lxc = true;
+  # };
   
   services.openssh.enable = true;
 
