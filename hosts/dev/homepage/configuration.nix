@@ -31,7 +31,6 @@
     environmentFile = config.sops.secrets."homepage-dashboard-env".path;
       # Contains secrets for config
     openFirewall = true;
-    proxmox = {};
     widgets = [
       {
         logo = {
