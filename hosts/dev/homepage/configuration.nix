@@ -22,14 +22,6 @@
   };
   
   services.openssh.enable = true;
-  
-  systemd.services.homepage-dashboard = {
-    environment.HOMEPAGE_CONFIG_DIR = lib.mkForce "/var/lib/homepage-dashboard";
-    serviceConfig = {
-      WorkingDirectory = "/var/lib/homepage-dashboard";
-      StateDirectory = "homepage-dashboard";
-    };
-  };
 
   services.homepage-dashboard = {
     enable=true;
@@ -37,8 +29,9 @@
     # allowedHosts = "homepage.montybeta.org,localhost:8082,127.0.0.1:8082,192.168.86.177:8082";
     allowedHosts = "*";
     environmentFile = config.sops.secrets."homepage-dashboard-env".path;
-      # Contains secrets for config as well as HOMEPAGE_CONFIG_DIR=/var/lib/homepage-dashboard
+      # Contains secrets for config
     openFirewall = true;
+    proxmox = {};
     widgets = [
       {
         logo = {
