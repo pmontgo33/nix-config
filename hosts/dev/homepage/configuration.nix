@@ -29,6 +29,7 @@
     # allowedHosts = "homepage.montybeta.org,localhost:8082,127.0.0.1:8082,192.168.86.177:8082";
     allowedHosts = "*";
     environmentFile = config.sops.secrets."homepage-dashboard-env".path;
+      # Contains secrets for config as well as HOMEPAGE_CONFIG_DIR=/var/lib/homepage-dashboard
     openFirewall = true;
     widgets = [
       {
