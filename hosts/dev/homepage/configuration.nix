@@ -8,7 +8,11 @@
 
   sops = {
     secrets = {
-      "homepage-dashboard-env" = {};
+      "homepage-dashboard-env" = {
+        user = "root";
+        group = "users";
+        mode = "0400";
+      };
     };
   };
 
