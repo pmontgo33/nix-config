@@ -30,6 +30,9 @@
     allowedHosts = "*";
     environmentFile = config.sops.secrets."homepage-dashboard-env".path;
       # Contains secrets for config as well as HOMEPAGE_CONFIG_DIR=/var/lib/homepage-dashboard
+    systemd.services.homepage-dashboard.environment.HOMEPAGE_CONFIG_DIR = "/var/lib/homepage-dashboard";
+    systemd.services.homepage-dashboard.serviceConfig.WorkingDirectory = "/var/lib/homepage-dashboard";
+    systemd.services.homepage-dashboard.serviceConfig.StateDirectory = "homepage-dashboard";
     openFirewall = true;
     widgets = [
       {
