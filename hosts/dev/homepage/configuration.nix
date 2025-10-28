@@ -553,7 +553,7 @@
               widget = {
                 type = "jellyfin";
                 url = "https://watchit.montycasa.com";
-                key = "{{jellyfin_key}}";
+                key = "{{HOMEPAGE_VAR_jellyfin_key}}";
                 enableNowPlaying = true;
                 enableUser = true;
                 showEpisodeNumber = true;
