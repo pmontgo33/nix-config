@@ -9,6 +9,7 @@
   sops = {
     secrets = {
       "homepage-dashboard-env" = {};
+    };
   };
 
   environment.systemPackages = with pkgs; [
