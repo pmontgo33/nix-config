@@ -316,6 +316,8 @@
               description = "DigitalOcean VPS";
               icon = "sh-digitalocean.svg";
             };
+          }
+          {
             Linode = {
               href = "https://cloud.linode.com/linodes";
               description = "Linode VPS";
@@ -749,7 +751,7 @@
     ];
   };
 
-  networking.firewall.allowedTCPPorts = [ 8082 ];
+  # networking.firewall.allowedTCPPorts = [ 8082 ];
   
 
   system.stateVersion = "25.05";
