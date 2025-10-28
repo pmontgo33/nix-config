@@ -9,7 +9,7 @@
   sops = {
     secrets = {
       "homepage-dashboard-env" = {
-        user = "root";
+        owner = "root";
         group = "users";
         mode = "0400";
       };
