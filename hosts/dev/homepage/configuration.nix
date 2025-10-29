@@ -32,7 +32,7 @@
     # package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.homepage-dashboard;
     # allowedHosts = "homepage.montybeta.org,localhost:8082,127.0.0.1:8082,192.168.86.177:8082";
     allowedHosts = "*";
-    environmentFile = [config.sops.secrets."homepage-dashboard-env".path];
+    environmentFile = config.sops.secrets."homepage-dashboard-env".path;
       # Contains secrets for config
     openFirewall = true;
     widgets = [
