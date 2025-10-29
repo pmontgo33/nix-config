@@ -10,7 +10,7 @@
         owner = "homepage-dashboard";
         group = "homepage-dashboard";
         mode = "0400";
-        restartUnits = [ "homepage_dashboard.service" ];
+        restartUnits = [ "homepage-dashboard.service" ];
       };
     };
   };
