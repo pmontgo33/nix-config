@@ -12,6 +12,9 @@
         owner = "homepage-dashboard";
         group = "homepage-dashboard";
         mode = "0400";
+
+        # Restart the service when the secret changes
+        restartUnits = [ "onlyoffice-docservice.service" ];
       };
     };
   };
