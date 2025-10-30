@@ -158,107 +158,142 @@
     #     ];
     #   }
     # ];
+    # bookmarks = [{
+    #   "Infrastructure" = [
+    #     {
+    #       "GitHub" = [{
+    #           icon = "si-github";
+    #           href = "https://github.com/pmontgo33?tab=repositories";
+    #       }];
+    #     }
+    #     {
+    #       "Proxmox Helper Scripts" = [
+    #         {
+    #           icon = "https://raw.githubusercontent.com/tteck/Proxmox/main/misc/images/logo.png";
+    #           href = "https://community-scripts.github.io/ProxmoxVE/scripts";
+    #         }
+    #       ];
+    #     }
+    #   ];
+    #   "Networking" = [
+    #     {
+    #       "Tailscale" = [
+    #         {
+    #           icon = "sh-tailscale.svg";
+    #           href = "https://login.tailscale.com/admin/machines";
+    #         }
+    #       ];
+    #     }
+    #     {
+    #       "Cloudflare" = [
+    #         {
+    #           icon = "sh-cloudflare.svg";
+    #           href = "https://dash.cloudflare.com/login";
+    #         }
+    #       ];
+    #     }
+    #   ];
+    #   "Cloud Storage" = [
+    #     {
+    #       "TrueCloud - Storj" = [
+    #         {
+    #           icon = "https://us1.storj.io/static/dist/assets/logo-dark-B-1o513O.svg";
+    #           href = "https://us1.storj.io/projects/KCrA-smpTX2/dashboard";
+    #         }
+    #       ];
+    #     }
+    #     {
+    #       "Backblaze" = [
+    #         {
+    #           icon = "sh-backblaze.svg";
+    #           href = "https://secure.backblaze.com/user_signin.htm";
+    #         }
+    #       ];
+    #     }
+    #   ];
+    #   "Documentation" = [
+    #     {
+    #       "Home Assistant Docs" = [
+    #         {
+    #           icon = "sh-home-assistant.svg";
+    #           href = "https://www.home-assistant.io/docs/";
+    #         }
+    #       ];
+    #     }
+    #     {
+    #       "Homepage Docs" = [
+    #         {
+    #           icon = "sh-homepage.png";
+    #           href = "https://gethomepage.dev/";
+    #         }
+    #       ];
+    #     }
+    #     {
+    #       "Frigate Docs" = [
+    #         {
+    #           icon = "sh-frigate.svg";
+    #           href = "https://docs.frigate.video/";
+    #         }
+    #       ];
+    #     }
+    #     {
+    #       "NixOS Search" = [
+    #         {
+    #           icon = "sh-nixos.svg";
+    #           href = "https://search.nixos.org/packages";
+    #         }
+    #       ];
+    #     }
+    #     {
+    #       "NixOS Wiki" = [
+    #         {
+    #           icon = "sh-nixos.svg";
+    #           href = "https://nixos.wiki/wiki/Main_Page";
+    #         }
+    #       ];
+    #     }
+    #     {
+    #       "Ansible Docs" = [
+    #         {
+    #           icon = "sh-ansible.svg";
+    #           href = "https://docs.ansible.com/ansible/latest/index.html";
+    #         }
+    #       ];
+    #     }
+    #   ];
+    # }];
+
     bookmarks = [{
-      "Infrastructure" = [
+      dev = [
         {
-          "GitHub" = [{
-              icon = "si-github";
-              href = "https://github.com/pmontgo33?tab=repositories";
+          github = [{
+            abbr = "GH";
+            href = "https://github.com/";
+            icon = "github-light.png";
           }];
         }
         {
-          "Proxmox Helper Scripts" = [
-            {
-              icon = "https://raw.githubusercontent.com/tteck/Proxmox/main/misc/images/logo.png";
-              href = "https://community-scripts.github.io/ProxmoxVE/scripts";
-            }
-          ];
+          "homepage docs" = [{
+            abbr = "HD";
+            href = "https://gethomepage.dev";
+            icon = "homepage.png";
+          }];
         }
       ];
-      "Networking" = [
+      machines = [
         {
-          "Tailscale" = [
-            {
-              icon = "sh-tailscale.svg";
-              href = "https://login.tailscale.com/admin/machines";
-            }
-          ];
+          tower = [{
+            abbr = "TR";
+            href = "https://dash.crgrd.uk";
+            icon = "homarr.png";
+          }];
         }
         {
-          "Cloudflare" = [
-            {
-              icon = "sh-cloudflare.svg";
-              href = "https://dash.cloudflare.com/login";
-            }
-          ];
-        }
-      ];
-      "Cloud Storage" = [
-        {
-          "TrueCloud - Storj" = [
-            {
-              icon = "https://us1.storj.io/static/dist/assets/logo-dark-B-1o513O.svg";
-              href = "https://us1.storj.io/projects/KCrA-smpTX2/dashboard";
-            }
-          ];
-        }
-        {
-          "Backblaze" = [
-            {
-              icon = "sh-backblaze.svg";
-              href = "https://secure.backblaze.com/user_signin.htm";
-            }
-          ];
-        }
-      ];
-      "Documentation" = [
-        {
-          "Home Assistant Docs" = [
-            {
-              icon = "sh-home-assistant.svg";
-              href = "https://www.home-assistant.io/docs/";
-            }
-          ];
-        }
-        {
-          "Homepage Docs" = [
-            {
-              icon = "sh-homepage.png";
-              href = "https://gethomepage.dev/";
-            }
-          ];
-        }
-        {
-          "Frigate Docs" = [
-            {
-              icon = "sh-frigate.svg";
-              href = "https://docs.frigate.video/";
-            }
-          ];
-        }
-        {
-          "NixOS Search" = [
-            {
-              icon = "sh-nixos.svg";
-              href = "https://search.nixos.org/packages";
-            }
-          ];
-        }
-        {
-          "NixOS Wiki" = [
-            {
-              icon = "sh-nixos.svg";
-              href = "https://nixos.wiki/wiki/Main_Page";
-            }
-          ];
-        }
-        {
-          "Ansible Docs" = [
-            {
-              icon = "sh-ansible.svg";
-              href = "https://docs.ansible.com/ansible/latest/index.html";
-            }
-          ];
+          gbox = [{
+            abbr = "GB";
+            href = "https://dash.gbox.crgrd.uk";
+            icon = "homepage.png";
+          }];
         }
       ];
     }];
