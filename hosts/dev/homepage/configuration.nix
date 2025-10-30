@@ -88,7 +88,7 @@
 
     bookmarks = [
       {
-        "Infrastructure" = [
+        Infrastructure = [
           {
             name = "GitHub";
             icon = "si-github";
@@ -100,7 +100,7 @@
             href = "https://community-scripts.github.io/ProxmoxVE/scripts";
           }
         ];
-        "Networking" = [
+        Networking = [
           {
             name = "Tailscale";
             icon = "sh-tailscale.svg";
@@ -112,7 +112,7 @@
             href = "https://dash.cloudflare.com/login";
           }
         ];
-        "CloudStorage" = [
+        CloudStorage = [
           {
             name = "TrueCloud - Storj";
             icon = "https://us1.storj.io/static/dist/assets/logo-dark-B-1o513O.svg";
@@ -124,7 +124,7 @@
             href = "https://secure.backblaze.com/user_signin.htm";
           }
         ];
-        "Documentation" = [
+        Documentation = [
           {
             name = "Home Assistant Docs";
             icon = "sh-home-assistant.svg";
