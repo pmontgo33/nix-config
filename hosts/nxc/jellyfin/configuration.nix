@@ -7,7 +7,7 @@
   ];
 
   environment.systemPackages = with pkgs; [
-    inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.jellyfin;
+    inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.jellyfin
     # pkgs.jellyfin
     pkgs.jellyfin-web
     pkgs.jellyfin-ffmpeg
