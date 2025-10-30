@@ -158,7 +158,22 @@
     #     ];
     #   }
     # ];
-    bookmarks = [];
+    bookmarks = [
+      {
+        Infrastructure = [
+            {
+              name = "GitHub";
+              icon = "si-github";
+              href = "https://github.com/pmontgo33?tab=repositories";
+            }
+            {
+              name = "Proxmox Helper Scripts";
+              icon = "https://raw.githubusercontent.com/tteck/Proxmox/main/misc/images/logo.png";
+              href = "https://community-scripts.github.io/ProxmoxVE/scripts";
+            }
+          ];
+      }
+    ];
 
     services = [
       {
@@ -663,18 +678,6 @@
                 url = "https://sonarr.montycasa.net";
                 key = "{{HOMEPAGE_VAR_SONARR_KEY}}";
                 enableQueue = true;
-              };
-            };
-          }
-          {
-            "Readarr" = {
-              href = "https://readarr.montycasa.net";
-              siteMonitor = "https://readarr.montycasa.net";
-              icon = "sh-readarr.svg";
-              widget = {
-                type = "readarr";
-                url = "https://readarr.montycasa.net";
-                key = "{{HOMEPAGE_VAR_READARR_KEY}}";
               };
             };
           }
