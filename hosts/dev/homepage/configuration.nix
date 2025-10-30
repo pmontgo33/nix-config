@@ -196,24 +196,24 @@
             ];
           }
         ];
-        "Cloud Storage" = [
-          {
-            "TrueCloud - Storj" = [
-              {
-                icon = "https://us1.storj.io/static/dist/assets/logo-dark-B-1o513O.svg";
-                href = "https://us1.storj.io/projects/KCrA-smpTX2/dashboard";
-              }
-            ];
-          }
-          {
-            "Backblaze" = [
-              {
-                icon = "sh-backblaze.svg";
-                href = "https://secure.backblaze.com/user_signin.htm";
-              }
-            ];
-          }
-        ];
+        # "Cloud Storage" = [
+        #   {
+        #     "TrueCloud - Storj" = [
+        #       {
+        #         icon = "https://us1.storj.io/static/dist/assets/logo-dark-B-1o513O.svg";
+        #         href = "https://us1.storj.io/projects/KCrA-smpTX2/dashboard";
+        #       }
+        #     ];
+        #   }
+        #   {
+        #     "Backblaze" = [
+        #       {
+        #         icon = "sh-backblaze.svg";
+        #         href = "https://secure.backblaze.com/user_signin.htm";
+        #       }
+        #     ];
+        #   }
+        # ];
         "Documentation" = [
           {
             "Home Assistant Docs" = [
