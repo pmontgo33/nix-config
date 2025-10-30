@@ -26,7 +26,7 @@
 
   services.homepage-dashboard = {
     enable = true;
-    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.homepage-dashboard;
+    # package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.homepage-dashboard;
     allowedHosts = "*";
     environmentFile = config.sops.secrets."homepage-dashboard-env".path;
     openFirewall = true;
