@@ -264,40 +264,36 @@
     #   ];
     # }];
 
-    bookmarks = [{
-      dev = [
-        {
-          github = [{
-            abbr = "GH";
-            href = "https://github.com/";
-            icon = "github-light.png";
-          }];
-        }
-        {
-          "homepage docs" = [{
-            abbr = "HD";
-            href = "https://gethomepage.dev";
-            icon = "homepage.png";
-          }];
-        }
-      ];
-      machines = [
-        {
-          tower = [{
-            abbr = "TR";
-            href = "https://dash.crgrd.uk";
-            icon = "homarr.png";
-          }];
-        }
-        {
-          gbox = [{
-            abbr = "GB";
-            href = "https://dash.gbox.crgrd.uk";
-            icon = "homepage.png";
-          }];
-        }
-      ];
-    }];
+    bookmarks = [
+      {
+        Developer = [
+          {
+            Github = [{
+              icon = "si-github";
+              href = "https://github.com/";
+            }];
+          }
+          {
+            "Nixos Search" = [{
+              icon = "si-nixos";
+              href = "https://search.nixos.org/packages";
+            }];
+          }
+          {
+            "Nixos Wiki" = [{
+              icon = "si-nixos";
+              href = "https://nixos.wiki/";
+            }];
+          }
+          {
+            "Kubernetes Docs" = [{
+              icon = "si-kubernetes";
+              href = "https://kubernetes.io/docs/home/";
+            }];
+          }
+        ];
+      }
+    ];
 
     services = [
       {
