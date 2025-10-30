@@ -7,8 +7,8 @@
   sops = {
     secrets = {
       "homepage-dashboard-env" = {
-        owner = "homepage-dashboard";
-        group = "homepage-dashboard";
+        # owner = "homepage-dashboard";
+        # group = "homepage-dashboard";
         mode = "0400";
         restartUnits = [ "homepage-dashboard.service" ];
       };
