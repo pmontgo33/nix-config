@@ -19,7 +19,7 @@
 
   extra-services.tailscale = {
     enable = true;
-    # lxc = true;
+    lxc = true;
   };
 
   services.openssh.enable = true;
