@@ -161,646 +161,643 @@
 
     services = [
       {
-        {
-          "Status" = [
-            {
-              "Uptime Kuma" = {
-                href = "https://uptime.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://uptime.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-uptime-kuma.svg";
-                widget = {
-                  type = "uptimekuma";
-                  url = "https://uptime.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  slug = "homepage";
-                };
+        "Status" = [
+          {
+            "Uptime Kuma" = {
+              href = "https://uptime.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://uptime.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-uptime-kuma.svg";
+              widget = {
+                type = "uptimekuma";
+                url = "https://uptime.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                slug = "homepage";
               };
-            }
-            {
-              "MySpeed" = {
-                href = "https://myspeed.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://myspeed.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-myspeed.png";
-                widget = {
-                  type = "myspeed";
-                  url = "https://myspeed.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                };
+            };
+          }
+          {
+            "MySpeed" = {
+              href = "https://myspeed.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://myspeed.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-myspeed.png";
+              widget = {
+                type = "myspeed";
+                url = "https://myspeed.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
               };
-            }
-            {
-              "Dockge" = {
-                href = "https://dockge.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://dockge.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-dockge.svg";
+            };
+          }
+          {
+            "Dockge" = {
+              href = "https://dockge.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://dockge.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-dockge.svg";
+            };
+          }
+          {
+            "Gotify" = {
+              href = "https://notify.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://notify.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-gotify.svg";
+            };
+          }
+        ];
+      }
+      {
+        "Proxmox" = [
+          {
+            "Stark" = {
+              href = "https://stark.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://stark.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              description = "Proxmox VE";
+              icon = "sh-proxmox.svg";
+              widget = {
+                type = "proxmox";
+                url = "https://stark.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                username = "{{HOMEPAGE_VAR_PROXMOX_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}";
+                node = "stark";
               };
-            }
-            {
-              "Gotify" = {
-                href = "https://notify.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://notify.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-gotify.svg";
+            };
+          }
+          {
+            "Loki" = {
+              href = "https://loki.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://loki.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              description = "Proxmox VE";
+              icon = "sh-proxmox.svg";
+              widget = {
+                type = "proxmox";
+                url = "https://loki.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                username = "{{HOMEPAGE_VAR_PROXMOX_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}";
+                node = "loki";
               };
-            }
-          ];
-        }
-        {
-          "Proxmox" = [
-            {
-              "Stark" = {
-                href = "https://stark.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://stark.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                description = "Proxmox VE";
-                icon = "sh-proxmox.svg";
-                widget = {
-                  type = "proxmox";
-                  url = "https://stark.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  username = "{{HOMEPAGE_VAR_PROXMOX_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}";
-                  node = "stark";
-                };
+            };
+          }
+          {
+            "Starlord" = {
+              href = "https://starlord.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://starlord.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              description = "Proxmox VE";
+              icon = "sh-proxmox.svg";
+              widget = {
+                type = "proxmox";
+                url = "https://starlord.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                username = "{{HOMEPAGE_VAR_PROXMOX_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}";
+                node = "starlord";
               };
-            }
-            {
-              "Loki" = {
-                href = "https://loki.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://loki.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                description = "Proxmox VE";
-                icon = "sh-proxmox.svg";
-                widget = {
-                  type = "proxmox";
-                  url = "https://loki.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  username = "{{HOMEPAGE_VAR_PROXMOX_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}";
-                  node = "loki";
-                };
+            };
+          }
+        ];
+      }
+      {
+        "Storage" = [
+          {
+            "TrueNAS Home" = {
+              href = "https://truenas.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://truenas.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              description = "TrueNAS Scale";
+              icon = "sh-truenas-scale.svg";
+              widget = {
+                type = "truenas";
+                url = "https://truenas.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                username = "{{HOMEPAGE_VAR_TRUENAS_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_TRUENAS_PASSWORD}}";
+                nasType = "scale";
               };
-            }
-            {
-              "Starlord" = {
-                href = "https://starlord.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://starlord.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                description = "Proxmox VE";
-                icon = "sh-proxmox.svg";
-                widget = {
-                  type = "proxmox";
-                  url = "https://starlord.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  username = "{{HOMEPAGE_VAR_PROXMOX_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_PROXMOX_PASSWORD}}";
-                  node = "starlord";
-                };
+            };
+          }
+          {
+            "Proxmox Backup Server" = {
+              href = "https://pbs.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://pbs.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/proxmox-light.png";
+              widget = {
+                type = "proxmoxbackupserver";
+                url = "https://pbs.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                username = "{{HOMEPAGE_VAR_PBS_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_PBS_PASSWORD}}";
               };
-            }
-          ];
-        }
-        {
-          "Storage" = [
-            {
-              "TrueNAS Home" = {
-                href = "https://truenas.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://truenas.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                description = "TrueNAS Scale";
-                icon = "sh-truenas-scale.svg";
-                widget = {
-                  type = "truenas";
-                  url = "https://truenas.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  username = "{{HOMEPAGE_VAR_TRUENAS_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_TRUENAS_PASSWORD}}";
-                  nasType = "scale";
-                };
+            };
+          }
+          {
+            "Syncthing" = {
+              href = "https://192.168.86.99:20910/";
+              siteMonitor = "https://192.168.86.99:20910/";
+              icon = "sh-syncthing.svg";
+            };
+          }
+          {
+            "Backblaze" = {
+              href = "https://secure.backblaze.com/user_signin.htm";
+              icon = "sh-backblaze.svg";
+            };
+          }
+        ];
+      }
+      {
+        "Other Machines" = [
+          {
+            "PiKVM" = {
+              href = "https://pikvm.skink-galaxy.ts.net";
+              siteMonitor = "https://pikvm.skink-galaxy.ts.net";
+              icon = "https://avatars.githubusercontent.com/u/41749659?s=200&v=4";
+            };
+          }
+          {
+            "Yondu VS Code" = {
+              href = "http://192.168.86.114:8680";
+              siteMonitor = "http://192.168.86.114:8680";
+              description = "VS Code Server for yondu server";
+              icon = "https://cdn3.iconfinder.com/data/icons/marvel-avatars-flaticons/64/yondu-avangers-marvel-avatars-gartoon-marvel_avatars-hero-512.png";
+            };
+          }
+        ];
+      }
+      {
+        "Offsite" = [
+          {
+            "Wakanda" = {
+              href = "https://wakanda.skink-galaxy.ts.net:8006/";
+              siteMonitor = "https://wakanda.skink-galaxy.ts.net:8006/";
+              description = "Offsite Proxmox VE";
+              icon = "sh-proxmox.svg";
+              widget = {
+                type = "proxmox";
+                url = "https://wakanda.skink-galaxy.ts.net:8006";
+                username = "{{HOMEPAGE_VAR_WAKANDA_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_WAKANDA_PASSWORD}}";
+                node = "wakanda";
               };
-            }
-            {
-              "Proxmox Backup Server" = {
-                href = "https://pbs.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://pbs.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/proxmox-light.png";
-                widget = {
-                  type = "proxmoxbackupserver";
-                  url = "https://pbs.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  username = "{{HOMEPAGE_VAR_PBS_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_PBS_PASSWORD}}";
-                };
+            };
+          }
+          {
+            "Bucky TrueNAS" = {
+              href = "https://bucky.skink-galaxy.ts.net/";
+              siteMonitor = "https://bucky.skink-galaxy.ts.net/";
+              description = "Offsite TrueNAS Scale";
+              icon = "sh-truenas-scale.svg";
+              widget = {
+                type = "truenas";
+                url = "https://bucky.skink-galaxy.ts.net/";
+                username = "{{HOMEPAGE_VAR_BUCKY_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_BUCKY_PASSWORD}}";
+                nasType = "scale";
               };
-            }
-            {
-              "Syncthing" = {
-                href = "https://{{$$$$$$$$$$['truenas'].ip}}:20910/";
-                siteMonitor = "https://{{$$$$$$$$$$['truenas'].ip}}:20910/";
-                icon = "sh-syncthing.svg";
+            };
+          }
+          {
+            "Bucky Backup Link" = {
+              href = "https://10.10.12.10";
+              siteMonitor = "https://10.10.12.10";
+              description = "Backup Link to Bucky";
+              icon = "sh-truenas-scale.svg";
+            };
+          }
+          {
+            "DigitalOcean" = {
+              href = "https://cloud.digitalocean.com/projects/8c2d35b4-ab76-4750-87db-4230144b4a44/resources?i=d4b54a";
+              description = "DigitalOcean VPS";
+              icon = "sh-digitalocean.svg";
+            };
+          }
+        ];
+      }
+      {
+        "Routers, DNS, Switches" = [
+          {
+            "OPNSense" = {
+              href = "https://router.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://router.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              description = "Router/Firewall";
+              icon = "sh-opnsense.svg";
+              widget = {
+                type = "opnsense";
+                url = "https://opnsense.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                username = "{{HOMEPAGE_VAR_OPNSENSE_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_OPNSENSE_PASSWORD}}";
               };
-            }
-            {
-              "Backblaze" = {
-                href = "https://secure.backblaze.com/user_signin.htm";
-                icon = "sh-backblaze.svg";
+            };
+          }
+          {
+            "Adguard Home" = {
+              href = "https://blocker.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://blocker.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              description = "Network DNS Adblocker";
+              icon = "sh-adguard-home.svg";
+              widget = {
+                type = "adguard";
+                url = "https://blocker.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                username = "{{HOMEPAGE_VAR_ADGUARD_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}";
               };
-            }
-          ];
-        }
-        {
-          "Other Machines" = [
-            {
-              "PiKVM" = {
-                href = "https://pikvm.skink-galaxy.ts.net";
-                siteMonitor = "https://pikvm.skink-galaxy.ts.net";
-                icon = "https://avatars.githubusercontent.com/u/41749659?s=200&v=4";
+            };
+          }
+          {
+            "Homelab 10GbE Aggregate Switch" = {
+              href = "http://192.168.86.2/";
+              siteMonitor = "http://192.168.86.2";
+              description = "8x10GbE SPF+";
+              icon = "mdi-router-network";
+            };
+          }
+          {
+            "Homelab 2.5GbE Mini Switch" = {
+              href = "http://192.168.86.3/";
+              siteMonitor = "http://192.168.86.3";
+              description = "2x10GbE SPF+ / 4x2.5GbE";
+              icon = "mdi-router-network";
+            };
+          }
+          {
+            "Homelab 2.5GbE PoE Switch" = {
+              href = "http://192.168.86.4/";
+              siteMonitor = "http://192.168.86.4";
+              description = "1x10GbE SPF+ / 8x2.5GbE PoE";
+              icon = "mdi-router-network";
+            };
+          }
+          {
+            "Basement PoE Switch" = {
+              href = "http://192.168.86.5/";
+              siteMonitor = "http://192.168.86.5";
+              description = "8x1GbE with 4x PoE";
+              icon = "mdi-router-network";
+            };
+          }
+        ];
+      }
+      {
+        "Access Points" = [
+          {
+            "Omada" = {
+              href = "https://omada.montycasa.net";
+              siteMonitor = "https://omada.montycasa.net";
+              description = "Omada Controller";
+              icon = "sh-omada.svg";
+              widget = {
+                type = "omada";
+                url = "https://omada.montycasa.net";
+                username = "{{HOMEPAGE_VAR_OMADA_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_OMADA_PASSWORD}}";
+                site = "{{HOMEPAGE_VAR_OMADA_SITE}}";
               };
-            }
-            {
-              "Yondu VS Code" = {
-                href = "http://{{$$$$$$$$$$['yondu'].ip}}:8680";
-                siteMonitor = "http://{{$$$$$$$$$$['yondu'].ip}}:8680";
-                description = "VS Code Server for yondu server";
-                icon = "https://cdn3.iconfinder.com/data/icons/marvel-avatars-flaticons/64/yondu-avangers-marvel-avatars-gartoon-marvel_avatars-hero-512.png";
+            };
+          }
+          {
+            "Homelab AP" = {
+              href = "http://192.168.86.11/";
+              siteMonitor = "http://192.168.86.11/";
+              description = "TP-Link Omada EAP723";
+              icon = "mdi-access-point-network";
+            };
+          }
+          {
+            "Kitchen AP" = {
+              href = "http://192.168.86.13/";
+              siteMonitor = "http://192.168.86.13/";
+              description = "TP-Link Omada EAP723";
+              icon = "mdi-access-point-network";
+            };
+          }
+          {
+            "Garage AP" = {
+              href = "http://192.168.86.15/";
+              siteMonitor = "http://192.168.86.15/";
+              description = "TP-Link Omada EAP235-Wall";
+              icon = "mdi-access-point-network";
+            };
+          }
+        ];
+      }
+      {
+        "Remote Access" = [
+          {
+            "Pangolin" = {
+              href = "https://pangolin.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://pangolin.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              description = "Proxy and Authentication";
+              icon = "sh-pangolin.svg";
+            };
+          }
+          {
+            "Tailscale" = {
+              href = "https://login.tailscale.com/admin/machines";
+              description = "Mesh VPN";
+              icon = "sh-tailscale.svg";
+            };
+          }
+          {
+            "Cloudflare" = {
+              href = "https://dash.cloudflare.com/login";
+              description = "Domain Name and DNS Service";
+              icon = "sh-cloudflare.svg";
+            };
+          }
+        ];
+      }
+      {
+        "Home Automation" = [
+          {
+            "Home Assistant" = {
+              href = "http://192.168.86.100:8123";
+              siteMonitor = "http://192.168.86.100:8123";
+              description = "Home Automation System";
+              icon = "sh-home-assistant.svg";
+            };
+          }
+          {
+            "WLED Patio" = {
+              href = "http://192.168.10.19/";
+              siteMonitor = "http://192.168.10.19/";
+              description = "Patio wall lights";
+              icon = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/wled.png";
+            };
+          }
+          {
+            "WLED Cabinets" = {
+              href = "http://192.168.10.17/";
+              siteMonitor = "http://192.168.10.17/";
+              description = "Kitchen under cabinet lights";
+              icon = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/wled.png";
+            };
+          }
+        ];
+      }
+      {
+        "NVR" = [
+          {
+            "Frigate" = {
+              href = "https://frigate.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://frigate.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              description = "Network Video Recorder";
+              icon = "sh-frigate.svg";
+            };
+          }
+          {
+            "Bella's Room" = {
+              href = "http://192.168.10.51/";
+              siteMonitor = "http://192.168.10.51/";
+              description = "IP Camera";
+              icon = "mdi-webcam";
+            };
+          }
+          {
+            "Girls's Room" = {
+              href = "http://192.168.10.50/";
+              siteMonitor = "http://192.168.10.50/";
+              description = "IP Camera";
+              icon = "mdi-webcam";
+            };
+          }
+          {
+            "Nursery" = {
+              href = "http://192.168.10.52/";
+              siteMonitor = "http://192.168.10.52/";
+              description = "IP Camera";
+              icon = "mdi-webcam";
+            };
+          }
+          {
+            "Front Door" = {
+              href = "http://192.168.10.54/";
+              siteMonitor = "http://192.168.10.54/";
+              description = "IP Camera";
+              icon = "mdi-cctv";
+            };
+          }
+          {
+            "Back Door" = {
+              href = "http://192.168.10.53/";
+              siteMonitor = "http://192.168.10.53/";
+              description = "IP Camera";
+              icon = "mdi-cctv";
+            };
+          }
+        ];
+      }
+      {
+        "Media Servers" = [
+          {
+            "Jellyfin" = {
+              href = "https://watchit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://watchit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              description = "Movie and TV Show Library";
+              icon = "sh-jellyfin.svg";
+              widget = {
+                type = "jellyfin";
+                url = "https://watchit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+                key = "{{HOMEPAGE_VAR_JELLYFIN_KEY}}";
+                enableNowPlaying = true;
+                enableUser = true;
+                showEpisodeNumber = true;
+                expandOneStreamToTwoRows = false;
               };
-            }
-          ];
-        }
-        {
-          "Offsite" = [
-            {
-              "Wakanda" = {
-                href = "https://wakanda.skink-galaxy.ts.net:8006/";
-                siteMonitor = "https://wakanda.skink-galaxy.ts.net:8006/";
-                description = "Offsite Proxmox VE";
-                icon = "sh-proxmox.svg";
-                widget = {
-                  type = "proxmox";
-                  url = "https://wakanda.skink-galaxy.ts.net:8006";
-                  username = "{{HOMEPAGE_VAR_WAKANDA_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_WAKANDA_PASSWORD}}";
-                  node = "wakanda";
-                };
+            };
+          }
+          {
+            "Immich" = {
+              href = "https://photos.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://photos.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              description = "Photo Library";
+              icon = "sh-immich.svg";
+              widget = {
+                type = "immich";
+                url = "https://photos.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+                key = "{{HOMEPAGE_VAR_IMMICH_KEY}}";
+                version = 2;
               };
-            }
-            {
-              "Bucky TrueNAS" = {
-                href = "https://bucky.skink-galaxy.ts.net/";
-                siteMonitor = "https://bucky.skink-galaxy.ts.net/";
-                description = "Offsite TrueNAS Scale";
-                icon = "sh-truenas-scale.svg";
-                widget = {
-                  type = "truenas";
-                  url = "https://bucky.skink-galaxy.ts.net/";
-                  username = "{{HOMEPAGE_VAR_BUCKY_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_BUCKY_PASSWORD}}";
-                  nasType = "scale";
-                };
+            };
+          }
+          {
+            "Audiobookshelf" = {
+              href = "https://audiobooks.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://audiobooks.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              description = "Audiobook Library";
+              icon = "sh-audiobookshelf.svg";
+              widget = {
+                type = "audiobookshelf";
+                url = "https://audiobooks.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+                key = "{{HOMEPAGE_VAR_AUDIOBOOKSHELF_KEY}}";
               };
-            }
-            {
-              "Bucky Backup Link" = {
-                href = "https://10.10.12.10";
-                siteMonitor = "https://10.10.12.10";
-                description = "Backup Link to Bucky";
-                icon = "sh-truenas-scale.svg";
+            };
+          }
+        ];
+      }
+      {
+        "Aar" = [
+          {
+            "qBittorrent" = {
+              href = "https://qbittorrent.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://qbittorrent.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-qbittorrent.svg";
+              widget = {
+                type = "qbittorrent";
+                url = "https://qbittorrent.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                username = "{{HOMEPAGE_VAR_QBITTORRENT_USERNAME}}";
+                password = "{{HOMEPAGE_VAR_QBITTORRENT_PASSWORD}}";
               };
-            }
-            {
-              "DigitalOcean" = {
-                href = "https://cloud.digitalocean.com/projects/8c2d35b4-ab76-4750-87db-4230144b4a44/resources?i=d4b54a";
-                description = "DigitalOcean VPS";
-                icon = "sh-digitalocean.svg";
+            };
+          }
+          {
+            "Radarr" = {
+              href = "https://radarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://radarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-radarr.svg";
+              widget = {
+                type = "radarr";
+                url = "https://radarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                key = "{{HOMEPAGE_VAR_RADARR_KEY}}";
+                enableQueue = true;
               };
-            }
-          ];
-        }
-        {
-          "Routers, DNS, Switches" = [
-            {
-              "OPNSense" = {
-                href = "https://router.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://router.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                description = "Router/Firewall";
-                icon = "sh-opnsense.svg";
-                widget = {
-                  type = "opnsense";
-                  url = "https://opnsense.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  username = "{{HOMEPAGE_VAR_OPNSENSE_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_OPNSENSE_PASSWORD}}";
-                };
+            };
+          }
+          {
+            "Sonarr" = {
+              href = "https://sonarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://sonarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-sonarr.svg";
+              widget = {
+                type = "sonarr";
+                url = "https://sonarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                key = "{{HOMEPAGE_VAR_SONARR_KEY}}";
+                enableQueue = true;
               };
-            }
-            {
-              "Adguard Home" = {
-                href = "https://blocker.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://blocker.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                description = "Network DNS Adblocker";
-                icon = "sh-adguard-home.svg";
-                widget = {
-                  type = "adguard";
-                  url = "https://blocker.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  username = "{{HOMEPAGE_VAR_ADGUARD_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}";
-                };
+            };
+          }
+          {
+            "Readarr" = {
+              href = "https://readarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://readarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-readarr.svg";
+              widget = {
+                type = "readarr";
+                url = "https://readarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                key = "{{HOMEPAGE_VAR_READARR_KEY}}";
               };
-            }
-            {
-              "Homelab 10GbE Aggregate Switch" = {
-                href = "http://192.168.86.2/";
-                siteMonitor = "http://192.168.86.2";
-                description = "8x10GbE SPF+";
-                icon = "mdi-router-network";
+            };
+          }
+          {
+            "Bazarr" = {
+              href = "https://bazarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://bazarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-bazarr.png";
+              widget = {
+                type = "bazarr";
+                url = "https://bazarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                key = "{{HOMEPAGE_VAR_BAZARR_KEY}}";
               };
-            }
-            {
-              "Homelab 2.5GbE Mini Switch" = {
-                href = "http://192.168.86.3/";
-                siteMonitor = "http://192.168.86.3";
-                description = "2x10GbE SPF+ / 4x2.5GbE";
-                icon = "mdi-router-network";
+            };
+          }
+          {
+            "Prowlarr" = {
+              href = "https://prowlarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://prowlarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-prowlarr.svg";
+              widget = {
+                type = "prowlarr";
+                url = "https://prowlarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+                key = "{{HOMEPAGE_VAR_PROWLARR_KEY}}";
               };
-            }
-            {
-              "Homelab 2.5GbE PoE Switch" = {
-                href = "http://192.168.86.4/";
-                siteMonitor = "http://192.168.86.4";
-                description = "1x10GbE SPF+ / 8x2.5GbE PoE";
-                icon = "mdi-router-network";
+            };
+          }
+          {
+            "Pinchflat" = {
+              href = "http://192.168.86.114:8945";
+              siteMonitor = "http://192.168.86.114:8945";
+              icon = "sh-pinchflat.png";
+            };
+          }
+          {
+            "Transmission" = {
+              href = "http://192.168.86.114:9092/";
+              siteMonitor = "http://192.168.86.114:9092/";
+              description = "NO VPN";
+              icon = "sh-transmission.svg";
+              widget = {
+                type = "transmission";
+                url = "http://192.168.86.114:9092";
+                username = "";
+                password = "{{HOMEPAGE_VAR_TRANSMISSION_KEY}}";
+                rpcUrl = "/transmission/";
               };
-            }
-            {
-              "Basement PoE Switch" = {
-                href = "http://192.168.86.5/";
-                siteMonitor = "http://192.168.86.5";
-                description = "8x1GbE with 4x PoE";
-                icon = "mdi-router-network";
+            };
+          }
+          {
+            "Jackett" = {
+              href = "http://192.168.86.114:9117/";
+              siteMonitor = "http://192.168.86.114:9117/";
+              description = "NO VPN";
+              icon = "sh-jackett.svg";
+              widget = {
+                type = "jackett";
+                url = "http://192.168.86.114:9117";
               };
-            }
-          ];
-        }
-        {
-          "Access Points" = [
-            {
-              "Omada" = {
-                href = "https://omada.montycasa.net";
-                siteMonitor = "https://omada.montycasa.net";
-                description = "Omada Controller";
-                icon = "sh-omada.svg";
-                widget = {
-                  type = "omada";
-                  url = "https://omada.montycasa.net";
-                  username = "{{HOMEPAGE_VAR_OMADA_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_OMADA_PASSWORD}}";
-                  site = "{{HOMEPAGE_VAR_OMADA_SITE}}";
-                };
-              };
-            }
-            {
-              "Homelab AP" = {
-                href = "http://192.168.86.11/";
-                siteMonitor = "http://192.168.86.11/";
-                description = "TP-Link Omada EAP723";
-                icon = "mdi-access-point-network";
-              };
-            }
-            {
-              "Kitchen AP" = {
-                href = "http://192.168.86.13/";
-                siteMonitor = "http://192.168.86.13/";
-                description = "TP-Link Omada EAP723";
-                icon = "mdi-access-point-network";
-              };
-            }
-            {
-              "Garage AP" = {
-                href = "http://192.168.86.15/";
-                siteMonitor = "http://192.168.86.15/";
-                description = "TP-Link Omada EAP235-Wall";
-                icon = "mdi-access-point-network";
-              };
-            }
-          ];
-        }
-        {
-          "Remote Access" = [
-            {
-              "Pangolin" = {
-                href = "https://pangolin.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://pangolin.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                description = "Proxy and Authentication";
-                icon = "sh-pangolin.svg";
-              };
-            }
-            {
-              "Tailscale" = {
-                href = "https://login.tailscale.com/admin/machines";
-                description = "Mesh VPN";
-                icon = "sh-tailscale.svg";
-              };
-            }
-            {
-              "Cloudflare" = {
-                href = "https://dash.cloudflare.com/login";
-                description = "Domain Name and DNS Service";
-                icon = "sh-cloudflare.svg";
-              };
-            }
-          ];
-        }
-        {
-          "Home Automation" = [
-            {
-              "Home Assistant" = {
-                href = "http://{{$$$$$$$$$$['homeassistant'].ip}}:{{$$$$$$$$$$['homeassistant'].port}}";
-                siteMonitor = "http://{{$$$$$$$$$$['homeassistant'].ip}}:{{$$$$$$$$$$['homeassistant'].port}}";
-                description = "Home Automation System";
-                icon = "sh-home-assistant.svg";
-              };
-            }
-            {
-              "WLED Patio" = {
-                href = "http://192.168.10.19/";
-                siteMonitor = "http://192.168.10.19/";
-                description = "Patio wall lights";
-                icon = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/wled.png";
-              };
-            }
-            {
-              "WLED Cabinets" = {
-                href = "http://192.168.10.17/";
-                siteMonitor = "http://192.168.10.17/";
-                description = "Kitchen under cabinet lights";
-                icon = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/wled.png";
-              };
-            }
-          ];
-        }
-        {
-          "NVR" = [
-            {
-              "Frigate" = {
-                href = "https://frigate.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://frigate.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                description = "Network Video Recorder";
-                icon = "sh-frigate.svg";
-              };
-            }
-            {
-              "Bella's Room" = {
-                href = "http://192.168.10.51/";
-                siteMonitor = "http://192.168.10.51/";
-                description = "IP Camera";
-                icon = "mdi-webcam";
-              };
-            }
-            {
-              "Girls's Room" = {
-                href = "http://192.168.10.50/";
-                siteMonitor = "http://192.168.10.50/";
-                description = "IP Camera";
-                icon = "mdi-webcam";
-              };
-            }
-            {
-              "Nursery" = {
-                href = "http://192.168.10.52/";
-                siteMonitor = "http://192.168.10.52/";
-                description = "IP Camera";
-                icon = "mdi-webcam";
-              };
-            }
-            {
-              "Front Door" = {
-                href = "http://192.168.10.54/";
-                siteMonitor = "http://192.168.10.54/";
-                description = "IP Camera";
-                icon = "mdi-cctv";
-              };
-            }
-            {
-              "Back Door" = {
-                href = "http://192.168.10.53/";
-                siteMonitor = "http://192.168.10.53/";
-                description = "IP Camera";
-                icon = "mdi-cctv";
-              };
-            }
-          ];
-        }
-        {
-          "Media Servers" = [
-            {
-              "Jellyfin" = {
-                href = "https://watchit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://watchit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                description = "Movie and TV Show Library";
-                icon = "sh-jellyfin.svg";
-                widget = {
-                  type = "jellyfin";
-                  url = "https://watchit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                  key = "{{HOMEPAGE_VAR_JELLYFIN_KEY}}";
-                  enableNowPlaying = true;
-                  enableUser = true;
-                  showEpisodeNumber = true;
-                  expandOneStreamToTwoRows = false;
-                };
-              };
-            }
-            {
-              "Immich" = {
-                href = "https://photos.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://photos.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                description = "Photo Library";
-                icon = "sh-immich.svg";
-                widget = {
-                  type = "immich";
-                  url = "https://photos.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                  key = "{{HOMEPAGE_VAR_IMMICH_KEY}}";
-                  version = 2;
-                };
-              };
-            }
-            {
-              "Audiobookshelf" = {
-                href = "https://audiobooks.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://audiobooks.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                description = "Audiobook Library";
-                icon = "sh-audiobookshelf.svg";
-                widget = {
-                  type = "audiobookshelf";
-                  url = "https://audiobooks.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                  key = "{{HOMEPAGE_VAR_AUDIOBOOKSHELF_KEY}}";
-                };
-              };
-            }
-          ];
-        }
-        {
-          "Aar" = [
-            {
-              "qBittorrent" = {
-                href = "https://qbittorrent.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://qbittorrent.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-qbittorrent.svg";
-                widget = {
-                  type = "qbittorrent";
-                  url = "https://qbittorrent.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  username = "{{HOMEPAGE_VAR_QBITTORRENT_USERNAME}}";
-                  password = "{{HOMEPAGE_VAR_QBITTORRENT_PASSWORD}}";
-                };
-              };
-            }
-            {
-              "Radarr" = {
-                href = "https://radarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://radarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-radarr.svg";
-                widget = {
-                  type = "radarr";
-                  url = "https://radarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  key = "{{HOMEPAGE_VAR_RADARR_KEY}}";
-                  enableQueue = true;
-                };
-              };
-            }
-            {
-              "Sonarr" = {
-                href = "https://sonarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://sonarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-sonarr.svg";
-                widget = {
-                  type = "sonarr";
-                  url = "https://sonarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  key = "{{HOMEPAGE_VAR_SONARR_KEY}}";
-                  enableQueue = true;
-                };
-              };
-            }
-            {
-              "Readarr" = {
-                href = "https://readarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://readarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-readarr.svg";
-                widget = {
-                  type = "readarr";
-                  url = "https://readarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  key = "{{HOMEPAGE_VAR_READARR_KEY}}";
-                };
-              };
-            }
-            {
-              "Bazarr" = {
-                href = "https://bazarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://bazarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-bazarr.png";
-                widget = {
-                  type = "bazarr";
-                  url = "https://bazarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  key = "{{HOMEPAGE_VAR_BAZARR_KEY}}";
-                };
-              };
-            }
-            {
-              "Prowlarr" = {
-                href = "https://prowlarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://prowlarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-prowlarr.svg";
-                widget = {
-                  type = "prowlarr";
-                  url = "https://prowlarr.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                  key = "{{HOMEPAGE_VAR_PROWLARR_KEY}}";
-                };
-              };
-            }
-            {
-              "Pinchflat" = {
-                href = "http://{{$$$$$$$$$$['yondu'].ip}}:8945";
-                siteMonitor = "http://{{$$$$$$$$$$['yondu'].ip}}:8945";
-                icon = "sh-pinchflat.png";
-              };
-            }
-            {
-              "Transmission" = {
-                href = "http://{{$$$$$$$$$$['yondu'].ip}}:9092/";
-                siteMonitor = "http://{{$$$$$$$$$$['yondu'].ip}}:9092/";
-                description = "NO VPN";
-                icon = "sh-transmission.svg";
-                widget = {
-                  type = "transmission";
-                  url = "http://{{$$$$$$$$$$['yondu'].ip}}:9092";
-                  username = "";
-                  password = "{{HOMEPAGE_VAR_TRANSMISSION_KEY}}";
-                  rpcUrl = "/transmission/";
-                };
-              };
-            }
-            {
-              "Jackett" = {
-                href = "http://{{$$$$$$$$$$['yondu'].ip}}:9117/";
-                siteMonitor = "http://{{$$$$$$$$$$['yondu'].ip}}:9117/";
-                description = "NO VPN";
-                icon = "sh-jackett.svg";
-                widget = {
-                  type = "jackett";
-                  url = "http://{{$$$$$$$$$$['yondu'].ip}}:9117";
-                };
-              };
-            }
-          ];
-        }
-        {
-          "Apps" = [
-            {
-              "Nextcloud" = {
-                href = "https://drive.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://drive.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-nextcloud.png";
-              };
-            }
-            {
-              "Forgejo" = {
-                href = "https://git.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://git.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-forgejo.svg";
-              };
-            }
-            {
-              "Alby Hub" = {
-                href = "https://ln.{{HOMEPAGE_VAR_BC_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://ln.{{HOMEPAGE_VAR_BC_CLOUDFLARE_DOMAIN}}";
-                icon = "si-alby";
-              };
-            }
-            {
-              "Karakeep" = {
-                href = "https://keep.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://keep.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-karakeep.svg";
-              };
-            }
-            {
-              "Paperless-ngx" = {
-                href = "https://paperless-ngx.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://paperless-ngx.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-paperless-ngx.svg";
-              };
-            }
-            {
-              "Mealie" = {
-                href = "https://mealie.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://mealie.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-mealie.svg";
-              };
-            }
-            {
-              "Endurain" = {
-                href = "https://fit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://fit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-endurain.svg";
-              };
-            }
-            {
-              "PocketID" = {
-                href = "https://auth.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                siteMonitor = "https://auth.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
-                icon = "sh-pocket-id.svg";
-              };
-            }
-          ];
-        }
+            };
+          }
+        ];
+      }
+      {
+        "Apps" = [
+          {
+            "Nextcloud" = {
+              href = "https://drive.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://drive.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-nextcloud.png";
+            };
+          }
+          {
+            "Forgejo" = {
+              href = "https://git.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://git.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-forgejo.svg";
+            };
+          }
+          {
+            "Alby Hub" = {
+              href = "https://ln.{{HOMEPAGE_VAR_BC_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://ln.{{HOMEPAGE_VAR_BC_CLOUDFLARE_DOMAIN}}";
+              icon = "si-alby";
+            };
+          }
+          {
+            "Karakeep" = {
+              href = "https://keep.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://keep.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-karakeep.svg";
+            };
+          }
+          {
+            "Paperless-ngx" = {
+              href = "https://paperless-ngx.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://paperless-ngx.{{HOMEPAGE_VAR_LOCAL_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-paperless-ngx.svg";
+            };
+          }
+          {
+            "Mealie" = {
+              href = "https://mealie.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://mealie.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-mealie.svg";
+            };
+          }
+          {
+            "Endurain" = {
+              href = "https://fit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://fit.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-endurain.svg";
+            };
+          }
+          {
+            "PocketID" = {
+              href = "https://auth.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              siteMonitor = "https://auth.{{HOMEPAGE_VAR_CLOUDFLARE_DOMAIN}}";
+              icon = "sh-pocket-id.svg";
+            };
+          }
+        ];
       }
     ];
-  };
 
   system.stateVersion = "25.05";
 }
