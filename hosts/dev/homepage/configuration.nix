@@ -293,6 +293,24 @@
           }
         ];
       }
+      {
+        "Infrastructure" = [
+          {
+            "GitHub" = [{
+                icon = "si-github";
+                href = "https://github.com/pmontgo33?tab=repositories";
+            }];
+          }
+          {
+            "Proxmox Helper Scripts" = [
+              {
+                icon = "https://raw.githubusercontent.com/tteck/Proxmox/main/misc/images/logo.png";
+                href = "https://community-scripts.github.io/ProxmoxVE/scripts";
+              }
+            ];
+          }
+        ];
+      }
     ];
 
     services = [
