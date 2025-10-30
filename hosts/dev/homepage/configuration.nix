@@ -160,7 +160,7 @@
     # ];
     bookmarks = [
       {
-        Infrastructure = [
+        "Infrastructure" = [
           {
             GitHub = [
               {
@@ -178,7 +178,7 @@
             ];
           }
         ];
-        Networking = [
+        "Networking" = [
           {
             "Tailscale" = [
               {
@@ -214,7 +214,7 @@
             ];
           }
         ];
-        Documentation = [
+        "Documentation" = [
           {
             "Home Assistant Docs" = [
               {
