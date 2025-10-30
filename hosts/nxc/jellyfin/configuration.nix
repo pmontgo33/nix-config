@@ -7,7 +7,8 @@
   ];
 
   environment.systemPackages = with pkgs; [
-  #  pkgs.jellyfin
+    inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.jellyfin;
+    # pkgs.jellyfin
     pkgs.jellyfin-web
     pkgs.jellyfin-ffmpeg
     intel-gpu-tools
