@@ -43,7 +43,13 @@
         openweathermap = "openweathermapapikey";
         weatherapi = "weatherapiapikey";
       };
+      
       layout = {
+        { tab = "Machines"; }
+        { tab = "Networking"; }
+        { tab = "Home"; }
+        { tab = "Media"; }
+        { tab = "Apps"; }
         Proxmox = { tab = "Machines"; };
         Storage = { tab = "Machines"; };
         "Other Machines" = { tab = "Machines"; };
@@ -86,183 +92,6 @@
         };
       }
     ];
-
-    # bookmarks = [
-    #   {
-    #     Infrastructure = [
-    #       {
-    #         name = "GitHub";
-    #         icon = "si-github";
-    #         href = "https://github.com/pmontgo33?tab=repositories";
-    #       }
-    #       {
-    #         name = "Proxmox Helper Scripts";
-    #         icon = "https://raw.githubusercontent.com/tteck/Proxmox/main/misc/images/logo.png";
-    #         href = "https://community-scripts.github.io/ProxmoxVE/scripts";
-    #       }
-    #     ];
-    #     Networking = [
-    #       {
-    #         name = "Tailscale";
-    #         icon = "sh-tailscale.svg";
-    #         href = "https://login.tailscale.com/admin/machines";
-    #       }
-    #       {
-    #         name = "Cloudflare";
-    #         icon = "sh-cloudflare.svg";
-    #         href = "https://dash.cloudflare.com/login";
-    #       }
-    #     ];
-    #     CloudStorage = [
-    #       {
-    #         name = "TrueCloud - Storj";
-    #         icon = "https://us1.storj.io/static/dist/assets/logo-dark-B-1o513O.svg";
-    #         href = "https://us1.storj.io/projects/KCrA-smpTX2/dashboard";
-    #       }
-    #       {
-    #         name = "Backblaze";
-    #         icon = "sh-backblaze.svg";
-    #         href = "https://secure.backblaze.com/user_signin.htm";
-    #       }
-    #     ];
-    #     Documentation = [
-    #       {
-    #         name = "Home Assistant Docs";
-    #         icon = "sh-home-assistant.svg";
-    #         href = "https://www.home-assistant.io/docs/";
-    #       }
-    #       {
-    #         name = "Homepage Docs";
-    #         icon = "sh-homepage.png";
-    #         href = "https://gethomepage.dev/";
-    #       }
-    #       {
-    #         name = "Frigate Docs";
-    #         icon = "sh-frigate.svg";
-    #         href = "https://docs.frigate.video/";
-    #       }
-    #       {
-    #         name = "NixOS Search";
-    #         icon = "sh-nixos.svg";
-    #         href = "https://search.nixos.org/packages";
-    #       }
-    #       {
-    #         name = "NixOS Wiki";
-    #         icon = "sh-nixos.svg";
-    #         href = "https://nixos.wiki/wiki/Main_Page";
-    #       }
-    #       {
-    #         name = "Ansible Docs";
-    #         icon = "sh-ansible.svg";
-    #         href = "https://docs.ansible.com/ansible/latest/index.html";
-    #       }
-    #     ];
-    #   }
-    # ];
-    # bookmarks = [{
-    #   "Infrastructure" = [
-    #     {
-    #       "GitHub" = [{
-    #           icon = "si-github";
-    #           href = "https://github.com/pmontgo33?tab=repositories";
-    #       }];
-    #     }
-    #     {
-    #       "Proxmox Helper Scripts" = [
-    #         {
-    #           icon = "https://raw.githubusercontent.com/tteck/Proxmox/main/misc/images/logo.png";
-    #           href = "https://community-scripts.github.io/ProxmoxVE/scripts";
-    #         }
-    #       ];
-    #     }
-    #   ];
-    #   "Networking" = [
-    #     {
-    #       "Tailscale" = [
-    #         {
-    #           icon = "sh-tailscale.svg";
-    #           href = "https://login.tailscale.com/admin/machines";
-    #         }
-    #       ];
-    #     }
-    #     {
-    #       "Cloudflare" = [
-    #         {
-    #           icon = "sh-cloudflare.svg";
-    #           href = "https://dash.cloudflare.com/login";
-    #         }
-    #       ];
-    #     }
-    #   ];
-    #   "Cloud Storage" = [
-    #     {
-    #       "TrueCloud - Storj" = [
-    #         {
-    #           icon = "https://us1.storj.io/static/dist/assets/logo-dark-B-1o513O.svg";
-    #           href = "https://us1.storj.io/projects/KCrA-smpTX2/dashboard";
-    #         }
-    #       ];
-    #     }
-    #     {
-    #       "Backblaze" = [
-    #         {
-    #           icon = "sh-backblaze.svg";
-    #           href = "https://secure.backblaze.com/user_signin.htm";
-    #         }
-    #       ];
-    #     }
-    #   ];
-    #   "Documentation" = [
-    #     {
-    #       "Home Assistant Docs" = [
-    #         {
-    #           icon = "sh-home-assistant.svg";
-    #           href = "https://www.home-assistant.io/docs/";
-    #         }
-    #       ];
-    #     }
-    #     {
-    #       "Homepage Docs" = [
-    #         {
-    #           icon = "sh-homepage.png";
-    #           href = "https://gethomepage.dev/";
-    #         }
-    #       ];
-    #     }
-    #     {
-    #       "Frigate Docs" = [
-    #         {
-    #           icon = "sh-frigate.svg";
-    #           href = "https://docs.frigate.video/";
-    #         }
-    #       ];
-    #     }
-    #     {
-    #       "NixOS Search" = [
-    #         {
-    #           icon = "sh-nixos.svg";
-    #           href = "https://search.nixos.org/packages";
-    #         }
-    #       ];
-    #     }
-    #     {
-    #       "NixOS Wiki" = [
-    #         {
-    #           icon = "sh-nixos.svg";
-    #           href = "https://nixos.wiki/wiki/Main_Page";
-    #         }
-    #       ];
-    #     }
-    #     {
-    #       "Ansible Docs" = [
-    #         {
-    #           icon = "sh-ansible.svg";
-    #           href = "https://docs.ansible.com/ansible/latest/index.html";
-    #         }
-    #       ];
-    #     }
-    #   ];
-    # }];
 
     bookmarks = [
       {
