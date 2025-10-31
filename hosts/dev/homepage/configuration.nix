@@ -45,45 +45,19 @@
       };
 
       layout = [
-        {
-          Proxmox = { tab = "Machines"; };
-        }
-        {
-          Storage = { tab = "Machines"; };
-        }
-        {
-          "Other Machines" = { tab = "Machines"; };
-        }
-        {
-          Offsite = { tab = "Machines"; };
-        }
-        {
-          "Routers, DNS, Switches" = { tab = "Networking"; };
-        }
-        {
-          "Access Points" = { tab = "Networking"; };
-        }
-        {
-          "Remote Access" = { tab = "Networking"; };
-        }
-        {
-          "Home Automation" = { tab = "Home"; };
-        }
-        {
-          NVR = { tab = "Home"; };
-        }
-        {
-          "Media Servers" = { tab = "Media"; style = "row"; columns = 1; };
-        }
-        {
-          Aar = { tab = "Media"; style = "row"; columns = 3; };
-        }
-        {
-          Apps = { tab = "Apps"; style = "row"; columns = 3; };
-        }
-        {
-          Status = { style = "row"; columns = 2; };
-        }
+        { Proxmox = { tab = "Machines"; }; }
+        { Storage = { tab = "Machines"; }; }
+        { "Other Machines" = { tab = "Machines"; }; }
+        { Offsite = { tab = "Machines"; }; }
+        { "Routers, DNS, Switches" = { tab = "Networking"; }; }
+        { "Access Points" = { tab = "Networking"; }; }
+        { "Remote Access" = { tab = "Networking"; }; }
+        { "Home Automation" = { tab = "Home"; }; }
+        { NVR = { tab = "Home"; }; }
+        { "Media Servers" = { tab = "Media"; style = "row"; columns = 1; }; }
+        { Aar = { tab = "Media"; style = "row"; columns = 3; }; }
+        { Apps = { tab = "Apps"; style = "row"; columns = 3; }; }
+        { Status = { style = "row"; columns = 2; }; }
       ];
     };
 
