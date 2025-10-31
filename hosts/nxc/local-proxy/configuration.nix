@@ -108,7 +108,7 @@
 
       "homepage.montycasa.net" = { 
         protocol = "http"; 
-        upstream = "192.168.86.121:3000"; 
+        upstream = "192.168.86.118:8082"; 
       };
 
       "paperless-ngx.montycasa.net" = { 
