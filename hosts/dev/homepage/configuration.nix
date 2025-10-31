@@ -43,38 +43,48 @@
         openweathermap = "openweathermapapikey";
         weatherapi = "weatherapiapikey";
       };
-      
-      layout = [
-        { "Proxmox" = { tab = "Machines"; }}
-        # { name = "Storage"; tab = "Machines"; }
-        # { name = "Other Machines"; tab = "Machines"; }
-        # { name = "Offsite"; tab = "Machines"; }
-        { "Routers, DNS, Switches" = { tab = "Networking"; }}
-        # { name = "Access Points"; tab = "Networking"; }
-        # { name = "Remote Access"; tab = "Networking"; }
-        # { name = "Home Automation"; tab = "Home"; }
-        # { name = "NVR"; tab = "Home"; }
-        # { name = "Media Servers"; tab = "Media"; style = "row"; columns = 1; }
-        # { name = "Aar"; tab = "Media"; style = "row"; columns = 3; }
-        # { name = "Apps"; tab = "Apps"; style = "row"; columns = 3; }
-        # { name = "Status"; style = "row"; columns = 2; }
-      ];
 
-      # layout = {
-      #   Proxmox = { tab = "Machines"; };
-      #   Storage = { tab = "Machines"; };
-      #   "Other Machines" = { tab = "Machines"; };
-      #   Offsite = { tab = "Machines"; };
-      #   "Routers, DNS, Switches" = { tab = "Networking"; };
-      #   "Access Points" = { tab = "Networking"; };
-      #   "Remote Access" = { tab = "Networking"; };
-      #   "Home Automation" = { tab = "Home"; };
-      #   NVR = { tab = "Home"; };
-      #   "Media Servers" = { tab = "Media"; style = "row"; columns = 1; };
-      #   Aar = { tab = "Media"; style = "row"; columns = 3; };
-      #   Apps = { tab = "Apps"; style = "row"; columns = 3; };
-      #   Status = { style = "row"; columns = 2; };
-      # };
+      layout = [
+        {
+          Proxmox = { tab = "Machines"; };
+        }
+        {
+          Storage = { tab = "Machines"; };
+        }
+        {
+          "Other Machines" = { tab = "Machines"; };
+        }
+        {
+          Offsite = { tab = "Machines"; };
+        }
+        {
+          "Routers, DNS, Switches" = { tab = "Networking"; };
+        }
+        {
+          "Access Points" = { tab = "Networking"; };
+        }
+        {
+          "Remote Access" = { tab = "Networking"; };
+        }
+        {
+          "Home Automation" = { tab = "Home"; };
+        }
+        {
+          NVR = { tab = "Home"; };
+        }
+        {
+          "Media Servers" = { tab = "Media"; style = "row"; columns = 1; };
+        }
+        {
+          Aar = { tab = "Media"; style = "row"; columns = 3; };
+        }
+        {
+          Apps = { tab = "Apps"; style = "row"; columns = 3; };
+        }
+        {
+          Status = { style = "row"; columns = 2; };
+        }
+      ];
     };
 
     widgets = [
