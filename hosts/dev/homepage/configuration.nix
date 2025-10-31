@@ -551,7 +551,7 @@
           {
             "WLED Patio" = {
               href = "http://192.168.10.19/";
-              siteMonitor = "http://192.168.10.17/";
+              siteMonitor = "http://192.168.10.19/";
               description = "Patio wall lights";
               icon = "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/wled.png";
             };
