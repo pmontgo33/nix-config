@@ -415,7 +415,7 @@
               icon = "sh-opnsense.svg";
               widget = {
                 type = "opnsense";
-                url = "https://opnsense.montycasa.net";
+                url = "https://router.montycasa.net";
                 username = "{{HOMEPAGE_VAR_OPNSENSE_USERNAME}}";
                 password = "{{HOMEPAGE_VAR_OPNSENSE_PASSWORD}}";
               };
