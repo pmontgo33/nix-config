@@ -45,19 +45,19 @@
       };
       
       layout = [
-        { name = "Proxmox"; tab = "Machines"; }
-        { name = "Storage"; tab = "Machines"; }
-        { name = "Other Machines"; tab = "Machines"; }
-        { name = "Offsite"; tab = "Machines"; }
-        { name = "Routers, DNS, Switches"; tab = "Networking"; }
-        { name = "Access Points"; tab = "Networking"; }
-        { name = "Remote Access"; tab = "Networking"; }
-        { name = "Home Automation"; tab = "Home"; }
-        { name = "NVR"; tab = "Home"; }
-        { name = "Media Servers"; tab = "Media"; style = "row"; columns = 1; }
-        { name = "Aar"; tab = "Media"; style = "row"; columns = 3; }
-        { name = "Apps"; tab = "Apps"; style = "row"; columns = 3; }
-        { name = "Status"; style = "row"; columns = 2; }
+        { "Proxmox" = { tab = "Machines"; }}
+        # { name = "Storage"; tab = "Machines"; }
+        # { name = "Other Machines"; tab = "Machines"; }
+        # { name = "Offsite"; tab = "Machines"; }
+        { "Routers, DNS, Switches" = { tab = "Networking"; }}
+        # { name = "Access Points"; tab = "Networking"; }
+        # { name = "Remote Access"; tab = "Networking"; }
+        # { name = "Home Automation"; tab = "Home"; }
+        # { name = "NVR"; tab = "Home"; }
+        # { name = "Media Servers"; tab = "Media"; style = "row"; columns = 1; }
+        # { name = "Aar"; tab = "Media"; style = "row"; columns = 3; }
+        # { name = "Apps"; tab = "Apps"; style = "row"; columns = 3; }
+        # { name = "Status"; style = "row"; columns = 2; }
       ];
 
       # layout = {
