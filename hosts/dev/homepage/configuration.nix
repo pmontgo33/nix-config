@@ -266,6 +266,44 @@
 
     bookmarks = [
       {
+        "Infrastructure" = [
+          {
+            "GitHub" = [{
+                icon = "si-github";
+                href = "https://github.com/pmontgo33?tab=repositories";
+            }];
+          }
+          {
+            "Proxmox Helper Scripts" = [
+              {
+                icon = "https://raw.githubusercontent.com/tteck/Proxmox/main/misc/images/logo.png";
+                href = "https://community-scripts.github.io/ProxmoxVE/scripts";
+              }
+            ];
+          }
+        ];
+      }
+      {
+        "Networking" = [
+          {
+            "Tailscale" = [
+              {
+                icon = "sh-tailscale.svg";
+                href = "https://login.tailscale.com/admin/machines";
+              }
+            ];
+          }
+          {
+            "Cloudflare" = [
+              {
+                icon = "sh-cloudflare.svg";
+                href = "https://dash.cloudflare.com/login";
+              }
+            ];
+          }
+        ];
+      }
+      {
         Developer = [
           {
             Github = [{
@@ -293,24 +331,7 @@
           }
         ];
       }
-      {
-        "Infrastructure" = [
-          {
-            "GitHub" = [{
-                icon = "si-github";
-                href = "https://github.com/pmontgo33?tab=repositories";
-            }];
-          }
-          {
-            "Proxmox Helper Scripts" = [
-              {
-                icon = "https://raw.githubusercontent.com/tteck/Proxmox/main/misc/images/logo.png";
-                href = "https://community-scripts.github.io/ProxmoxVE/scripts";
-              }
-            ];
-          }
-        ];
-      }
+      
     ];
 
     services = [
