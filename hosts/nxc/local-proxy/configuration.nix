@@ -152,8 +152,9 @@
 
   extra-services.tailscale = {
     enable = true;
-    userspace-networking = true;
+    # userspace-networking = true;
   };
+  boot.kernelModules = [ "tun" ];
   
   services.openssh.enable = true;  
 
