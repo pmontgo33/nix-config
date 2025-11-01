@@ -130,6 +130,16 @@
         protocol = "http"; 
         upstream = "192.168.86.99:20910"; 
       };
+
+      "wakanda.montycasa.net" = { 
+        protocol = "https"; 
+        upstream = "100.122.26.79:8006"; 
+      };
+
+      "bucky.montycasa.net" = { 
+        protocol = "https"; 
+        upstream = "100.118.191.95:443"; 
+      };
     };
 
     # layer4SniServices = {
