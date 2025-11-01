@@ -42,7 +42,7 @@ in {
       # Only use userspace networking if LXC mode is enabled
       interfaceName = mkIf cfg. userspace-networking "userspace-networking";
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
-      # useRoutingFeatures = "client";
+      useRoutingFeatures = "client";
       extraUpFlags = [
         "--force-reauth"
         "--reset"
