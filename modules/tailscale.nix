@@ -15,10 +15,10 @@ in {
     
     enable = mkEnableOption "enable tailscale config";
     
-    lxc = mkOption {
+    userspace-networking = mkOption {
       type = types.bool;
       default = false;
-      description = "Enable LXC mode (userspace networking)";
+      description = "Enable userspace networking";
     };
 
   };
@@ -40,7 +40,7 @@ in {
       enable = true;
       openFirewall = true;
       # Only use userspace networking if LXC mode is enabled
-      interfaceName = mkIf cfg.lxc "userspace-networking";
+      interfaceName = mkIf cfg. userspace-networking "userspace-networking";
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
       useRoutingFeatures = "client";
       extraUpFlags = [
