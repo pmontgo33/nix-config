@@ -54,6 +54,6 @@ in {
     
     networking.nameservers = [ "100.100.100.100" "192.168.86.1" "1.1.1.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
-    services.resolved.enable = true;
+    services.resolved.enable = false;
   };
 }
