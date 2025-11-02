@@ -152,16 +152,16 @@
 
   extra-services.tailscale = {
     enable = true;
-    # userspace-networking = true;
+    userspace-networking = true;
   };
-  boot.kernelModules = [ "tun" ];
-  boot.kernel.sysctl = {
-    "net.ipv4.ip_forward" = 1;
-    "net.ipv6.conf.all.forwarding" = 1;
-  };
+  # boot.kernelModules = [ "tun" ];
+  # boot.kernel.sysctl = {
+  #   "net.ipv4.ip_forward" = 1;
+  #   "net.ipv6.conf.all.forwarding" = 1;
+  # };
 
-  networking.firewall.trustedInterfaces = [ "tailscale0" ];
-  users.users.caddy.extraGroups = [ "tailscale" ];  # if this group exists
+  # networking.firewall.trustedInterfaces = [ "tailscale0" ];
+  # users.users.caddy.extraGroups = [ "tailscale" ];  # if this group exists
   
   services.openssh.enable = true;  
 
