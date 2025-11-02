@@ -48,8 +48,7 @@ in {
         "--reset"
         "--ssh"
         "--accept-routes"
-        "--accept-dns=true"
-        "--exit-node-allow-lan-access=true"
+        "--accept-dns=false"
       ];
     };
     
