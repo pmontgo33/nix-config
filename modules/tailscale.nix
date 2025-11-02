@@ -47,7 +47,7 @@ in {
         "--force-reauth"
         "--reset"
         "--ssh"
-        "--accept-routes"
+        # "--accept-routes"
         "--accept-dns=false"
       ];
     };
