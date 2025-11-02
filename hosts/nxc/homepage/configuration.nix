@@ -19,7 +19,7 @@
 
   extra-services.tailscale = {
     enable = true;
-    lxc = true;
+    userspace-neworking = true;
   };
 
   services.openssh.enable = true;
