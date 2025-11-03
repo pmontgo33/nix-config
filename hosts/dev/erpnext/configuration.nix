@@ -17,8 +17,8 @@ in
   
   services.openssh.enable = true;
 
-  sops.secrets.erpnext-mysql-root-password = {};
-  sops.secrets.erpnext-mysql-password = {};
+  sops.secrets.erpnext-mariadb-root-password = {};
+  sops.secrets.erpnext-mariadb-password = {};
 
   virtualisation.podman = {
     enable = true;
@@ -83,12 +83,14 @@ in
           "${dataDir}/mariadb:/var/lib/mysql"
         ];
         environmentFiles = [
-          config.sops.secrets.erpnext-mysql-root-password.path
-          config.sops.secrets.erpnext-mysql-password.path
+          config.sops.secrets.erpnext-mariadb-root-password.path
+          config.sops.secrets.erpnext-mariadb-password.path
         ];
         environment = {
           MYSQL_DATABASE = "erpnext";
           MYSQL_USER = "erpnext";
+          MARIADB_DATABASE = "erpnext";
+          MARIADB_USER = "erpnext";
         };
         extraOptions = [
           "--network=erpnext-network"
@@ -243,7 +245,7 @@ in
       ADMIN_PASSWORD=''${2:-admin123}
       
       # Read root password from sops secret
-      MYSQL_ROOT_PASSWORD=$(cat ${config.sops.secrets.erpnext-mysql-root-password.path})
+      MARIADB_ROOT_PASSWORD=$(cat ${config.sops.secrets.erpnext-mariadb-root-password.path})
       
       echo "Initializing ERPNext site: $SITE_NAME"
       echo "Waiting for MariaDB to be ready..."
@@ -251,7 +253,7 @@ in
       
       ${pkgs.podman}/bin/podman exec erpnext-backend \
         bench new-site "$SITE_NAME" \
-        --db-root-password "$MYSQL_ROOT_PASSWORD" \
+        --db-root-password "$MARIADB_ROOT_PASSWORD" \
         --admin-password "$ADMIN_PASSWORD" \
         --install-app erpnext \
         --set-default
