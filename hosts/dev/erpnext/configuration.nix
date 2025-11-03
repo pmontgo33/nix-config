@@ -42,9 +42,13 @@ in
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.podman}/bin/podman network create erpnext-network || true";
-      ExecStop = "${pkgs.podman}/bin/podman network rm erpnext-network || true";
     };
+    script = ''
+      ${pkgs.podman}/bin/podman network create erpnext-network || true
+    '';
+    preStop = ''
+      ${pkgs.podman}/bin/podman network rm erpnext-network || true
+    '';
   };
 
   virtualisation.oci-containers = {
