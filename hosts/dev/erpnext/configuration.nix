@@ -218,7 +218,7 @@ in
       ADMIN_PASSWORD=''${2:-admin123}
       
       # Read root password from sops secret
-      MYSQL_ROOT_PASSWORD=$(cat ${config.sops.secrets."erpnext/mysql_root_password".placeholder})
+      MYSQL_ROOT_PASSWORD=$(cat ${config.sops.secrets.erpnext-mysql-root-password.path})
       
       echo "Initializing ERPNext site: $SITE_NAME"
       echo "Waiting for MariaDB to be ready..."
