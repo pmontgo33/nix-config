@@ -33,8 +33,29 @@ in
     "d ${dataDir}/mariadb 0755 root root -"
     "d ${dataDir}/redis-cache 0755 root root -"
     "d ${dataDir}/redis-queue 0755 root root -"
-    "d ${dataDir}/sites 0755 root root -"
+    "d ${dataDir}/sites 0755 1000 1000 -"
   ];
+
+  systemd.services.erpnext-init-sites-dir = {
+    wantedBy = [ "multi-user.target" ];
+    before = [ "podman-erpnext-backend.service" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      if [ ! -f ${dataDir}/sites/apps.txt ]; then
+        echo "Initializing ERPNext sites directory..."
+        cat > ${dataDir}/sites/apps.txt << 'EOF'
+      frappe
+      erpnext
+      EOF
+        chown -R 1000:1000 ${dataDir}/sites
+        echo "Sites directory initialized."
+      fi
+    '';
+  };
 
   systemd.services.podman-erpnext-network = {
     wantedBy = [ "multi-user.target" ];
