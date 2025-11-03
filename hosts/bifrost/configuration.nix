@@ -121,7 +121,7 @@
 
   extra-services.tailscale = {
     enable = true;
-    lxc = true;
+    userspace-networking = true;
   };
 
 
