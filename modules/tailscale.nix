@@ -28,9 +28,7 @@ in {
   ];
 
   config = mkIf cfg.enable {
-    # sops secrets configuration
     sops = {
-      # defaultSopsFile = ../../../secrets/secrets.yaml;
       secrets = {
         "tailscale_auth_key" = {};
       };
@@ -52,7 +50,7 @@ in {
       ];
     };
     
-    networking.nameservers = [ "100.100.100.100" "192.168.86.1" "1.1.1.1" ];
+    networking.nameservers = [ "100.100.100.100" "1.1.1.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
     # services.resolved.enable = false;
   };
