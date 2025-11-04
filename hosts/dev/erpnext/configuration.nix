@@ -54,6 +54,21 @@ in
         chown -R 1000:1000 ${dataDir}/sites
         echo "Sites directory initialized."
       fi
+      
+      # Create common_site_config.json if it doesn't exist
+      if [ ! -f ${dataDir}/sites/common_site_config.json ]; then
+        echo "Creating common site configuration..."
+        cat > ${dataDir}/sites/common_site_config.json << 'EOF'
+      {
+        "db_host": "erpnext-mariadb",
+        "redis_cache": "redis://erpnext-redis-cache:6379",
+        "redis_queue": "redis://erpnext-redis-queue:6379",
+        "redis_socketio": "redis://erpnext-redis-queue:6379"
+      }
+      EOF
+        chown 1000:1000 ${dataDir}/sites/common_site_config.json
+        echo "Common site configuration created."
+      fi
     '';
   };
 
