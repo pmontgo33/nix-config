@@ -1,8 +1,14 @@
 { lib, config, pkgs, inputs, outputs, ... }:
 
+let
+  pkgs-unstable = import inputs.nixpkgs-unstable {
+    system = pkgs.system;
+    config.allowUnfree = true;
+  };
+in
 {
   imports = [ ../../common/home.nix ];
-
+  
   home.packages = with pkgs; [
     kdePackages.kate
     google-chrome
@@ -13,6 +19,7 @@
     # inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.notesnook ##installed via flatpak to get latest version
     # nextcloud-client
     nixos-generators
+    pkgs-unstable.code-cursor
   ];
 
   programs.vscode = {
