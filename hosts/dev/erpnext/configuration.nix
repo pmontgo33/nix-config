@@ -265,12 +265,9 @@ in
       echo "Waiting for MariaDB to be ready..."
       sleep 10
       
-      ${pkgs.podman}/bin/podman exec erpnext-backend \
-        bench new-site "$SITE_NAME" \
-        --db-root-password "$MARIADB_ROOT_PASSWORD" \
-        --admin-password "$ADMIN_PASSWORD" \
-        --install-app erpnext \
-        --set-default
+      # Pass password via environment variable to avoid echo issues
+      ${pkgs.podman}/bin/podman exec -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" erpnext-backend bash -c \
+      "bench new-site '$SITE_NAME' --db-root-password \"\$MYSQL_ROOT_PASSWORD\" --admin-password '$ADMIN_PASSWORD' --install-app erpnext --set-default"
       
       echo "Site initialized successfully!"
       echo "Access ERPNext at: http://localhost:8000"
