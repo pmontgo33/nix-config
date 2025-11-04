@@ -260,8 +260,7 @@ in
       ADMIN_PASSWORD=''${2:-admin123}
       
       # Read root password from sops secret
-      MARIADB_ROOT_PASSWORD=$(cat ${config.sops.secrets.erpnext-mariadb-root-password.path})
-      
+      MYSQL_ROOT_PASSWORD=$(grep MARIADB_ROOT_PASSWORD ${config.sops.secrets.erpnext-mariadb-root-password.path} | cut -d'=' -f2)       
       echo "Initializing ERPNext site: $SITE_NAME"
       echo "Waiting for MariaDB to be ready..."
       sleep 10
