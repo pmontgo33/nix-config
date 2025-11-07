@@ -319,14 +319,6 @@
           UN_RADARR_0_TIMEOUT = "10s";
           UN_RADARR_0_DELETE_ORIG = "false";
           UN_RADARR_0_DELETE_DELAY = "5m";
-          # Readarr Config
-          UN_READARR_0_URL = "http://readarr:8787";
-          UN_READARR_0_API_KEY = "f636d26e54354b059c97a703b55d1110";
-          UN_READARR_0_PATHS_0 = "/mnt/media/downloads";
-          UN_READARR_0_PROTOCOLS = "torrent";
-          UN_READARR_0_TIMEOUT = "10s";
-          UN_READARR_0_DELETE_ORIG = "false";
-          UN_READARR_0_DELETE_DELAY = "5m";
         };
         volumes = [
           "/mnt/media/downloads:/mnt/media/downloads"
