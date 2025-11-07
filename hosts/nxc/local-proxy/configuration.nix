@@ -38,7 +38,7 @@
 
       "wakanda.montycasa.net" = { 
         protocol = "https"; 
-        upstream = "100.122.26.79:8006"; 
+        upstream = "wakanda.skink-galaxy.ts.net:8006"; 
       };
 
       "pbs.montycasa.net" = { 
@@ -147,7 +147,7 @@
 
   extra-services.tailscale = {
     enable = true;
-    # userspace-networking = true;
+    userspace-networking = true;
   };
   
   services.openssh.enable = true;  
