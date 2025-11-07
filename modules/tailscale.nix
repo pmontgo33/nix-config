@@ -36,6 +36,7 @@ in {
     
     services.tailscale = {
       enable = true;
+      package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.tailscale;
       openFirewall = true;
       # Only use userspace networking if LXC mode is enabled
       interfaceName = mkIf cfg.userspace-networking "userspace-networking";
