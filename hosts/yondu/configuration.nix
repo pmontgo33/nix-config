@@ -38,6 +38,7 @@
   extra-services.mount_media.enable = true;
 
   sops.secrets.gluetun-env = {};
+  sops.secrets.unpackerr-env = {};
 
   virtualisation.podman = {
     enable = true;
@@ -71,6 +72,7 @@
         ];
         environmentFiles = [
           config.sops.secrets.gluetun-env.path
+          # WIREGUARD_PRIVATE_KEY
         ];
         environment = {
           VPN_SERVICE_PROVIDER = "protonvpn";
@@ -290,6 +292,11 @@
           "--security-opt=no-new-privileges:true"
           "--network=media-network"
         ];
+        environmentFiles = [
+          config.sops.secrets.unpackerr-env.path
+          # UN_SONARR_0_API_KEY
+          # UN_RADARR_0_API_KEY
+        ];
         environment = {
           TZ = "America/New_York";
           UN_DEBUG = "false";
@@ -305,7 +312,6 @@
           UN_DIR_MODE = "0755";
           # Sonarr Config
           UN_SONARR_0_URL = "http://sonarr:8989";
-          UN_SONARR_0_API_KEY = "656d1d2b26ab4e24a8e3e1ccb1322cf7";
           UN_SONARR_0_PATHS_0 = "/mnt/media/downloads";
           UN_SONARR_0_PROTOCOLS = "torrent";
           UN_SONARR_0_TIMEOUT = "10s";
@@ -313,7 +319,6 @@
           UN_SONARR_0_DELETE_DELAY = "5m";
           # Radarr Config
           UN_RADARR_0_URL = "http://radarr:7878";
-          UN_RADARR_0_API_KEY = "733235c4fa944fc6b24ce9d5213fd660";
           UN_RADARR_0_PATHS_0 = "/mnt/media/downloads";
           UN_RADARR_0_PROTOCOLS = "torrent";
           UN_RADARR_0_TIMEOUT = "10s";
