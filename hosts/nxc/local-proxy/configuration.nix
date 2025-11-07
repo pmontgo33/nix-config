@@ -36,6 +36,11 @@
         upstream = "192.168.86.97:8006"; 
       };
 
+      "wakanda.montycasa.net" = { 
+        protocol = "https"; 
+        upstream = "100.122.26.79:8006"; 
+      };
+
       "pbs.montycasa.net" = { 
         protocol = "https"; 
         upstream = "192.168.86.102:8007"; 
@@ -130,16 +135,6 @@
         protocol = "http"; 
         upstream = "192.168.86.99:20910"; 
       };
-
-      "wakanda.montycasa.net" = { 
-        protocol = "https"; 
-        upstream = "100.122.26.79:8006"; 
-      };
-
-      "bucky.montycasa.net" = { 
-        protocol = "https"; 
-        upstream = "100.118.191.95:443"; 
-      };
     };
 
     # layer4SniServices = {
@@ -152,16 +147,8 @@
 
   extra-services.tailscale = {
     enable = true;
-    userspace-networking = true;
+    lxc = true;
   };
-  # boot.kernelModules = [ "tun" ];
-  # boot.kernel.sysctl = {
-  #   "net.ipv4.ip_forward" = 1;
-  #   "net.ipv6.conf.all.forwarding" = 1;
-  # };
-
-  # networking.firewall.trustedInterfaces = [ "tailscale0" ];
-  # users.users.caddy.extraGroups = [ "tailscale" ];  # if this group exists
   
   services.openssh.enable = true;  
 
