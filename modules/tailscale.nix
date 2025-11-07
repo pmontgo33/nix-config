@@ -46,7 +46,7 @@ in {
         "--reset"
         "--ssh"
         "--accept-routes"
-        "--accept-dns=false"
+        # "--accept-dns=false"
       ];
     };
     
