@@ -151,6 +151,7 @@
   };
   users.users.caddy.extraGroups = [ "tailscale" ];
   networking.firewall.enable = false;
+  nix.settings.sandbox = false;
   
   services.openssh.enable = true;  
 
