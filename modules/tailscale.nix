@@ -7,7 +7,7 @@
  For other, run:
  tailscale up --ssh
  */
-{config, lib, ...}:
+{config, lib, inputs, ...}:
 with lib; let
   cfg = config.extra-services.tailscale;
 in {
@@ -48,7 +48,7 @@ in {
         "--reset"
         "--ssh"
         "--accept-routes"
-        # "--accept-dns=false"
+        "--accept-dns=false"
       ];
     };
     
