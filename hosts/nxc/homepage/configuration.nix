@@ -361,7 +361,7 @@
           {
             "Wakanda" = {
               href = "https://100.122.26.79:8006/";
-              ping = "100.122.26.79:8006";
+              ping = "100.122.26.79";
               description = "Offsite Proxmox VE";
               icon = "sh-proxmox.svg";
               widget = {
