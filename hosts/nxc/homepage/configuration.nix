@@ -360,13 +360,13 @@
         "Offsite" = [
           {
             "Wakanda" = {
-              href = "https://100.122.26.79:8006/";
-              ping = "100.122.26.79";
+              href = "https://wakanda.skink-galaxy.ts.net:8006/";
+              siteMonitor = "https://wakanda.skink-galaxy.ts.net:8006/";
               description = "Offsite Proxmox VE";
               icon = "sh-proxmox.svg";
               widget = {
                 type = "proxmox";
-                url = "https://100.122.26.79:8006/";
+                url = "https://wakanda.skink-galaxy.ts.net:8006";
                 username = "{{HOMEPAGE_VAR_WAKANDA_USERNAME}}";
                 password = "{{HOMEPAGE_VAR_WAKANDA_PASSWORD}}";
                 node = "wakanda";
@@ -375,13 +375,13 @@
           }
           {
             "Bucky TrueNAS" = {
-              href = "https://100.118.191.95/";
-              siteMonitor = "https://100.118.191.95/";
+              href = "https://bucky.skink-galaxy.ts.net/";
+              siteMonitor = "https://bucky.skink-galaxy.ts.net/";
               description = "Offsite TrueNAS Scale";
               icon = "sh-truenas-scale.svg";
               widget = {
                 type = "truenas";
-                url = "https://100.118.191.95/";
+                url = "https://bucky.skink-galaxy.ts.net/";
                 username = "{{HOMEPAGE_VAR_BUCKY_USERNAME}}";
                 password = "{{HOMEPAGE_VAR_BUCKY_PASSWORD}}";
                 nasType = "scale";
