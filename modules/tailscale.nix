@@ -7,7 +7,7 @@
  For other, run:
  tailscale up --ssh
  */
-{config, lib, inputs, ...}:
+{config, lib, pkgs, inputs, ...}:
 with lib; let
   cfg = config.extra-services.tailscale;
 in {
