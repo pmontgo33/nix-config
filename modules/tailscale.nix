@@ -53,6 +53,7 @@ in {
     
     networking.nameservers = [ "100.100.100.100" "192.168.86.1" "1.1.1.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
+    networking.firewall.checkReversePath = "loose";
     # services.resolved.enable = false;
   };
 }
