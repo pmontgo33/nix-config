@@ -54,6 +54,10 @@ in {
     networking.nameservers = [ "100.100.100.100" "192.168.86.1" "1.1.1.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
     networking.firewall.checkReversePath = "loose";
+
+    networking.firewall.trustedInterfaces = [ "tailscale0" ];
+    networking.firewall.allowedUDPPorts = [ config.services.tailscale.port ];
+    networking.firewall.allowedTCPPorts = [ 22 ];
     # services.resolved.enable = false;
   };
 }
