@@ -150,8 +150,7 @@
     # userspace-networking = true;
   };
   users.users.caddy.extraGroups = [ "tailscale" ];
-  networking.sysctl."net.ipv4.ip_forward" = 1;
-  networking.sysctl."net.ipv6.conf.all.forwarding" = 1;
+  networking.firewall.enable = false;
   
   services.openssh.enable = true;  
 
