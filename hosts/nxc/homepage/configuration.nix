@@ -376,7 +376,7 @@
           {
             "Bucky TrueNAS" = {
               href = "https://bucky.montycasa.net/";
-              siteMonitor = "https://montycasa.net/";
+              siteMonitor = "https://bucky.montycasa.net/";
               description = "Offsite TrueNAS Scale";
               icon = "sh-truenas-scale.svg";
               widget = {
