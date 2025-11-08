@@ -47,7 +47,7 @@ in {
         "--force-reauth"
         "--reset"
         "--ssh"
-        "--accept-routes=false"
+        "--accept-routes"
         "--accept-dns=false"
         # "--netfilter-mode=off"
         # "--advertise-routes=192.168.86.0/24"
