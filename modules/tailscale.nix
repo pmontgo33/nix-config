@@ -42,7 +42,7 @@ in {
       interfaceName = mkIf cfg.userspace-networking "userspace-networking";
       authKeyFile = config.sops.secrets.tailscale_auth_key.path;
       useRoutingFeatures = "client";
-      permitCertUid = "caddy";
+      # permitCertUid = "caddy";
       extraUpFlags = [
         "--force-reauth"
         "--reset"
