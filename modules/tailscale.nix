@@ -12,21 +12,23 @@ with lib; let
   cfg = config.extra-services.tailscale;
 in {
   options.extra-services.tailscale = {
-    
     enable = mkEnableOption "enable tailscale config";
-    
     userspace-networking = mkOption {
       type = types.bool;
       default = false;
       description = "Enable userspace networking";
     };
-
+    lxc = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Enable LXC-specific fixes for local network routing";
+    };
   };
   
   imports = [
     ../secrets
   ];
-
+  
   config = mkIf cfg.enable {
     sops = {
       secrets = {
@@ -56,7 +58,40 @@ in {
     
     networking.nameservers = [ "100.100.100.100" "192.168.86.1" "1.1.1.1" ];
     networking.search = [ "skink-galaxy.ts.net" ];
-
-    # services.resolved.enable = false;
+    
+    # LXC-specific fixes
+    networking.firewall.checkReversePath = mkIf cfg.lxc "loose";
+    
+    # Fix for local network routing conflict with Tailscale in LXC
+    systemd.services.fix-tailscale-local-routing = mkIf cfg.lxc {
+      description = "Remove local subnet route from Tailscale routing table";
+      after = [ "tailscaled.service" ];
+      wants = [ "tailscaled.service" ];
+      wantedBy = [ "multi-user.target" ];
+      
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      
+      script = ''
+        # Wait for Tailscale interface to be up
+        for i in {1..30}; do
+          if ${pkgs.iproute2}/bin/ip link show tailscale0 > /dev/null 2>&1; then
+            echo "Tailscale interface is up"
+            break
+          fi
+          sleep 1
+        done
+        
+        # Give Tailscale a moment to set up routes
+        sleep 2
+        
+        # Delete the problematic route that causes local network to be unreachable
+        ${pkgs.iproute2}/bin/ip route del 192.168.86.0/24 dev tailscale0 table 52 2>/dev/null && \
+          echo "Removed 192.168.86.0/24 route from Tailscale routing table" || \
+          echo "Route 192.168.86.0/24 not found in table 52 (this is fine)"
+      '';
+    };
   };
 }
