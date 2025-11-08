@@ -149,7 +149,6 @@
     enable = true;
     userspace-networking = true;
   };
-  users.users.caddy.extraGroups = [ "tailscale" ];
   
   services.openssh.enable = true;  
 
