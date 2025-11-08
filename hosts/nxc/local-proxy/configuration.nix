@@ -37,7 +37,7 @@
       };
 
       "wakanda.montycasa.net" = { 
-        protocol = "http"; 
+        protocol = "https"; 
         upstream = "100.122.26.79:8006"; 
       };
 
