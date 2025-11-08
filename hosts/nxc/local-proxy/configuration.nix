@@ -149,12 +149,10 @@
     enable = true;
     # userspace-networking = true;
   };
-  boot.kernel.sysctl = {
-    "net.ipv4.ip_forward" = 1;
-    "net.ipv6.conf.all.forwarding" = 1;
+  networking.firewall = {
+    trustedInterfaces = [ "tailscale0" ];
+    checkReversePath = "loose";
   };
-  boot.enableContainers = true;
-  virtualisation.lxc.enable = true;
   
   services.openssh.enable = true;  
 
