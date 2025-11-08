@@ -51,6 +51,11 @@
         upstream = "192.168.86.99:443"; 
       };
 
+      "bucky.montycasa.net" = { 
+        protocol = "https"; 
+        upstream = "100.118.191.95:443"; 
+      };
+
       "uptime.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.106:3001"; 
