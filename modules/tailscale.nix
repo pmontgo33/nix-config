@@ -49,6 +49,7 @@ in {
         "--ssh"
         "--accept-routes"
         "--accept-dns=false"
+        "--advertise-routes=192.168.86.0/24"
       ];
     };
     
