@@ -36,10 +36,10 @@
         upstream = "192.168.86.97:8006"; 
       };
 
-      # "wakanda.montycasa.net" = { 
-      #   protocol = "https"; 
-      #   upstream = "100.122.26.79:8006"; 
-      # };
+      "wakanda.montycasa.net" = { 
+        protocol = "https"; 
+        upstream = "100.122.26.79:8006"; 
+      };
 
       "pbs.montycasa.net" = { 
         protocol = "https"; 
@@ -147,7 +147,7 @@
 
   extra-services.tailscale = {
     enable = true;
-    # userspace-networking = true;
+    userspace-networking = true;
   };
   
   services.openssh.enable = true;  
