@@ -153,6 +153,8 @@
     "net.ipv4.ip_forward" = 1;
     "net.ipv6.conf.all.forwarding" = 1;
   };
+  boot.enableContainers = true;
+  virtualisation.lxc.enable = true;
   
   services.openssh.enable = true;  
 
