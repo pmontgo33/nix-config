@@ -49,7 +49,7 @@ in {
         "--ssh"
         "--accept-routes=false"
         "--accept-dns=false"
-        "--netfilter-mode=off"
+        # "--netfilter-mode=off"
         # "--advertise-routes=192.168.86.0/24"
       ];
     };
