@@ -15,15 +15,20 @@ in {
         "--update-input" "nixpkgs"
         "--update-input" "nixpkgs-unstable"
         "--update-input" "home-manager"
-        "-L" # print build logs
+        "-L"
         "--refresh"
       ];
       dates = "Mon *-*-* 02:00:00";
       randomizedDelaySec = "45min";
       operation = "boot";
+      persistent = true;
+    };
+
+    systemd.timers.nixos-upgrade = {
+      timerConfig = {
+        Persistent = true;
+      };
     };
 
   };
 }
-
-  
