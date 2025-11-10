@@ -12,18 +12,16 @@ in {
       enable = true;
       flake = "github:pmontgo33/nix-config#${config.networking.hostName}";
       flags = [
-        "--update-input" "nixpkgs"
-        "--update-input" "nixpkgs-unstable"
-        "--update-input" "home-manager"
-        "-L"
+        "-L" # print build logs
         "--refresh"
       ];
       dates = "Mon *-*-* 02:00:00";
       randomizedDelaySec = "45min";
       operation = "boot";
-      persistent = true;
+      persistent = true;  # Run on next boot if missed
     };
 
+    # Ensure the timer is persistent at the systemd level
     systemd.timers.nixos-upgrade = {
       timerConfig = {
         Persistent = true;
