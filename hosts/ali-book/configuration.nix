@@ -13,6 +13,7 @@
     ];
 
   extra-services.auto-upgrade.enable = true;
+  nix.autoOptimiseStore = true;
   extra-services.tailscale = {
     enable = true;
     tags = ["tag:receive-only"];
