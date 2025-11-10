@@ -361,13 +361,13 @@
         "Offsite" = [
           {
             "Wakanda" = {
-              href = "https://wakanda.montycasa.net/";
-              siteMonitor = "https://wakanda.montycasa.net/";
+              href = "https://wakanda.skink-galaxy.ts.net/";
+              siteMonitor = "https://wakanda.skink-galaxy.ts.net/";
               description = "Offsite Proxmox VE";
               icon = "sh-proxmox.svg";
               widget = {
                 type = "proxmox";
-                url = "https://wakanda.montycasa.net";
+                url = "https://wakanda.skink-galaxy.ts.net";
                 username = "{{HOMEPAGE_VAR_WAKANDA_USERNAME}}";
                 password = "{{HOMEPAGE_VAR_WAKANDA_PASSWORD}}";
                 node = "wakanda";
