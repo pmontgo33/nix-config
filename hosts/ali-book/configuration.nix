@@ -96,6 +96,7 @@
     packages = with pkgs; [
     #  thunderbird
       simplex-chat-desktop
+      cowsay
     ];
   };
 
