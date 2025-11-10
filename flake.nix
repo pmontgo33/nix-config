@@ -46,7 +46,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/ali-book
+        ./hosts/nixbooks/ali-book
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
@@ -66,7 +66,7 @@
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/emma-book
+        ./hosts/nixbooks/emma-book
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager

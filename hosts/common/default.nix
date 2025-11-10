@@ -2,11 +2,10 @@
 
 { lib, pkgs, inputs, outputs, ... }: {
 
-  imports =
-    [
+  imports = [
       ../../modules
       ../../secrets
-    ];
+  ];
 
   environment.systemPackages = with pkgs; [
     wget
