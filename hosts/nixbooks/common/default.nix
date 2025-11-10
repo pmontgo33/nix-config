@@ -3,7 +3,8 @@
   imports = [ ../../common ];
 
   extra-services.auto-upgrade.enable = true;
-  nix.autoOptimiseStore = true;
+  # nix.autoOptimiseStore = true;
+  nix.settings.auto-optimise-store = true;
   extra-services.tailscale = {
     enable = true;
     tags = ["tag:receive-only"];

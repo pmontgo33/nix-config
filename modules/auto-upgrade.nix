@@ -15,7 +15,8 @@ in {
         "-L" # print build logs
         "--refresh"
       ];
-      dates = "Mon *-*-* 02:00:00";
+      # dates = "Mon *-*-* 02:00:00";
+      dates = "Tue *-*-* 02:00:00";
       randomizedDelaySec = "45min";
       operation = "boot";
       persistent = true;  # Run on next boot if missed
