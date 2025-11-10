@@ -23,6 +23,12 @@ in {
       default = false;
       description = "Enable LXC-specific fixes for local network routing";
     };
+    tags = mkOption {
+      type = types.listOf types.str;
+      default = [];
+      example = [ "tag:server" "tag:web" ];
+      description = "Tailscale tags to apply to this node";
+    };
   };
   
   imports = [
@@ -53,7 +59,9 @@ in {
         "--accept-dns=false"
         # "--netfilter-mode=off"
         # "--advertise-routes=192.168.86.0/24"
-      ];
+      ] ++ (optionals (cfg.tags != []) [
+        "--advertise-tags=${concatStringsSep "," cfg.tags}"
+      ]);
     };
     
     networking.nameservers = [ "100.100.100.100" "192.168.86.1" "1.1.1.1" ];
