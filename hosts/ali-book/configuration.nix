@@ -13,6 +13,10 @@
     ];
 
   extra-services.auto-upgrade.enable = true;
+  extra-services.tailscale = {
+    enable = true;
+    tags = ["tag:receive-only"];
+  };
 
   # Enable services for removable media support
   # services.udisks2.enable = true;
