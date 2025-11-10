@@ -56,7 +56,7 @@ in {
         "--reset"
         "--ssh"
         "--accept-routes"
-        "--accept-dns=false"
+        "--accept-dns=true"
         # "--netfilter-mode=off"
         # "--advertise-routes=192.168.86.0/24"
       ] ++ (optionals (cfg.tags != []) [
