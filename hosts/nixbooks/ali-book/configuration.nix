@@ -6,9 +6,13 @@
       ./hardware-configuration.nix
   ];
 
-  networking.hostName = "ali-book"; # Define your hostname.
+  networking.hostName = "ali-book";
+
+  extra-services.tailscale = {
+    enable = true;
+    tags = ["tag:receive-only"];
+  };
   
-  # Filesystem configuration
   fileSystems."/home" = {
     device = "/dev/disk/by-uuid/fcf87905-cdb2-48d3-bf33-7e47d50e33f4";
     fsType = "ext4";
@@ -21,13 +25,11 @@
     ];
   };
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.aleandra = {
     isNormalUser = true;
     description = "Aleandra";
     extraGroups = [ "networkmanager" "wheel" "storage" ];
     packages = with pkgs; [
-    #  thunderbird
       simplex-chat-desktop
       cowsay
     ];

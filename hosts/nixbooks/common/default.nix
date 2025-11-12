@@ -4,10 +4,6 @@
 
   extra-services.auto-upgrade.enable = true;
   nix.autoOptimiseStore = true;
-  extra-services.tailscale = {
-    enable = true;
-    tags = ["tag:receive-only"];
-  };
 
   environment.systemPackages = with pkgs; [
     git
@@ -40,6 +36,7 @@
 
   # Enable networking
   networking.networkmanager.enable = true;
+  networking.wireless.enable = false;
 
   # Set your time zone.
   time.timeZone = "America/New_York";

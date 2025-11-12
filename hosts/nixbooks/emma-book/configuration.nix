@@ -6,9 +6,13 @@
       ./hardware-configuration.nix
   ];
 
-  networking.hostName = "emma-book"; # Define your hostname.
+  networking.hostName = "emma-book";
 
-  # Filesystem configuration
+  extra-services.tailscale = {
+    enable = true;
+    tags = ["tag:receive-only"];
+  };
+
   fileSystems."/home" = {
     device = "/dev/disk/by-uuid/0f2ce08a-5508-4532-b82e-c9007e22776d";
     fsType = "ext4";
@@ -21,7 +25,6 @@
     ];
   };
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.emma = {
     isNormalUser = true;
     description = "Emma";
