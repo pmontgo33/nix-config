@@ -3,7 +3,7 @@
   imports = [ ../../common ];
 
   extra-services.auto-upgrade.enable = true;
-  nix.autoOptimiseStore = true;
+  nix.settings.auto-optimise-store = true;
 
   environment.systemPackages = with pkgs; [
     git
