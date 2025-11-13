@@ -8,7 +8,13 @@ let
 in
 {
   imports = [ ../../common/home.nix ];
-  
+
+  # Enable automatic updates in KDE Discover
+  xdg.configFile."discoverrc".text = ''
+    [Global]
+    UseUnattendedUpdates=true
+  '';
+
   home.packages = with pkgs; [
     kdePackages.kate
     google-chrome
@@ -20,6 +26,8 @@ in
     # nextcloud-client
     nixos-generators
     pkgs-unstable.code-cursor
+    pkgs-unstable.claude-code
+    nodejs_22 #required for claude-code
   ];
 
   programs.vscode = {
@@ -31,6 +39,7 @@ in
       redhat.vscode-yaml # dependency for redhat.ansible
       ms-python.python # dependency for redhat.ansible
       samuelcolvin.jinjahtml
+      pkgs-unstable.vscode-extensions.anthropic.claude-code
     ];
   };
 }

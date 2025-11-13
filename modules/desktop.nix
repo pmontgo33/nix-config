@@ -15,10 +15,8 @@ in {
       kdePackages.kcalc
     ];
 
-    #Install flatpak
-    services.flatpak.enable = true;
+   services.flatpak.enable = true;
 
-    # Install firefox.
     programs.firefox = {
       enable = true;
       policies = {
