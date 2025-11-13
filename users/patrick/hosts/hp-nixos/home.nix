@@ -26,13 +26,13 @@ in
     # nextcloud-client
     nixos-generators
     pkgs-unstable.code-cursor
-    pkgs-unstable.claude-code
-    nodejs_22 #required for claude-code
+    claude-code
+    pkgs-unstable.nodejs_22 #required for claude-code
   ];
 
   programs.vscode = {
     enable = true;
-    package = pkgs.vscodium;
+    package = pkgs-unstable.vscodium;
     profiles.default.extensions = with pkgs.vscode-extensions; [
       jnoortheen.nix-ide
       redhat.ansible
