@@ -26,7 +26,7 @@ in
     # nextcloud-client
     nixos-generators
     pkgs-unstable.code-cursor
-    claude-code
+    pkgs-unstable.claude-code
     pkgs-unstable.nodejs_22 #required for claude-code
   ];
 
@@ -39,7 +39,7 @@ in
       redhat.vscode-yaml # dependency for redhat.ansible
       ms-python.python # dependency for redhat.ansible
       samuelcolvin.jinjahtml
-      pkgs-unstable.vscode-extensions.anthropic.claude-code
+      # pkgs-unstable.vscode-extensions.anthropic.claude-code
     ];
   };
 }

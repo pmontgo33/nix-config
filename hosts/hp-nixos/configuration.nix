@@ -30,7 +30,8 @@
     sshpass
     vlc
     jq
-    
+    numlockx
+
   ];
 
 
@@ -80,6 +81,11 @@
   # Enable the X11 windowing system.
   # You can disable this if you're only using the Wayland session.
   services.xserver.enable = true;
+
+  # Enable Num Lock on X11 startup
+  services.xserver.displayManager.sessionCommands = ''
+    ${pkgs.numlockx}/bin/numlockx on
+  '';
 
   # Enable the KDE Plasma Desktop Environment.
   services.displayManager.sddm.enable = true;
