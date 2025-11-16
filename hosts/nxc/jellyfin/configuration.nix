@@ -20,6 +20,7 @@
   ];
 
   extra-services.mount_media.enable = true;
+  extra-services.mount_home_media.enable = true;
 
   extra-services.tailscale = {
     enable = true;
