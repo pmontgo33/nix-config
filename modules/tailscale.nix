@@ -29,6 +29,12 @@ in {
       example = [ "tag:server" "tag:web" ];
       description = "Tailscale tags to apply to this node";
     };
+    extraFlags = mkOption {
+      type = types.listOf types.str;
+      default = [];
+      example = [ "--advertise-routes=192.168.1.0/24" "--netfilter-mode=off" ];
+      description = "Additional flags to pass to tailscale up";
+    };
   };
   
   imports = [
@@ -61,7 +67,7 @@ in {
         # "--advertise-routes=192.168.86.0/24"
       ] ++ (optionals (cfg.tags != []) [
         "--advertise-tags=${concatStringsSep "," cfg.tags}"
-      ]);
+      ]) ++ cfg.extraFlags;
     };
     
     networking.nameservers = [ "100.100.100.100" "1.1.1.1" ];

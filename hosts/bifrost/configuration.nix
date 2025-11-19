@@ -25,6 +25,12 @@
     extraGroups = [ "wheel" "networkmanager" ];
   };
 
+  extra-services.tailscale = {
+    enable = true;
+    extraFlags = ["--relay-server-port=40000"]
+    # userspace-networking = true;
+  };
+
   services.openssh = {
     enable = true;
    #  permitRootLogin = "yes";
@@ -122,13 +128,6 @@
     #   };
     };
   };
-
-  extra-services.tailscale = {
-    enable = true;
-    # userspace-networking = true;
-  };
-
-
 
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = true;
