@@ -131,6 +131,7 @@
 
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = true;
+  networking.firewall.allowedUDPPorts = [ 40000 ];
 
   # Use the GRUB 2 boot loader.
   boot.loader.grub.enable = true;
