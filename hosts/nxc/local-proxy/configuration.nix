@@ -128,7 +128,7 @@
 
       "myspeed.montycasa.net" = { 
         protocol = "http"; 
-        upstream = "192.168.86.125:5216"; 
+        upstream = "192.168.86.106:5216"; 
       };
 
       "grist.montycasa.net" = { 

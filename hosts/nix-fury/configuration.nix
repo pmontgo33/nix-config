@@ -39,6 +39,37 @@
 
   services.openssh.enable = true;
 
+  # Enable virtualisation for containers
+  virtualisation.podman = {
+    enable = true;
+    dockerCompat = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
+  # Create necessary directories
+  systemd.tmpfiles.rules = [
+    "d /var/lib/myspeed 0755 root root -"
+  ];
+
+  virtualisation.oci-containers = {
+    backend = "podman";
+    containers = {
+      myspeed = {
+        image = "germannewsmaker/myspeed:latest";
+        autoStart = true;
+        ports = [
+          "5216:5216"
+        ];
+        extraOptions = [
+          "--pull=always"
+        ];
+        volumes = [
+          "/var/lib/myspeed:/myspeed/data"
+        ];
+      };
+    };
+  };
+
   services.gotify = {
     enable = true;
     package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.gotify-server;
@@ -85,7 +116,7 @@
   #   host = "smp.montycasa.com";
   # };
 
-  networking.firewall.allowedTCPPorts = [ 8080 3001 ];
+  networking.firewall.allowedTCPPorts = [ 8080 3001 5216 ];
 
   system.stateVersion = "24.05";
 }
