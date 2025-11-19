@@ -27,7 +27,7 @@
 
   extra-services.tailscale = {
     enable = true;
-    extraFlags = ["--relay-server-port=40000"]
+    extraFlags = ["--relay-server-port=40000"];
     # userspace-networking = true;
   };
 
