@@ -5,10 +5,10 @@
 
 {
   imports = [
-    ./hardware-configuration.nix
+    # ./hardware-configuration.nix
     ./disk-config.nix
-    ../../users/patrick/hosts/t570
-    ../../users/lina/hosts/t570
+    ../../users/patrick/hosts/tesseract
+    ../../users/lina/hosts/tesseract
     ../../secrets
   ];
 
@@ -24,12 +24,26 @@
       efi.canTouchEfiVariables = true;
     };
 
+    # Hybrid kernel approach: Latest with LTS fallback
+    # Primary: Latest stable kernel for newest features and optimizations
     kernelPackages = pkgs.linuxPackages_latest;
+
+    # Keep more generations in bootloader to include LTS fallback
+    loader.systemd-boot.configurationLimit = 10;
+
+    # Alternative: Uncomment to switch to LTS as primary (if latest causes issues)
+    # kernelPackages = pkgs.linuxPackages_6_6;
 
     kernelParams = [
       "quiet"
       "splash"
       "mem_sleep_default=deep"  # Better suspend support
+      "intel_pstate=active"      # Intel Pstate for better power management
+      "i915.enable_fbc=1"        # Framebuffer compression
+      "i915.enable_psr=1"        # Panel self refresh
+      "i915.fastboot=1"          # Faster boot times
+      "pcie_aspm=force"          # Force PCIe Active State Power Management
+      # "resume_offset=XXXXX"    # TODO: Add after finding swap offset with: sudo btrfs inspect-internal map-swapfile -r /swap/swapfile
     ];
 
     initrd.availableKernelModules = [
@@ -40,8 +54,18 @@
       "rtsx_pci_sdmmc"
     ];
 
-    # Enable Intel microcode updates
+    # Enable Intel microcode updates and early KMS
     kernelModules = [ "kvm-intel" ];
+    initrd.kernelModules = [ "i915" ];  # Intel graphics early init for smoother boot
+
+    # Hibernation configuration
+    resumeDevice = "/dev/mapper/cryptroot";
+
+    # Intel i915 graphics optimizations
+    extraModprobeConfig = ''
+      options i915 enable_guc=2
+      options i915 enable_fbc=1
+    '';
   };
 
   networking = {
@@ -60,10 +84,9 @@
   hardware = {
     cpu.intel.updateMicrocode = true;
 
-    opengl = {
+    graphics = {
       enable = true;
-      driSupport = true;
-      driSupport32Bit = true;
+      enable32Bit = true;
       extraPackages = with pkgs; [
         intel-media-driver  # LIBVA_DRIVER_NAME=iHD
         vaapiIntel          # LIBVA_DRIVER_NAME=i965 (older but sometimes better)
@@ -90,6 +113,7 @@
     };
 
     # NVIDIA Configuration - Prime Offload (On-Demand)
+    # Best for battery life - NVIDIA only used when explicitly requested
     nvidia = {
       modesetting.enable = true;
       powerManagement.enable = true;
@@ -98,12 +122,18 @@
       nvidiaSettings = true;
       package = config.boot.kernelPackages.nvidiaPackages.stable;
 
-      # NVIDIA Optimus PRIME
+      # NVIDIA Optimus PRIME - Offload Mode (Current)
+      # Use 'nvidia-offload <command>' or 'nvidia-run <command>' to run apps with NVIDIA
       prime = {
         offload = {
           enable = true;
           enableOffloadCmd = true;  # Provides nvidia-offload command
         };
+
+        # Alternative: Sync Mode (uncomment to use)
+        # Both GPUs always active - worse battery, better compatibility
+        # To switch: comment out 'offload' section above, uncomment below
+        # sync.enable = true;
 
         # Get these with: lspci | grep VGA
         # Update after first boot if needed
@@ -113,7 +143,40 @@
     };
   };
 
+  # Enable zram for better performance
+  zramSwap = {
+    enable = true;
+    algorithm = "zstd";
+    memoryPercent = 50;
+    priority = 100;  # Higher priority = used first (before disk swap)
+  };
+
+  # Disk swap configuration with lower priority (fallback)
+  swapDevices = [{
+    device = "/swap/swapfile";
+    priority = 10;  # Lower priority = used after zram is full
+  }];
+
   services = {
+    # Periodical TRIM for SSD longevity and performance
+    fstrim.enable = true;
+
+    # Btrfs automatic scrubbing for data integrity
+    btrfs.autoScrub = {
+      enable = true;
+      interval = "monthly";
+      fileSystems = [ "/" ];
+    };
+
+    # udev rules for better power management
+    udev.extraRules = ''
+      # Disable wake-on-LAN to save power
+      ACTION=="add", SUBSYSTEM=="net", KERNEL=="eth*", RUN+="${pkgs.ethtool}/bin/ethtool -s $name wol d"
+
+      # Auto-suspend USB devices for better battery life
+      ACTION=="add", SUBSYSTEM=="usb", TEST=="power/control", ATTR{power/control}="auto"
+    '';
+
     # TLP for better battery life
     tlp = {
       enable = true;
@@ -131,11 +194,12 @@
         CPU_MAX_PERF_ON_BAT = 50;
 
         # Battery care (extends battery life)
-        START_CHARGE_THRESH_BAT0 = 40;
-        STOP_CHARGE_THRESH_BAT0 = 80;
+        # Optimized thresholds for T570 - higher start, lower stop for better longevity
+        START_CHARGE_THRESH_BAT0 = 75;
+        STOP_CHARGE_THRESH_BAT0 = 85;
 
-        START_CHARGE_THRESH_BAT1 = 40;
-        STOP_CHARGE_THRESH_BAT1 = 80;
+        START_CHARGE_THRESH_BAT1 = 75;
+        STOP_CHARGE_THRESH_BAT1 = 85;
 
         # Disable turbo on battery
         CPU_BOOST_ON_AC = 1;
@@ -144,6 +208,9 @@
         # Runtime power management
         RUNTIME_PM_ON_AC = "auto";
         RUNTIME_PM_ON_BAT = "auto";
+
+        PLATFORM_PROFILE_ON_AC = "performance";
+        PLATFORM_PROFILE_ON_BAT = "balanced";
 
         # USB autosuspend
         USB_AUTOSUSPEND = 1;
@@ -176,6 +243,18 @@
 
   # Use systemd in initrd (required for TPM2)
   boot.initrd.systemd.enable = true;
+
+  # Systemd optimizations for faster shutdown/reboot
+  systemd.extraConfig = ''
+    DefaultTimeoutStopSec=10s
+  '';
+
+  # Enable systemd-oomd for better memory pressure handling
+  systemd.oomd = {
+    enable = true;
+    enableRootSlice = true;
+    enableUserSlices = true;
+  };
 
   services.xserver = {
     enable = true;
@@ -212,7 +291,6 @@
 
   services.desktopManager.plasma6.enable = true;
 
-  sound.enable = true;
   hardware.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {

@@ -10,13 +10,42 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     sops-nix = {
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, sops-nix, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, ... }: {
+
+    ## tesseract ##
+    nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = { inherit inputs; };
+      modules = [
+        ./hosts/tesseract
+        disko.nixosModules.disko
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+
+          home-manager.users.patrick = import ./users/patrick/hosts/tesseract/home.nix;
+          home-manager.users.lina = import ./users/lina/hosts/tesseract/home.nix;
+
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
 
     ## hp-nixos ##
     nixosConfigurations.hp-nixos = nixpkgs.lib.nixosSystem {
