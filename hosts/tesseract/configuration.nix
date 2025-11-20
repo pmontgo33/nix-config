@@ -52,6 +52,7 @@
       "usb_storage"
       "sd_mod"
       "rtsx_pci_sdmmc"
+      "iwlwifi"  # Intel WiFi driver
     ];
 
     # Enable Intel microcode updates and early KMS
@@ -89,7 +90,10 @@
 
   # Enable WiFi firmware
   hardware.enableRedistributableFirmware = true;
-  hardware.firmware = [ pkgs.wireless-regdb ];
+  hardware.firmware = with pkgs; [
+    wireless-regdb
+    linux-firmware  # Additional firmware including Intel WiFi
+  ];
 
   hardware = {
     cpu.intel.updateMicrocode = true;
