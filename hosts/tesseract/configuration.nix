@@ -56,7 +56,7 @@
     ];
 
     # Enable Intel microcode updates and early KMS
-    kernelModules = [ "kvm-intel" "iwlwifi" ];  # iwlwifi for Intel WiFi
+    kernelModules = [ "kvm-intel" "iwlwifi" "iwlmvm" ];  # iwlwifi + iwlmvm for Intel WiFi
     initrd.kernelModules = [ "i915" ];  # Intel graphics early init for smoother boot
 
     # Hibernation configuration
@@ -73,11 +73,19 @@
     hostName = "tesseract";
     networkmanager = {
       enable = true;
-      wifi.powersave = false;  # Disable WiFi power saving initially for stability
+      wifi = {
+        powersave = false;  # Disable WiFi power saving initially for stability
+        scanRandMacAddress = false;  # Disable MAC randomization for stability
+      };
+      # Ensure WiFi is managed by NetworkManager
+      unmanaged = [ ];
     };
 
     # Enable DHCP (from hardware-configuration.nix)
     useDHCP = lib.mkDefault true;
+
+    # Make sure wireless is enabled globally
+    wireless.enable = lib.mkDefault false;  # Disable wpa_supplicant (conflicts with NetworkManager)
 
     # Firewall
     firewall = {
