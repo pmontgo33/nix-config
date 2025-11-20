@@ -14,7 +14,7 @@
 
   extra-services.desktop.enable = true;
   extra-services.tailscale.enable = true;
-  extra-services.mount_home_media.enable = true;
+  # extra-services.mount_home_media.enable = true;
   extra-services.pbs-home-dirs.enable = true;
   extra-services.auto-upgrade.enable = true;
 
@@ -43,7 +43,7 @@
       "i915.enable_psr=1"        # Panel self refresh
       "i915.fastboot=1"          # Faster boot times
       "pcie_aspm=force"          # Force PCIe Active State Power Management
-      # "resume_offset=XXXXX"    # TODO: Add after finding swap offset with: sudo btrfs inspect-internal map-swapfile -r /swap/swapfile
+      "resume_offset=533760"      # Hybernate swap file offset
     ];
 
     initrd.availableKernelModules = [
@@ -89,11 +89,13 @@
   };
 
   # Enable WiFi firmware for Intel AC 8265
-  hardware.enableRedistributableFirmware = true;
+  hardware.enableRedistributableFirmware = lib.mkForce true;
 
-  # Explicitly include Intel WiFi firmware
+  # Explicitly include Intel WiFi firmware packages
   hardware.firmware = with pkgs; [
     wireless-regdb
+    linux-firmware
+    firmwareLinuxNonfree
   ];
 
   hardware = {
