@@ -5,7 +5,7 @@
 
 {
   imports = [
-    # ./hardware-configuration.nix
+    ./hardware-configuration.nix
     ./disk-config.nix
     ../../users/patrick/hosts/tesseract
     ../../users/lina/hosts/tesseract
