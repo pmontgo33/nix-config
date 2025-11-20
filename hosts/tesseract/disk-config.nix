@@ -122,13 +122,11 @@
     # TPM2 unlock configuration
     # This will be enrolled after first boot with:
     # sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+7 /dev/nvme0n1p2
+    # Note: fallbackToPassword is automatically enabled in systemd stage 1
     crypttabExtraOpts = [
       "tpm2-device=auto"
       "tpm2-pcrs=0+7"
     ];
-    
-    # Fallback to password if TPM fails
-    fallbackToPassword = true;
   };
   
   # =============================

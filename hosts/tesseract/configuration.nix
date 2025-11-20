@@ -158,6 +158,10 @@
   }];
 
   services = {
+    # Disable power-profiles-daemon (conflicts with TLP)
+    # KDE Plasma 6 enables this by default, but we're using TLP instead
+    power-profiles-daemon.enable = false;
+
     # Periodical TRIM for SSD longevity and performance
     fstrim.enable = true;
 
