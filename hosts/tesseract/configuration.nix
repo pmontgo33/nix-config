@@ -336,7 +336,7 @@
   environment.systemPackages = with pkgs; [
     # From hp-nixos
     ansible
-    ansible-lint
+    # ansible-lint  # Temporarily disabled due to dependency conflict in nixpkgs 25.05
     terraform
     sshpass
     vlc
