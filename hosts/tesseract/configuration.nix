@@ -55,7 +55,7 @@
     ];
 
     # Enable Intel microcode updates and early KMS
-    kernelModules = [ "kvm-intel" ];
+    kernelModules = [ "kvm-intel" "iwlwifi" ];  # iwlwifi for Intel WiFi
     initrd.kernelModules = [ "i915" ];  # Intel graphics early init for smoother boot
 
     # Hibernation configuration
@@ -70,7 +70,10 @@
 
   networking = {
     hostName = "tesseract";
-    networkmanager.enable = true;
+    networkmanager = {
+      enable = true;
+      wifi.powersave = false;  # Disable WiFi power saving initially for stability
+    };
 
     # Firewall
     firewall = {
@@ -80,6 +83,10 @@
       # allowedUDPPorts = [ ];
     };
   };
+
+  # Enable WiFi firmware
+  hardware.enableRedistributableFirmware = true;
+  hardware.firmware = [ pkgs.wireless-regdb ];
 
   hardware = {
     cpu.intel.updateMicrocode = true;
@@ -264,38 +271,39 @@
     enable = true;
     videoDrivers = [ "nvidia" "intel" ];
 
-    # KDE Plasma 6
-    displayManager = {
-      sddm = {
-        enable = true;
-        autoNumlock = true;
-      };
-      sessionCommands = ''
-        ${pkgs.numlockx}/bin/numlockx on
-      '';
-    };
-
     # Keyboard layout
     xkb = {
       layout = "us";
       variant = "";
     };
+  };
 
-    # Touchpad
-    libinput = {
-      enable = true;
-      touchpad = {
-        naturalScrolling = true;
-        tapping = true;
-        disableWhileTyping = true;
-        accelProfile = "adaptive";
-      };
+  # Display Manager (moved out of xserver in 25.05)
+  services.displayManager.sddm = {
+    enable = true;
+    autoNumlock = true;
+  };
+
+  # Session startup commands (for Plasma/X11 sessions)
+  services.xserver.displayManager.sessionCommands = ''
+    ${pkgs.numlockx}/bin/numlockx on
+  '';
+
+  # Touchpad configuration (moved out of xserver in 25.05)
+  services.libinput = {
+    enable = true;
+    touchpad = {
+      naturalScrolling = true;
+      tapping = true;
+      disableWhileTyping = true;
+      accelProfile = "adaptive";
     };
   };
 
   services.desktopManager.plasma6.enable = true;
 
-  hardware.pulseaudio.enable = false;
+  # Audio configuration
+  services.pulseaudio.enable = false;  # Using PipeWire instead
   security.rtkit.enable = true;
   services.pipewire = {
     enable = true;
