@@ -306,7 +306,7 @@
 
   services.printing = {
     enable = true;
-    drivers = [ pkgs.canon-cups-ufr2 ];
+    # drivers = [ pkgs.canon-cups-ufr2 ];  # Disabled - causes build issues and may not be needed
     browsing = true;
   };
 
