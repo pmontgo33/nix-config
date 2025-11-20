@@ -88,15 +88,19 @@
     };
   };
 
-  # Enable WiFi firmware
+  # Enable WiFi firmware for Intel AC 8265
   hardware.enableRedistributableFirmware = true;
+
+  # Explicitly include Intel WiFi firmware
   hardware.firmware = with pkgs; [
     wireless-regdb
-    linux-firmware  # Additional firmware including Intel WiFi
   ];
 
   hardware = {
     cpu.intel.updateMicrocode = true;
+
+    # Ensure WiFi firmware is available
+    enableAllFirmware = lib.mkForce true;
 
     graphics = {
       enable = true;
