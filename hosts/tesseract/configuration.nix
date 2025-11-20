@@ -1,11 +1,11 @@
 # ThinkPad T570 Configuration
 # Optimized for Intel/NVIDIA hybrid graphics, LUKS encryption, and mobile use
 
-{ config, pkgs, inputs, ... }:
+{ config, lib, pkgs, inputs, ... }:
 
 {
   imports = [
-    ./hardware-configuration.nix
+    # ./hardware-configuration.nix  # Not needed - disko manages filesystems
     ./disk-config.nix
     ../../users/patrick/hosts/tesseract
     ../../users/lina/hosts/tesseract
@@ -74,6 +74,9 @@
       enable = true;
       wifi.powersave = false;  # Disable WiFi power saving initially for stability
     };
+
+    # Enable DHCP (from hardware-configuration.nix)
+    useDHCP = lib.mkDefault true;
 
     # Firewall
     firewall = {
