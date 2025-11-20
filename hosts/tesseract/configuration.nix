@@ -350,7 +350,7 @@
     tpm2-tools
 
     # NVIDIA tools
-    nvtopPackages.full
+    nvtopPackages.nvidia  # Use nvidia variant instead of full (avoids CUDA dependencies)
 
     # Hibernation tools
     pmutils
