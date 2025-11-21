@@ -186,9 +186,8 @@
   }];
 
   services = {
-    # Disable power-profiles-daemon (conflicts with TLP)
-    # KDE Plasma 6 enables this by default, but we're using TLP instead
-    power-profiles-daemon.enable = false;
+    # Enable power-profiles-daemon for GUI profile switching in KDE
+    power-profiles-daemon.enable = true;
 
     # Periodical TRIM for SSD longevity and performance
     fstrim.enable = true;
@@ -208,50 +207,6 @@
       # Auto-suspend USB devices for better battery life
       ACTION=="add", SUBSYSTEM=="usb", TEST=="power/control", ATTR{power/control}="auto"
     '';
-
-    # TLP for better battery life
-    tlp = {
-      enable = true;
-      settings = {
-        # CPU scaling
-        CPU_SCALING_GOVERNOR_ON_AC = "performance";
-        CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
-
-        CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
-        CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
-
-        CPU_MIN_PERF_ON_AC = 0;
-        CPU_MAX_PERF_ON_AC = 100;
-        CPU_MIN_PERF_ON_BAT = 0;
-        CPU_MAX_PERF_ON_BAT = 50;
-
-        # Battery care (extends battery life)
-        # Optimized thresholds for T570 - higher start, lower stop for better longevity
-        START_CHARGE_THRESH_BAT0 = 75;
-        STOP_CHARGE_THRESH_BAT0 = 85;
-
-        START_CHARGE_THRESH_BAT1 = 75;
-        STOP_CHARGE_THRESH_BAT1 = 85;
-
-        # Disable turbo on battery
-        CPU_BOOST_ON_AC = 1;
-        CPU_BOOST_ON_BAT = 0;
-
-        # Runtime power management
-        RUNTIME_PM_ON_AC = "auto";
-        RUNTIME_PM_ON_BAT = "auto";
-
-        PLATFORM_PROFILE_ON_AC = "performance";
-        PLATFORM_PROFILE_ON_BAT = "balanced";
-
-        # USB autosuspend
-        USB_AUTOSUSPEND = 1;
-
-        # SATA link power management
-        SATA_LINKPWR_ON_AC = "max_performance";
-        SATA_LINKPWR_ON_BAT = "min_power";
-      };
-    };
 
     # Thermal management
     thermald.enable = true;

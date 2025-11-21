@@ -19,9 +19,13 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    nix-flatpak = {
+      url = "github:gmodena/nix-flatpak";
+    };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, nix-flatpak, ... }: {
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
@@ -42,7 +46,10 @@
           home-manager.users.patrick = import ./users/patrick/hosts/tesseract/home.nix;
           home-manager.users.lina = import ./users/lina/hosts/tesseract/home.nix;
 
-          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+          home-manager.sharedModules = [
+            sops-nix.homeManagerModules.sops
+            nix-flatpak.homeManagerModules.nix-flatpak
+          ];
         }
       ];
     };

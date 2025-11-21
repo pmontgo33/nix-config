@@ -30,6 +30,17 @@ in
     pkgs-unstable.nodejs_22 #required for claude-code
   ];
 
+  services.flatpak.enable = true;
+
+  services.flatpak.packages = [
+    "com.notesnook.Notesnook"
+  ];
+
+  services.flatpak.update.auto = {
+    enable = true;
+    onCalendar = "daily"; # Options: daily, weekly, monthly, or a systemd timer format like "12:00"
+  };
+
   programs.vscode = {
     enable = true;
     package = pkgs-unstable.vscodium;
