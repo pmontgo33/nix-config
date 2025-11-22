@@ -132,6 +132,8 @@ in {
       wants = [ "network-online.target" "sops-nix.service" ];
       after = [ "network-online.target" "sops-nix.service" ];
       requires = [ "network-online.target" ];  # Fail if network not available
+      # Prevent service from running during nixos-rebuild switch
+      restartIfChanged = false;
       serviceConfig = {
         Type = "oneshot";
         User = "root";
@@ -211,17 +213,17 @@ in {
               --backup-id "$BACKUP_ID" \
               --backup-time $(date +%s) \
               home.pxar:/home \
-              --exclude=/home/*/.cache \
-              --exclude=/home/*/.local/share/Trash \
-              --exclude=/home/*/.thumbnails \
-              --exclude=/home/*/Downloads \
-              --exclude=/home/*/Nextcloud \
-              --exclude=/home/*/mnt \
-              --exclude=/home/*/.npm \
-              --exclude=/home/*/.cargo/registry \
-              --exclude=/home/*/.cargo/git \
-              --exclude=/home/*/.rustup/toolchains \
-              --exclude=/home/*/.local/share/Steam \
+              --exclude='*/.cache' \
+              --exclude='*/.local/share/Trash' \
+              --exclude='*/.thumbnails' \
+              --exclude='*/Downloads' \
+              --exclude='*/Nextcloud' \
+              --exclude='*/mnt' \
+              --exclude='*/.npm' \
+              --exclude='*/.cargo/registry' \
+              --exclude='*/.cargo/git' \
+              --exclude='*/.rustup/toolchains' \
+              --exclude='*/.local/share/Steam' \
               --exclude='*.tmp' \
               --exclude='*.temp' \
               --exclude='node_modules' \

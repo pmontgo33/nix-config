@@ -199,13 +199,13 @@
     };
 
     # udev rules for better power management
-    udev.extraRules = ''
-      # Disable wake-on-LAN to save power
-      ACTION=="add", SUBSYSTEM=="net", KERNEL=="eth*", RUN+="${pkgs.ethtool}/bin/ethtool -s $name wol d"
+    # udev.extraRules = ''
+    #   # Disable wake-on-LAN to save power
+    #   ACTION=="add", SUBSYSTEM=="net", KERNEL=="eth*", RUN+="${pkgs.ethtool}/bin/ethtool -s $name wol d"
 
-      # Auto-suspend USB devices for better battery life
-      ACTION=="add", SUBSYSTEM=="usb", TEST=="power/control", ATTR{power/control}="auto"
-    '';
+    #   # Auto-suspend USB devices for better battery life
+    #   ACTION=="add", SUBSYSTEM=="usb", TEST=="power/control", ATTR{power/control}="auto"
+    # '';
 
     # Thermal management
     thermald.enable = true;
@@ -213,11 +213,11 @@
     # Firmware updates
     fwupd.enable = true;
 
-    # Auto-suspend on lid close
+    # Auto-suspend/hibernate on lid close
     logind = {
-      lidSwitch = "suspend";
+      lidSwitch = "hibernate";  # On battery: hibernate immediately
       lidSwitchDocked = "ignore";
-      lidSwitchExternalPower = "suspend";
+      lidSwitchExternalPower = "suspend-then-hibernate";  # On AC: sleep then hibernate
     };
   };
 
