@@ -74,14 +74,13 @@
     networkmanager = {
       enable = true;
       wifi = {
-        powersave = false;  # Disable WiFi power saving initially for stability
-        scanRandMacAddress = false;  # Disable MAC randomization for stability
+        powersave = true;
+        scanRandMacAddress = true;
       };
       # Ensure WiFi is managed by NetworkManager
       unmanaged = [ ];
     };
 
-    # Enable DHCP (from hardware-configuration.nix)
     useDHCP = lib.mkDefault true;
 
     # Make sure wireless is enabled globally
@@ -163,10 +162,10 @@
         # To switch: comment out 'offload' section above, uncomment below
         # sync.enable = true;
 
-        # Get these with: lspci | grep VGA
-        # Update after first boot if needed
+        # Intel HD Graphics 620: 00:02.0
+        # NVIDIA GeForce 940MX: 02:00.0
         intelBusId = "PCI:0:2:0";
-        nvidiaBusId = "PCI:1:0:0";
+        nvidiaBusId = "PCI:2:0:0";
       };
     };
   };
@@ -245,7 +244,7 @@
 
   services.xserver = {
     enable = true;
-    videoDrivers = [ "nvidia" "intel" ];
+    videoDrivers = [ "nvidia" "modesetting" ];
 
     # Keyboard layout
     xkb = {

@@ -2,6 +2,8 @@
 
 with lib; let
   cfg = config.extra-services.pbs-home-dirs;
+  pbsRepository = "192.168.86.102:8007:pbs";
+  pbsHost = "192.168.86.102";
 in {
   options.extra-services.pbs-home-dirs.enable = mkEnableOption "enable pbc-home-dirs config";
 
@@ -54,7 +56,7 @@ in {
           exit 1
         fi
 
-        export PBS_REPOSITORY="192.168.86.102:8007:pbs"
+        export PBS_REPOSITORY="${pbsRepository}"
         export PBS_PASSWORD="$(cat ${config.sops.secrets.pbs-password.path})"
         export PBS_FINGERPRINT="$(cat ${config.sops.secrets.pbs-fingerprint.path})"
 
@@ -74,7 +76,7 @@ in {
         echo "=== PBS Debug Information ==="
         echo "Password file exists: $(test -f ${config.sops.secrets.pbs-password.path} && echo "YES" || echo "NO")"
         echo "Fingerprint file exists: $(test -f ${config.sops.secrets.pbs-fingerprint.path} && echo "YES" || echo "NO")"
-        echo "Password length: $(cat ${config.sops.secrets.pbs-password.path} | wc -c)"
+        echo "Password file readable: $(test -r ${config.sops.secrets.pbs-password.path} && echo "YES" || echo "NO")"
         echo "Fingerprint: $(cat ${config.sops.secrets.pbs-fingerprint.path})"
         echo
         echo "Testing different repository formats:"
@@ -102,13 +104,26 @@ in {
       '')
     ];
 
-    # Timer for home directories backup - 1 minute after user login
+    # Timer for home directories backup - daily with catch-up on boot
     systemd.timers.proxmox-backup-homes = {
-      description = "Run Proxmox home directories backup 1 minute after user login";
+      description = "Daily Proxmox home directories backup";
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnActiveSec = "1min";  # Run 1 minute after the timer itself is activated
+        OnCalendar = "daily";  # Run once per day
+        Persistent = true;     # If the system was off during a scheduled run, execute on next boot
+        RandomizedDelaySec = "30m";  # Add 0-30min random delay to spread load across multiple machines
       };
+    };
+
+    # Log rotation for backup logs
+    services.logrotate.settings.proxmox-backup-homes = {
+      files = "/var/log/proxmox-backup-homes.log";
+      frequency = "weekly";
+      rotate = 4;
+      compress = true;
+      delaycompress = true;
+      missingok = true;
+      notifempty = true;
     };
 
     # Create Backup of all Home directories
@@ -120,6 +135,11 @@ in {
       serviceConfig = {
         Type = "oneshot";
         User = "root";
+        Restart = "on-failure";
+        RestartSec = "5min";
+        # Limit retry attempts to avoid infinite loops
+        StartLimitBurst = 3;
+        StartLimitIntervalSec = "1h";
         ExecStart = "${pkgs.writeShellScript "proxmox-backup-homes" ''
           #!${pkgs.bash}/bin/bash
           set -euo pipefail  # Exit on any error, undefined variable, or pipe failure
@@ -128,7 +148,7 @@ in {
           export PATH="${pkgs.coreutils}/bin:${pkgs.iputils}/bin:${pkgs.openssh}/bin:${pkgs.proxmox-backup-client}/bin:$PATH"
 
           # Set environment variables for authentication (using same format as working pbs-list-backups)
-          export PBS_REPOSITORY="192.168.86.102:8007:pbs"
+          export PBS_REPOSITORY="${pbsRepository}"
           export PBS_PASSWORD="$(cat ${config.sops.secrets.pbs-password.path})"
           export PBS_FINGERPRINT="$(cat ${config.sops.secrets.pbs-fingerprint.path})"
 
@@ -145,7 +165,6 @@ in {
           log_message "Starting home directories backup"
           log_message "Repository: $PBS_REPOSITORY"
           log_message "Backup ID: $BACKUP_ID"
-          log_message "Debug - PBS_PASSWORD length: $(echo -n "$PBS_PASSWORD" | wc -c)"
           log_message "Debug - PBS_FINGERPRINT: $PBS_FINGERPRINT"
 
           # Debug: Check if proxmox-backup-client is available
@@ -153,7 +172,7 @@ in {
           log_message "Debug - PATH: $PATH"
 
           # Check connectivity - extract just the IP address
-          PBS_HOST="192.168.86.102"
+          PBS_HOST="${pbsHost}"
           log_message "Testing connectivity to $PBS_HOST"
           if ! ping -c 1 -W 5 "$PBS_HOST" > /dev/null 2>&1; then
               log_message "ERROR: PBS server $PBS_HOST not reachable"
@@ -179,7 +198,6 @@ in {
               log_message "Error output:"
               cat /tmp/pbs_auth_test.out | tee -a "$LOG_FILE"
               log_message "Repository used: $PBS_REPOSITORY"
-              log_message "Password length: $(echo -n "$PBS_PASSWORD" | wc -c)"
               log_message "Fingerprint: $PBS_FINGERPRINT"
               rm -f /tmp/pbs_auth_test.out
               exit 1
@@ -199,9 +217,14 @@ in {
               --exclude=/home/*/Downloads \
               --exclude=/home/*/Nextcloud \
               --exclude=/home/*/mnt \
+              --exclude=/home/*/.npm \
+              --exclude=/home/*/.cargo/registry \
+              --exclude=/home/*/.cargo/git \
+              --exclude=/home/*/.rustup/toolchains \
+              --exclude=/home/*/.local/share/Steam \
               --exclude='*.tmp' \
+              --exclude='*.temp' \
               --exclude='node_modules' \
-              --exclude='.git' \
               2>&1 | tee -a "$LOG_FILE"; then
               log_message "Home directories backup completed successfully"
           else
