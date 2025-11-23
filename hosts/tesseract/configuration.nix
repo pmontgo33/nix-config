@@ -43,7 +43,9 @@
       "i915.enable_psr=1"        # Panel self refresh
       "i915.fastboot=1"          # Faster boot times
       "pcie_aspm=force"          # Force PCIe Active State Power Management
-      "resume_offset=533760"      # Hybernate swap file offset
+      "resume_offset=46005252"    # Hibernate swap file offset (recalculated for nocow swap file)
+      "nvme_core.default_ps_max_latency_us=0"  # Disable NVMe power saving for stability
+      "nvidia.NVreg_PreserveVideoMemoryAllocations=0"  # Disable NVIDIA hibernate video memory preservation (causes boot issues)
     ];
 
     initrd.availableKernelModules = [
@@ -143,8 +145,8 @@
     # Best for battery life - NVIDIA only used when explicitly requested
     nvidia = {
       modesetting.enable = true;
-      powerManagement.enable = true;
-      powerManagement.finegrained = true;  # Enable dynamic power management
+      powerManagement.enable = false;  # Disabled - causes hibernate/resume issues with NVMe detection
+      powerManagement.finegrained = false;  # Disabled - interferes with hibernate
       open = false;  # Use proprietary driver (better support for older GPUs)
       nvidiaSettings = true;
       package = config.boot.kernelPackages.nvidiaPackages.stable;
@@ -185,8 +187,38 @@
   }];
 
   services = {
-    # Enable power-profiles-daemon for GUI profile switching in KDE
-    power-profiles-daemon.enable = true;
+    # Disable power-profiles-daemon (conflicts with TLP)
+    power-profiles-daemon.enable = false;
+
+    # Use TLP for better hibernate support and power management
+    tlp = {
+      enable = true;
+      settings = {
+        # CPU scaling governor
+        # On AC: full performance, On battery: balanced (can use 'sudo tlp ac' for temp performance boost)
+        CPU_SCALING_GOVERNOR_ON_AC = "performance";
+        CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
+
+        # CPU Energy/Performance Policy (HWP)
+        CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
+        CPU_ENERGY_PERF_POLICY_ON_BAT = "balance_power";
+
+        # Allow turbo boost (can be enabled for performance when needed)
+        CPU_BOOST_ON_AC = 1;
+        CPU_BOOST_ON_BAT = 1;  # Enable turbo even on battery (you can disable if needed)
+
+        # Platform profile (for systems that support it)
+        PLATFORM_PROFILE_ON_AC = "performance";
+        PLATFORM_PROFILE_ON_BAT = "balanced";
+
+        # NVMe power management: Controlled via kernel parameter (nvme_core.default_ps_max_latency_us=0)
+        # Set to 0 for max stability - prevents NVMe from entering power-saving states
+
+        # WiFi power saving
+        WIFI_PWR_ON_AC = "off";
+        WIFI_PWR_ON_BAT = "on";
+      };
+    };
 
     # Periodical TRIM for SSD longevity and performance
     fstrim.enable = true;
@@ -213,13 +245,18 @@
     # Firmware updates
     fwupd.enable = true;
 
-    # Auto-suspend/hibernate on lid close
+    # Auto-suspend-then-hibernate on lid close
     logind = {
-      lidSwitch = "hibernate";  # On battery: hibernate immediately
+      lidSwitch = "suspend-then-hibernate";  # Suspend first, then hibernate after timeout
       lidSwitchDocked = "ignore";
-      lidSwitchExternalPower = "suspend-then-hibernate";  # On AC: sleep then hibernate
+      lidSwitchExternalPower = "suspend-then-hibernate";
     };
   };
+
+  # Configure suspend-then-hibernate timing
+  systemd.sleep.extraConfig = ''
+    HibernateDelaySec=2h
+  '';
 
   security.tpm2 = {
     enable = true;
