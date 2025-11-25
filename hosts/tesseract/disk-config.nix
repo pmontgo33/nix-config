@@ -1,5 +1,5 @@
-# Disk Configuration for ThinkPad T570
-# 512GB NVMe with LUKS encryption, TPM2 auto-unlock, btrfs, and hibernation
+# Disk Configuration for ThinkPad P53s
+# 1TB NVMe with LUKS encryption, TPM2 auto-unlock, btrfs, and hibernation
 
 {
   disko.devices = {
@@ -91,14 +91,13 @@
                     };
                     
                     # Swap subvolume for hibernation
-                    # 16GB = typical RAM size for T570
-                    # Adjust if you have different RAM amount
+                    # 32GB = RAM size for P53s
                     "/swap" = {
                       mountpoint = "/swap";
                       mountOptions = [ "noatime" ];
                       swap = {
                         swapfile = {
-                          size = "16G";  # Match your RAM size
+                          size = "32G";  # Match your 32GB RAM
                         };
                       };
                     };

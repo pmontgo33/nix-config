@@ -1,4 +1,5 @@
-# ThinkPad T570 Configuration
+# ThinkPad P53s Configuration
+# Intel i7-8665U VPro @ 1.90GHz, 32GB RAM, 1TB NVMe, NVIDIA Quadro P520
 # Optimized for Intel/NVIDIA hybrid graphics, LUKS encryption, and mobile use
 
 { config, lib, pkgs, inputs, ... }:
@@ -43,9 +44,9 @@
       "i915.enable_psr=1"        # Panel self refresh
       "i915.fastboot=1"          # Faster boot times
       "pcie_aspm=force"          # Force PCIe Active State Power Management
-      "resume_offset=46005252"    # Hibernate swap file offset (recalculated for nocow swap file)
-      "nvme_core.default_ps_max_latency_us=0"  # Disable NVMe power saving for stability
-      "nvidia.NVreg_PreserveVideoMemoryAllocations=0"  # Disable NVIDIA hibernate video memory preservation (causes boot issues)
+      "resume_offset=46005252"    # IMPORTANT: Recalculate after install with: sudo btrfs inspect-internal map-swapfile -r /swap/swapfile
+      "nvme_core.default_ps_max_latency_us=5000"  # NVMe power saving (0=disabled, 5000=moderate savings) - test for stability
+      "nvidia.NVreg_PreserveVideoMemoryAllocations=0"  # Disabled for conservative power mgmt - change to 1 if enabling finegrained
     ];
 
     initrd.availableKernelModules = [
@@ -64,10 +65,11 @@
     # Hibernation configuration
     resumeDevice = "/dev/mapper/cryptroot";
 
-    # Intel i915 graphics optimizations
+    # Intel i915 graphics optimizations (UHD Graphics 620)
     extraModprobeConfig = ''
-      options i915 enable_guc=2
+      options i915 enable_guc=3
       options i915 enable_fbc=1
+      options i915 fastboot=1
     '';
   };
 
@@ -97,7 +99,7 @@
     };
   };
 
-  # Enable WiFi firmware for Intel AC 8265
+  # Enable WiFi firmware for Intel WiFi (P53s: typically AX200/9560)
   hardware.enableRedistributableFirmware = lib.mkForce true;
 
   # Explicitly include Intel WiFi firmware packages
@@ -145,11 +147,11 @@
     # Best for battery life - NVIDIA only used when explicitly requested
     nvidia = {
       modesetting.enable = true;
-      powerManagement.enable = false;  # Disabled - causes hibernate/resume issues with NVMe detection
-      powerManagement.finegrained = false;  # Disabled - interferes with hibernate
-      open = false;  # Use proprietary driver (better support for older GPUs)
+      powerManagement.enable = false;  # Disabled initially - enable after confirming hibernate works
+      powerManagement.finegrained = false;  # Disabled initially - can enable for battery life after testing
+      open = false;  # Use proprietary driver (better support for Quadro P520/Pascal)
       nvidiaSettings = true;
-      package = config.boot.kernelPackages.nvidiaPackages.stable;
+      package = config.boot.kernelPackages.nvidiaPackages.production;  # Production driver for Quadro
 
       # NVIDIA Optimus PRIME - Offload Mode (Current)
       # Use 'nvidia-offload <command>' or 'nvidia-run <command>' to run apps with NVIDIA
@@ -164,10 +166,11 @@
         # To switch: comment out 'offload' section above, uncomment below
         # sync.enable = true;
 
-        # Intel HD Graphics 620: 00:02.0
-        # NVIDIA GeForce 940MX: 02:00.0
+        # IMPORTANT: Verify these PCI Bus IDs after installation with: lspci | grep -E "VGA|3D"
+        # Intel UHD Graphics 620 and NVIDIA Quadro P520
+        # Expected: Intel at 00:02.0, NVIDIA at 01:00.0 (adjust based on actual lspci output)
         intelBusId = "PCI:0:2:0";
-        nvidiaBusId = "PCI:2:0:0";
+        nvidiaBusId = "PCI:1:0:0";  # UPDATE THIS: Verify with lspci on P53s hardware
       };
     };
   };
@@ -176,7 +179,7 @@
   zramSwap = {
     enable = true;
     algorithm = "zstd";
-    memoryPercent = 50;
+    memoryPercent = 25;  # Reduced from 50% - with 32GB RAM, less zram needed
     priority = 100;  # Higher priority = used first (before disk swap)
   };
 
@@ -241,6 +244,10 @@
 
     # Thermal management
     thermald.enable = true;
+
+    # Intel CPU throttling fix (BD PROCHOT workaround)
+    # Disables unnecessary throttling and can improve performance/thermals
+    throttled.enable = true;
 
     # Firmware updates
     fwupd.enable = true;
@@ -350,7 +357,7 @@
 
   services.fprintd = {
     enable = true;
-    # T570 uses Validity fingerprint sensor
+    # P53s uses Synaptics fingerprint sensor
   };
 
   environment.systemPackages = with pkgs; [
@@ -368,6 +375,7 @@
     powertop
     acpi
     tpm2-tools
+    throttled  # Intel throttling fix for better thermals/performance on i7-8665U
 
     # NVIDIA tools
     nvtopPackages.nvidia  # Use nvidia variant instead of full (avoids CUDA dependencies)
