@@ -168,9 +168,9 @@
 
         # IMPORTANT: Verify these PCI Bus IDs after installation with: lspci | grep -E "VGA|3D"
         # Intel UHD Graphics 620 and NVIDIA Quadro P520
-        # Expected: Intel at 00:02.0, NVIDIA at 01:00.0 (adjust based on actual lspci output)
+        # Verified: Intel at 00:02.0, NVIDIA at 3c:00.0 (60 in decimal)
         intelBusId = "PCI:0:2:0";
-        nvidiaBusId = "PCI:1:0:0";  # UPDATE THIS: Verify with lspci on P53s hardware
+        nvidiaBusId = "PCI:60:0:0";  # 3c:00.0 in hex = 60:0:0 in decimal
       };
     };
   };
