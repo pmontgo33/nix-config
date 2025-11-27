@@ -44,7 +44,7 @@
       "i915.enable_psr=1"        # Panel self refresh
       "i915.fastboot=1"          # Faster boot times
       "pcie_aspm=force"          # Force PCIe Active State Power Management
-      "resume_offset=46005252"    # IMPORTANT: Recalculate after install with: sudo btrfs inspect-internal map-swapfile -r /swap/swapfile
+      "resume_offset=533760"    # IMPORTANT: Recalculate after install with: sudo btrfs inspect-internal map-swapfile -r /swap/swapfile
       "nvme_core.default_ps_max_latency_us=5000"  # NVMe power saving (0=disabled, 5000=moderate savings) - test for stability
       "nvidia.NVreg_PreserveVideoMemoryAllocations=0"  # Disabled for conservative power mgmt - change to 1 if enabling finegrained
     ];
