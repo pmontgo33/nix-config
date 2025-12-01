@@ -23,9 +23,15 @@
     nix-flatpak = {
       url = "github:gmodena/nix-flatpak";
     };
+
+    plasma-manager = {
+      url = "github:nix-community/plasma-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+    };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, nix-flatpak, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, ... }: {
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
@@ -49,6 +55,7 @@
           home-manager.sharedModules = [
             sops-nix.homeManagerModules.sops
             nix-flatpak.homeManagerModules.nix-flatpak
+            plasma-manager.homeManagerModules.plasma-manager
           ];
         }
       ];

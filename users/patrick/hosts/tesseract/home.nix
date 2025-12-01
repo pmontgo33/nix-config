@@ -41,6 +41,19 @@ in
     onCalendar = "daily"; # Options: daily, weekly, monthly, or a systemd timer format like "12:00"
   };
 
+  # Plasma 6 configuration
+  programs.plasma = {
+    enable = true;
+
+    workspace = {
+      # Enable numlock on startup
+      enableNumlockOnStartup = true;
+
+      # Set theme to Breeze Dark
+      theme = "breeze-dark";
+    };
+  };
+
   programs.vscode = {
     enable = true;
     package = pkgs-unstable.vscodium;
