@@ -786,8 +786,8 @@
           }
           {
             "Alby Hub" = {
-              href = "https://ln.{{HOMEPAGE_VAR_BC_CLOUDFLARE_DOMAIN}}";
-              siteMonitor = "https://ln.{{HOMEPAGE_VAR_BC_CLOUDFLARE_DOMAIN}}";
+              href = "https://ln.montybitcoin.com";
+              siteMonitor = "https://ln.montybitcoin.com";
               icon = "si-alby";
             };
           }
