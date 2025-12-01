@@ -10,7 +10,7 @@
 	
   environment.systemPackages = with pkgs; [
 		ansible
-    ansible-lint
+    # ansible-lint
     terraform
     sshpass
     lazygit
