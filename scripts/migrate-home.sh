@@ -11,26 +11,23 @@ SOURCE_USER="${1:-patrick}"
 SOURCE_HOST="${2:-tesseract}"
 DEST_PATH="${3:-/home/patrick/}"
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EXCLUSIONS_FILE="${SCRIPT_DIR}/backup-exclusions.txt"
+
+if [ ! -f "$EXCLUSIONS_FILE" ]; then
+  echo "Error: Exclusions file not found at $EXCLUSIONS_FILE"
+  exit 1
+fi
+
 echo "Migrating home directory..."
 echo "  Source: ${SOURCE_USER}@${SOURCE_HOST}:/home/${SOURCE_USER}/"
 echo "  Destination: ${DEST_PATH}"
+echo "  Using exclusions from: ${EXCLUSIONS_FILE}"
 echo ""
 
 rsync -avhP --delete \
-  --exclude='*/.cache' \
-  --exclude='*/.local/share/Trash' \
-  --exclude='*/.thumbnails' \
-  --exclude='*/Downloads' \
-  --exclude='*/Nextcloud' \
-  --exclude='*/mnt' \
-  --exclude='*/.npm' \
-  --exclude='*/.cargo/registry' \
-  --exclude='*/.cargo/git' \
-  --exclude='*/.rustup/toolchains' \
-  --exclude='*/.local/share/Steam' \
-  --exclude='*.tmp' \
-  --exclude='*.temp' \
-  --exclude='node_modules' \
+  --exclude-from="$EXCLUSIONS_FILE" \
   "${SOURCE_USER}@${SOURCE_HOST}:/home/${SOURCE_USER}/" "$DEST_PATH"
 
 echo ""

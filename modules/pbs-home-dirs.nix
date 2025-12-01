@@ -4,6 +4,12 @@ with lib; let
   cfg = config.extra-services.pbs-home-dirs;
   pbsRepository = "192.168.86.102:8007:pbs";
   pbsHost = "192.168.86.102";
+
+  # Read shared exclusion list
+  exclusionsFile = ../scripts/backup-exclusions.txt;
+  exclusionsList = lib.splitString "\n" (builtins.readFile exclusionsFile);
+  # Filter out empty lines and comments
+  exclusions = lib.filter (line: line != "" && !(lib.hasPrefix "#" line)) exclusionsList;
 in {
   options.extra-services.pbs-home-dirs.enable = mkEnableOption "enable pbc-home-dirs config";
 
@@ -206,6 +212,13 @@ in {
           fi
           rm -f /tmp/pbs_auth_test.out
 
+          # Create .pxarexclude file in /home with exclusion patterns
+          log_message "Creating exclusion file /home/.pxarexclude"
+          cat > /home/.pxarexclude <<-'EOF'
+          ${lib.concatStringsSep "\n          " exclusions}
+          EOF
+          log_message "Exclusion file created with ${toString (builtins.length exclusions)} patterns"
+
           # Backup home directories
           log_message "Starting backup operation"
           if proxmox-backup-client backup \
@@ -213,20 +226,6 @@ in {
               --backup-id "$BACKUP_ID" \
               --backup-time $(date +%s) \
               home.pxar:/home \
-              --exclude='*/.cache' \
-              --exclude='*/.local/share/Trash' \
-              --exclude='*/.thumbnails' \
-              --exclude='*/Downloads' \
-              --exclude='*/Nextcloud' \
-              --exclude='*/mnt' \
-              --exclude='*/.npm' \
-              --exclude='*/.cargo/registry' \
-              --exclude='*/.cargo/git' \
-              --exclude='*/.rustup/toolchains' \
-              --exclude='*/.local/share/Steam' \
-              --exclude='*.tmp' \
-              --exclude='*.temp' \
-              --exclude='node_modules' \
               2>&1 | tee -a "$LOG_FILE"; then
               log_message "Home directories backup completed successfully"
           else

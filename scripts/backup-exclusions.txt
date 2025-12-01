@@ -1,0 +1,19 @@
+# Shared exclusion list for backups and home directory migrations
+# Used by:
+# - modules/pbs-home-dirs.nix (Proxmox Backup)
+# - scripts/migrate-home.sh (rsync home migration)
+
+*/.cache
+*/.local/share/Trash
+*/.thumbnails
+*/Downloads
+*/Nextcloud
+*/mnt
+*/.npm
+*/.cargo/registry
+*/.cargo/git
+*/.rustup/toolchains
+*/.local/share/Steam
+*.tmp
+*.temp
+node_modules
