@@ -46,11 +46,17 @@ in
     enable = true;
 
     workspace = {
-      # Enable numlock on startup
-      enableNumlockOnStartup = true;
-
       # Set theme to Breeze Dark
       theme = "breeze-dark";
+    };
+
+    # Enable numlock on startup via config file
+    configFile = {
+      kcminputrc = {
+        Keyboard = {
+          NumLock = 0; # 0 = turn on, 1 = turn off, 2 = leave unchanged
+        };
+      };
     };
   };
 
