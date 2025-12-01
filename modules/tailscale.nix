@@ -77,41 +77,38 @@ in {
     networking.firewall.checkReversePath = mkIf cfg.lxc "loose";
     
     # Fix for local network routing conflict with Tailscale in LXC
+    # Timer to periodically check and remove the route
+    systemd.timers.fix-tailscale-local-routing = mkIf cfg.lxc {
+      description = "Timer for removing local subnet route from Tailscale routing table";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "15s";
+        OnUnitActiveSec = "30s";
+        Unit = "fix-tailscale-local-routing.service";
+      };
+    };
+
     systemd.services.fix-tailscale-local-routing = mkIf cfg.lxc {
       description = "Remove local subnet route from Tailscale routing table";
       after = [ "tailscaled.service" ];
       wants = [ "tailscaled.service" ];
-      wantedBy = [ "multi-user.target" ];
 
       serviceConfig = {
-        Type = "simple";
-        Restart = "always";
-        RestartSec = "10s";
+        Type = "oneshot";
       };
 
       script = ''
-        # Wait for Tailscale interface to be up
-        echo "Waiting for Tailscale interface..."
-        for i in {1..60}; do
-          if ${pkgs.iproute2}/bin/ip link show tailscale0 > /dev/null 2>&1; then
-            echo "Tailscale interface is up"
-            break
-          fi
-          sleep 1
-        done
+        # Check if Tailscale interface exists
+        if ! ${pkgs.iproute2}/bin/ip link show tailscale0 > /dev/null 2>&1; then
+          echo "Tailscale interface not yet up, skipping"
+          exit 0
+        fi
 
-        # Give Tailscale extra time to fully initialize and set up all routes
-        echo "Waiting for Tailscale to finish route setup..."
-        sleep 10
-
-        # Continuously monitor and remove the problematic route
-        while true; do
-          if ${pkgs.iproute2}/bin/ip route show table 52 | ${pkgs.gnugrep}/bin/grep -q "192.168.86.0/24 dev tailscale0"; then
-            ${pkgs.iproute2}/bin/ip route del 192.168.86.0/24 dev tailscale0 table 52 2>/dev/null && \
-              echo "$(date): Removed 192.168.86.0/24 route from Tailscale routing table"
-          fi
-          sleep 5
-        done
+        # Delete the problematic route if it exists
+        if ${pkgs.iproute2}/bin/ip route show table 52 | ${pkgs.gnugrep}/bin/grep -q "192.168.86.0/24 dev tailscale0"; then
+          ${pkgs.iproute2}/bin/ip route del 192.168.86.0/24 dev tailscale0 table 52 2>/dev/null && \
+            echo "$(date): Removed 192.168.86.0/24 route from Tailscale routing table"
+        fi
       '';
     };
   };
