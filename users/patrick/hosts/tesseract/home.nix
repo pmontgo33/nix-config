@@ -50,6 +50,33 @@ in
       theme = "breeze-dark";
     };
 
+    # Configure panels with pinned apps
+    panels = [
+      {
+        location = "bottom";
+        widgets = [
+          "org.kde.plasma.kickoff"
+          {
+            name = "org.kde.plasma.icontasks";
+            config = {
+              General = {
+                launchers = [
+                  "applications:org.kde.dolphin.desktop"
+                  "applications:org.kde.konsole.desktop"
+                  "applications:firefox.desktop"
+                  "applications:codium.desktop"
+                  "applications:com.notesnook.Notesnook.desktop"
+                ];
+              };
+            };
+          }
+          "org.kde.plasma.marginsseparator"
+          "org.kde.plasma.systemtray"
+          "org.kde.plasma.digitalclock"
+        ];
+      }
+    ];
+
     # Enable numlock on startup via config file
     configFile = {
       kcminputrc = {
