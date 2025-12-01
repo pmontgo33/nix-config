@@ -179,7 +179,7 @@
           home-manager.backupFileExtension = "backup";
           home-manager.extraSpecialArgs = { inherit inputs; };
 
-          home-manager.users.patrick = import ./users/patrick/hosts/hp-nixos/home.nix;
+          home-manager.users.patrick = import ./users/patrick/hosts/tesseract/home.nix;
 
           home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
         }
