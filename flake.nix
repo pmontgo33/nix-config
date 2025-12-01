@@ -180,8 +180,12 @@
           home-manager.extraSpecialArgs = { inherit inputs; };
 
           home-manager.users.patrick = import ./users/patrick/hosts/tesseract/home.nix;
-
-          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+          
+          home-manager.sharedModules = [
+            sops-nix.homeManagerModules.sops
+            nix-flatpak.homeManagerModules.nix-flatpak
+            plasma-manager.homeModules.plasma-manager
+          ];
         }
       ];
 
