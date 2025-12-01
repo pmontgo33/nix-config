@@ -82,29 +82,36 @@ in {
       after = [ "tailscaled.service" ];
       wants = [ "tailscaled.service" ];
       wantedBy = [ "multi-user.target" ];
-      
+
       serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
+        Type = "simple";
+        Restart = "always";
+        RestartSec = "10s";
       };
-      
+
       script = ''
         # Wait for Tailscale interface to be up
-        for i in {1..30}; do
+        echo "Waiting for Tailscale interface..."
+        for i in {1..60}; do
           if ${pkgs.iproute2}/bin/ip link show tailscale0 > /dev/null 2>&1; then
             echo "Tailscale interface is up"
             break
           fi
           sleep 1
         done
-        
-        # Give Tailscale a moment to set up routes
-        sleep 2
-        
-        # Delete the problematic route that causes local network to be unreachable
-        ${pkgs.iproute2}/bin/ip route del 192.168.86.0/24 dev tailscale0 table 52 2>/dev/null && \
-          echo "Removed 192.168.86.0/24 route from Tailscale routing table" || \
-          echo "Route 192.168.86.0/24 not found in table 52 (this is fine)"
+
+        # Give Tailscale extra time to fully initialize and set up all routes
+        echo "Waiting for Tailscale to finish route setup..."
+        sleep 10
+
+        # Continuously monitor and remove the problematic route
+        while true; do
+          if ${pkgs.iproute2}/bin/ip route show table 52 | ${pkgs.gnugrep}/bin/grep -q "192.168.86.0/24 dev tailscale0"; then
+            ${pkgs.iproute2}/bin/ip route del 192.168.86.0/24 dev tailscale0 table 52 2>/dev/null && \
+              echo "$(date): Removed 192.168.86.0/24 route from Tailscale routing table"
+          fi
+          sleep 5
+        done
       '';
     };
   };
