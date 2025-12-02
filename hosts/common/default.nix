@@ -18,6 +18,9 @@
   # Set Timezone
   time.timeZone = "America/New_York";
 
+  # Set the host platform (replaces deprecated 'system' parameter)
+  nixpkgs.hostPlatform = "x86_64-linux";
+
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 

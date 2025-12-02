@@ -7,7 +7,7 @@
   ];
 
   environment.systemPackages = with pkgs; [
-    inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.jellyfin
+    inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.jellyfin
     # pkgs.jellyfin
     pkgs.jellyfin-web
     pkgs.jellyfin-ffmpeg
@@ -33,7 +33,7 @@
 
   services.jellyfin = {
     enable = true;
-    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.jellyfin;
+    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.jellyfin;
     openFirewall = true;
   };
 

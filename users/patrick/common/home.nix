@@ -51,7 +51,10 @@
     };
   };
 
-  programs.ssh.enable = true;
+  programs.ssh = {
+    enable = true;
+    enableDefaultConfig = false;
+  };
   # programs.ssh.extraConfig = builtins.readFile ./ssh.conf;
 
 

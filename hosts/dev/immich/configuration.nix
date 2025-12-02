@@ -33,7 +33,7 @@
   # Immich service configuration
   services.immich = {
     enable = true;
-    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.immich;
+    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.immich;
     # host = "0.0.0.0";
     # port = 2283;
     openFirewall = true;

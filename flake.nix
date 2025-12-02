@@ -35,7 +35,6 @@
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/tesseract
@@ -63,7 +62,6 @@
 
     ## hp-nixos ##
     nixosConfigurations.hp-nixos = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/hp-nixos
@@ -86,7 +84,6 @@
 
     ## nixbook installer ##
     nixosConfigurations.nixbook-installer = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
@@ -107,7 +104,6 @@
 
     ## ali-book ##
     nixosConfigurations.ali-book = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nixbooks/ali-book
@@ -127,7 +123,6 @@
 
     ## emma-book ##
     nixosConfigurations.emma-book = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nixbooks/emma-book
@@ -147,7 +142,6 @@
 
     ## cora-book ##
     nixosConfigurations.cora-book = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nixbooks/cora-book
@@ -166,7 +160,6 @@
 
     ## plasma-vm-nixos ##
     nixosConfigurations.plasma-vm-nixos = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/plasma-vm-nixos
@@ -193,7 +186,6 @@
 
     ## nxc-base ##
     nixosConfigurations.nxc-base = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/nxc-base
@@ -212,7 +204,6 @@
 
     ## lxc-tailscale ##
     nixosConfigurations.lxc-tailscale = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/lxc-tailscale
@@ -231,7 +222,6 @@
 
     ## nix-fury ##
     nixosConfigurations.nix-fury = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nix-fury
@@ -254,7 +244,6 @@
 
     ## yondu ##
     nixosConfigurations.yondu = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/yondu
@@ -277,7 +266,6 @@
 
     ## bifrost ##
     nixosConfigurations.bifrost = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/bifrost
@@ -296,7 +284,6 @@
 
     ## local-proxy ##
     nixosConfigurations.local-proxy = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/local-proxy
@@ -315,7 +302,6 @@
 
     ## jellyfin ##
     nixosConfigurations.jellyfin = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/jellyfin
@@ -334,7 +320,6 @@
 
     ## immich ##
     nixosConfigurations.immich = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/dev/immich
@@ -353,7 +338,6 @@
 
     ## homepage ##
     nixosConfigurations.homepage = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/homepage
@@ -372,7 +356,6 @@
 
     ## endurain ##
     nixosConfigurations.endurain = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/endurain
@@ -392,7 +375,6 @@
 
     ## ERPNext ##
     nixosConfigurations.erpnext = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/dev/erpnext
@@ -412,7 +394,6 @@
 
     ## grist ##
     nixosConfigurations.grist = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/grist
@@ -434,7 +415,6 @@
 
     ## pocket-id ##
     nixosConfigurations.pocket-id = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/dev/pocket-id
@@ -453,7 +433,6 @@
 
     ## nextcloud ##
     nixosConfigurations.nextcloud = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nextcloud
@@ -473,7 +452,6 @@
 
     ## onlyoffice ##
     nixosConfigurations.onlyoffice = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/dev/onlyoffice
@@ -495,7 +473,6 @@
 
     ## forgejo ##
     nixosConfigurations.forgejo = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = {
         inherit inputs;
         nixosConfigurations = self.nixosConfigurations;
@@ -520,7 +497,6 @@
 
     ## omnitools ##
     nixosConfigurations.omnitools = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/omnitools

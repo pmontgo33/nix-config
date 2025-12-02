@@ -72,7 +72,7 @@
 
   services.gotify = {
     enable = true;
-    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.gotify-server;
+    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.gotify-server;
     environment = {
       GOTIFY_SERVER_PORT = 8080;
     };
