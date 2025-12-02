@@ -261,9 +261,9 @@
   };
 
   # Configure suspend-then-hibernate timing
-  systemd.sleep.extraConfig = ''
-    HibernateDelaySec=2h
-  '';
+  systemd.sleep.settings = {
+    HibernateDelaySec = "2h";
+  };
 
   security.tpm2 = {
     enable = true;
@@ -275,9 +275,9 @@
   boot.initrd.systemd.enable = true;
 
   # Systemd optimizations for faster shutdown/reboot
-  systemd.extraConfig = ''
-    DefaultTimeoutStopSec=10s
-  '';
+  systemd.settings.Manager = {
+    DefaultTimeoutStopSec = "10s";
+  };
 
   # Enable systemd-oomd for better memory pressure handling
   systemd.oomd = {
