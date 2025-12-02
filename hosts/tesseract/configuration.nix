@@ -261,9 +261,9 @@
   };
 
   # Configure suspend-then-hibernate timing
-  systemd.sleep.settings = {
-    HibernateDelaySec = "2h";
-  };
+  systemd.sleep.extraConfig = ''
+    HibernateDelaySec=2h
+  '';
 
   security.tpm2 = {
     enable = true;
