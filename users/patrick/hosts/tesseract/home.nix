@@ -50,7 +50,6 @@ in
       theme = "breeze-dark";
     };
 
-    # Configure panels with pinned apps
     panels = [
       {
         location = "bottom";
