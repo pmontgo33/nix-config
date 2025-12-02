@@ -46,7 +46,6 @@ in
     enable = true;
 
     workspace = {
-      # Set theme to Breeze Dark
       theme = "breeze-dark";
     };
 

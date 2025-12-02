@@ -88,6 +88,7 @@
           "--health-interval=10s"
           "--health-timeout=5s"
           "--health-retries=5"
+          "--health-start-period=10s"
         ];
       };
       
