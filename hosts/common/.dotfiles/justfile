@@ -1,5 +1,14 @@
 nrs host="$HOSTNAME":
   sudo nixos-rebuild switch --flake github:pmontgo33/nix-config#{{host}} --refresh
 
+nrb host="$HOSTNAME":
+  sudo nixos-rebuild build --flake github:pmontgo33/nix-config#{{host}} --refresh
+
 nrs-wtf host="$HOSTNAME":
   sudo nixos-rebuild switch --flake github:pmontgo33/nix-config#{{host}} --refresh --show-trace --print-build-logs --verbose
+
+nrs-branch branch="master":
+  sudo nixos-rebuild switch --flake github:pmontgo33/nix-config/{{branch}}#$HOSTNAME --refresh
+
+nrb-branch branch="master":
+  sudo nixos-rebuild build --flake github:pmontgo33/nix-config/{{branch}}#$HOSTNAME --refresh
