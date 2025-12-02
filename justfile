@@ -4,6 +4,9 @@ nrs host="$HOSTNAME":
 nrs-r host:
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --target-host root@{{host}} --use-remote-sudo
 
+nrsb-r host:
+  nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --build-host root@nix-fury --target-host root@{{host}}
+
 nrs-wtf host="$HOSTNAME":
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --show-trace --print-build-logs --verbose
 
