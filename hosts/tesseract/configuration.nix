@@ -106,7 +106,6 @@
   hardware.firmware = with pkgs; [
     wireless-regdb
     linux-firmware
-    firmwareLinuxNonfree
   ];
 
   hardware = {
@@ -121,7 +120,7 @@
       extraPackages = with pkgs; [
         intel-media-driver  # LIBVA_DRIVER_NAME=iHD
         intel-vaapi-driver  # LIBVA_DRIVER_NAME=i965 (older but sometimes better)
-        vaapiVdpau
+        libva-vdpau-driver
         libvdpau-va-gl
       ];
     };
@@ -253,10 +252,10 @@
     fwupd.enable = true;
 
     # Auto-suspend-then-hibernate on lid close
-    logind = {
-      lidSwitch = "suspend-then-hibernate";  # Suspend first, then hibernate after timeout
-      lidSwitchDocked = "ignore";
-      lidSwitchExternalPower = "suspend-then-hibernate";
+    logind.settings.Login = {
+      HandleLidSwitch = "suspend-then-hibernate";  # Suspend first, then hibernate after timeout
+      HandleLidSwitchDocked = "ignore";
+      HandleLidSwitchExternalPower = "suspend-then-hibernate";
     };
   };
 

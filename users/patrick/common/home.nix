@@ -18,8 +18,12 @@
 
   programs.git = {
     enable = true;
-    userName = "Monty";
-    userEmail = "21371673+pmontgo33@users.noreply.github.com";
+    settings = {
+      user = {
+        name = "Monty";
+        email = "21371673+pmontgo33@users.noreply.github.com";
+      };
+    };
   };
 
   programs.firefox = {
