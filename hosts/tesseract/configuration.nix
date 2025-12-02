@@ -120,7 +120,7 @@
       enable32Bit = true;
       extraPackages = with pkgs; [
         intel-media-driver  # LIBVA_DRIVER_NAME=iHD
-        vaapiIntel          # LIBVA_DRIVER_NAME=i965 (older but sometimes better)
+        intel-vaapi-driver  # LIBVA_DRIVER_NAME=i965 (older but sometimes better)
         vaapiVdpau
         libvdpau-va-gl
       ];
