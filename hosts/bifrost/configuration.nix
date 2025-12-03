@@ -31,6 +31,12 @@
     # userspace-networking = true;
   };
 
+  extra-services.host-checkin = {
+    enable = true;
+    isCentralHost = true;
+    checkInInterval = "hourly";
+  };
+
   services.openssh = {
     enable = true;
    #  permitRootLogin = "yes";

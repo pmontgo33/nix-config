@@ -18,6 +18,12 @@
   # extra-services.mount_home_media.enable = true;
   extra-services.pbs-home-dirs.enable = true;
   extra-services.auto-upgrade.enable = true;
+  extra-services.host-checkin = {
+    enable = true;
+    checkInInterval = "hourly";
+    pullStates = true;
+    stateFileDestination = "/home/patrick/nix-config";
+  };
 
   boot = {
     loader = {
@@ -189,38 +195,38 @@
   }];
 
   services = {
-    # Disable power-profiles-daemon (conflicts with TLP)
-    power-profiles-daemon.enable = false;
+    
+    power-profiles-daemon.enable = true;
 
-    # Use TLP for better hibernate support and power management
-    tlp = {
-      enable = true;
-      settings = {
-        # CPU scaling governor
-        # On AC: full performance, On battery: balanced (can use 'sudo tlp ac' for temp performance boost)
-        CPU_SCALING_GOVERNOR_ON_AC = "performance";
-        CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
+    # Use TLP or power-profiles-daemon
+    # tlp = {
+    #   enable = true;
+    #   settings = {
+    #     # CPU scaling governor
+    #     # On AC: full performance, On battery: balanced (can use 'sudo tlp ac' for temp performance boost)
+    #     CPU_SCALING_GOVERNOR_ON_AC = "performance";
+    #     CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
 
-        # CPU Energy/Performance Policy (HWP)
-        CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
-        CPU_ENERGY_PERF_POLICY_ON_BAT = "balance_power";
+    #     # CPU Energy/Performance Policy (HWP)
+    #     CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
+    #     CPU_ENERGY_PERF_POLICY_ON_BAT = "balance_power";
 
-        # Allow turbo boost (can be enabled for performance when needed)
-        CPU_BOOST_ON_AC = 1;
-        CPU_BOOST_ON_BAT = 1;  # Enable turbo even on battery (you can disable if needed)
+    #     # Allow turbo boost (can be enabled for performance when needed)
+    #     CPU_BOOST_ON_AC = 1;
+    #     CPU_BOOST_ON_BAT = 1;  # Enable turbo even on battery (you can disable if needed)
 
-        # Platform profile (for systems that support it)
-        PLATFORM_PROFILE_ON_AC = "performance";
-        PLATFORM_PROFILE_ON_BAT = "balanced";
+    #     # Platform profile (for systems that support it)
+    #     PLATFORM_PROFILE_ON_AC = "performance";
+    #     PLATFORM_PROFILE_ON_BAT = "balanced";
 
-        # NVMe power management: Controlled via kernel parameter (nvme_core.default_ps_max_latency_us=0)
-        # Set to 0 for max stability - prevents NVMe from entering power-saving states
+    #     # NVMe power management: Controlled via kernel parameter (nvme_core.default_ps_max_latency_us=0)
+    #     # Set to 0 for max stability - prevents NVMe from entering power-saving states
 
-        # WiFi power saving
-        WIFI_PWR_ON_AC = "off";
-        WIFI_PWR_ON_BAT = "on";
-      };
-    };
+    #     # WiFi power saving
+    #     WIFI_PWR_ON_AC = "off";
+    #     WIFI_PWR_ON_BAT = "on";
+    #   };
+    # };
 
     # Periodical TRIM for SSD longevity and performance
     fstrim.enable = true;
