@@ -35,7 +35,7 @@ let
 
     HOSTNAME=$(${pkgs.nettools}/bin/hostname)
     TIMESTAMP=$(${pkgs.coreutils}/bin/date -Iseconds)
-    NIXOS_VERSION=$(${pkgs.nixos-version}/bin/nixos-version)
+    NIXOS_VERSION=$(nixos-version)
     LAST_REBUILD=$(${pkgs.coreutils}/bin/stat -c %y /run/current-system | ${pkgs.coreutils}/bin/cut -d' ' -f1)
 
     # Create JSON payload with host information
