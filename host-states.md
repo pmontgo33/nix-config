@@ -8,6 +8,8 @@ Last updated: 2025-12-03
 
 | Host Name | Status | NixOS Version | Last Verified | Last Rebuild | Notes |
 |-----------|--------|---------------|---------------|--------------|-------|
+| nextcloud | ✅ Online | 25.11 (Xantusia) | 2025-12-03 | 2025-12-03 | Upgraded to 25.11 |
+| plasma-vm-nixos | ✅ Online | 25.11 (Xantusia) | 2025-12-03 | 2025-12-03 | Upgraded to 25.11 |
 | tesseract | ✅ Online | 25.11 (Xantusia) | 2025-12-03 | 2025-12-03 | Upgraded to 25.11 |
 
 ## Development/Special Hosts (Not Tracked)

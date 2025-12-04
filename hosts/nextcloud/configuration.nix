@@ -1,4 +1,4 @@
-{ config, pkgs, modulesPath, inputs, outputs, ... }:
+{ config, lib, pkgs, modulesPath, inputs, outputs, ... }:
 
 {
   imports = [
@@ -8,8 +8,9 @@
 
   extra-services.tailscale = {
     enable = true;
-    userspace-networking = true;
+    lxc = true;
   };
+  extra-services.host-checkin.enable = true;
 
   # sops secrets configuration
   sops.secrets."nextcloud-admin-password" = {

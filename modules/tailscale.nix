@@ -62,19 +62,25 @@ in {
         "--reset"
         "--ssh"
         "--accept-routes"
+      ] ++ (optionals cfg.lxc [
+        "--accept-dns=false"
+      ]) ++ (optionals (!cfg.lxc) [
         "--accept-dns=true"
-        # "--netfilter-mode=off"
-        # "--advertise-routes=192.168.86.0/24"
-      ] ++ (optionals (cfg.tags != []) [
+      ]) ++ (optionals (cfg.tags != []) [
         "--advertise-tags=${concatStringsSep "," cfg.tags}"
       ]) ++ cfg.extraFlags;
     };
-    
-    networking.nameservers = [ "100.100.100.100" "1.1.1.1" ];
+
+    # DNS configuration for MagicDNS
     networking.search = [ "skink-galaxy.ts.net" ];
-    
+
     # LXC-specific fixes
     networking.firewall.checkReversePath = mkIf cfg.lxc "loose";
+    # LXC requires mkForce since DNS is often managed by the LXC host
+    networking.nameservers = mkMerge [
+      [ "100.100.100.100" "1.1.1.1" ]
+      (mkIf cfg.lxc (mkForce [ "100.100.100.100" "1.1.1.1" ]))
+    ];
     
     # Fix for local network routing conflict with Tailscale in LXC
     # Timer to periodically check and remove the route
