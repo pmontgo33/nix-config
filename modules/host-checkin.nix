@@ -89,7 +89,7 @@ in {
 
     checkInInterval = mkOption {
       type = types.str;
-      default = "hourly";
+      default = "daily";
       example = "hourly";
       description = ''
         How often to check in with bifrost. Can be any systemd timer specification.
