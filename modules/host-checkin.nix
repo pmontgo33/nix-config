@@ -35,7 +35,7 @@ let
 
     HOSTNAME=$(${pkgs.nettools}/bin/hostname)
     TIMESTAMP=$(${pkgs.coreutils}/bin/date -Iseconds)
-    NIXOS_VERSION=$(nixos-version)
+    NIXOS_VERSION=$(${pkgs.coreutils}/bin/cat /run/current-system/nixos-version)
     LAST_REBUILD=$(${pkgs.coreutils}/bin/stat -c %y /run/current-system | ${pkgs.coreutils}/bin/cut -d' ' -f1)
 
     # Create JSON payload with host information
@@ -141,6 +141,8 @@ in {
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${checkinScript}";
+        TimeoutStartSec = "30s";
+        Restart = "no";
       };
       # Don't fail if bifrost is unreachable
       startLimitBurst = 3;
@@ -164,6 +166,8 @@ in {
       serviceConfig = {
         Type = "oneshot";
         ExecStart = "${pullStatesScript}";
+        TimeoutStartSec = "30s";
+        Restart = "no";
       };
     };
 
