@@ -20,9 +20,9 @@
   services.flatpak.enable = true;
   programs.firefox.enable = true;
 
-  # Enable services for removable media support
-  # services.udisks2.enable = true;
-  # services.gvfs.enable = true;
+  documentation.enable = false;
+  documentation.man.enable = false;
+  documentation.nixos.enable = false;
 
   # Bootloader.
   boot.loader.systemd-boot.enable = true;
