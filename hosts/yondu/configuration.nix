@@ -14,6 +14,7 @@
     enable = true;
     userspace-networking = true;
   };
+  extra-services.host-checkin.enable = true;
   
   services.openssh.enable = true;
 
