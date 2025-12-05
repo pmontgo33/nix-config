@@ -47,7 +47,7 @@
     enable = true;
     clean = {
       enable = true;
-      dates = "weekly";  # Run every day
+      dates = "weekly";
       extraArgs = "--keep-since 14d --keep 5";
     };
     flake = "github:pmontgo33/nix-config";
