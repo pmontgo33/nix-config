@@ -2,16 +2,17 @@
 
 This file tracks the current state of all NixOS hosts in the infrastructure, including their NixOS version, last verification date, and last rebuild date. This helps identify which hosts need updates or maintenance.
 
-Last updated: 2025-12-03
+Last updated: 2025-12-04
 
 ## Host Status Table
 
 | Host Name | Status | NixOS Version | Last Verified | Last Rebuild | Notes |
 |-----------|--------|---------------|---------------|--------------|-------|
+| bifrost | ✅ Online | 25.11 (Xantusia) | 2025-12-04 | 2025-12-04 | Upgraded to 25.11 |
 | nextcloud | ✅ Online | 25.11 (Xantusia) | 2025-12-03 | 2025-12-03 | Upgraded to 25.11 |
-| plasma-vm-nixos | ✅ Online | 25.11 (Xantusia) | 2025-12-03 | 2025-12-03 | Upgraded to 25.11 |
-| tesseract | ✅ Online | 25.11 (Xantusia) | 2025-12-03 | 2025-12-03 | Upgraded to 25.11 |
-| yondu | ✅ Online | 25.11 (Xantusia) | 2025-12-03 | 2025-12-03 | Upgraded to 25.11 |
+| plasma-vm-nixos | ✅ Online | 25.11 (Xantusia) | 2025-12-04 | 2025-12-03 | Upgraded to 25.11 |
+| tesseract | ✅ Online | 25.11 (Xantusia) | 2025-12-04 | 2025-12-03 | Upgraded to 25.11 |
+| yondu | ✅ Online | 25.11 (Xantusia) | 2025-12-04 | 2025-12-03 | Upgraded to 25.11 |
 
 ## Development/Special Hosts (Not Tracked)
 

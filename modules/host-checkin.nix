@@ -29,8 +29,8 @@ let
   centralUser = "root";
   checkinDir = "/var/lib/host-checkins";
 
-  # Script that sends this host's status to bifrost
-  checkinScript = pkgs.writeShellScript "host-checkin" ''
+  # Script that sends this host's status to bifrost (for remote hosts)
+  checkinScriptRemote = pkgs.writeShellScript "host-checkin-remote" ''
     set -euo pipefail
 
     HOSTNAME=$(${pkgs.nettools}/bin/hostname)
@@ -59,6 +59,36 @@ let
       "mkdir -p ${checkinDir} && cat > ${checkinDir}/$HOSTNAME.json"
 
     echo "Check-in successful for $HOSTNAME at $TIMESTAMP"
+  '';
+
+  # Script that writes status locally (for central host)
+  checkinScriptLocal = pkgs.writeShellScript "host-checkin-local" ''
+    set -euo pipefail
+
+    HOSTNAME=$(${pkgs.nettools}/bin/hostname)
+    TIMESTAMP=$(${pkgs.coreutils}/bin/date -Iseconds)
+    NIXOS_VERSION=$(${pkgs.coreutils}/bin/cat /run/current-system/nixos-version)
+    LAST_REBUILD=$(${pkgs.coreutils}/bin/stat -c %y /run/current-system | ${pkgs.coreutils}/bin/cut -d' ' -f1)
+
+    # Create JSON payload with host information
+    PAYLOAD=$(${pkgs.jq}/bin/jq -n \
+      --arg hostname "$HOSTNAME" \
+      --arg timestamp "$TIMESTAMP" \
+      --arg version "$NIXOS_VERSION" \
+      --arg rebuild "$LAST_REBUILD" \
+      '{
+        hostname: $hostname,
+        timestamp: $timestamp,
+        nixos_version: $version,
+        last_rebuild: $rebuild,
+        status: "online"
+      }')
+
+    # Write locally
+    mkdir -p ${checkinDir}
+    echo "$PAYLOAD" > ${checkinDir}/$HOSTNAME.json
+
+    echo "Check-in successful for $HOSTNAME at $TIMESTAMP (local)"
   '';
 
   # Script that pulls the host-states.md file from bifrost
@@ -140,7 +170,7 @@ in {
       description = "Send host status check-in to bifrost";
       serviceConfig = {
         Type = "oneshot";
-        ExecStart = "${checkinScript}";
+        ExecStart = if cfg.isCentralHost then "${checkinScriptLocal}" else "${checkinScriptRemote}";
         TimeoutStartSec = "30s";
         Restart = "no";
       };
