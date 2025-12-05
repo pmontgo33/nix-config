@@ -10,6 +10,12 @@
     
   ];
 
+  extra-services.tailscale = {
+    enable = true;
+    lxc = true;
+  };
+  extra-services.host-checkin.enable = true;
+
   sops.secrets.cloudflare-api-token = {
     owner = "caddy";
     mode = "0400";
@@ -150,11 +156,6 @@
     # };
   };
 
-  extra-services.tailscale = {
-    enable = true;
-    lxc = true;
-    # userspace-networking = true;
-  };
   networking.firewall = {
     checkReversePath = "loose";
   };

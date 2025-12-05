@@ -71,16 +71,27 @@ in {
       ]) ++ cfg.extraFlags;
     };
 
-    # DNS configuration for MagicDNS
-    networking.search = [ "skink-galaxy.ts.net" ];
-
     # LXC-specific fixes
     networking.firewall.checkReversePath = mkIf cfg.lxc "loose";
-    # LXC requires mkForce since DNS is often managed by the LXC host
-    networking.nameservers = mkMerge [
-      [ "100.100.100.100" "1.1.1.1" ]
-      (mkIf cfg.lxc (mkForce [ "100.100.100.100" "1.1.1.1" ]))
-    ];
+
+    # LXC-specific DNS configuration
+    # Disable systemd-resolved and resolvconf, use static resolv.conf instead
+    # This prevents the LXC host from overriding DNS settings
+    services.resolved.enable = mkIf cfg.lxc false;
+    networking.resolvconf.enable = mkIf cfg.lxc false;
+    environment.etc = mkIf cfg.lxc {
+      "resolv.conf".text = ''
+        # Tailscale MagicDNS
+        nameserver 100.100.100.100
+        nameserver 1.1.1.1
+        search skink-galaxy.ts.net
+        options edns0
+      '';
+    };
+
+    # Non-LXC DNS configuration uses standard networking options
+    networking.nameservers = mkIf (!cfg.lxc) [ "100.100.100.100" "1.1.1.1" ];
+    networking.search = mkIf (!cfg.lxc) [ "skink-galaxy.ts.net" ];
     
     # Fix for local network routing conflict with Tailscale in LXC
     # Timer to periodically check and remove the route

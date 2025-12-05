@@ -9,8 +9,9 @@
 
   extra-services.tailscale = {
     enable = true;
-    userspace-networking = true;
+    lxc = true;
   };
+  extra-services.host-checkin.enable = true;
 
   sops = {
       # defaultSopsFile = ../../../secrets/secrets.yaml;
