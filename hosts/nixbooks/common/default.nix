@@ -123,6 +123,12 @@
     "broadcom-sta" # aka “wl”
   ];
 
+  # Override the default nh clean to reduce disk space on nixbooks
+  programs.nh.clean = {
+    dates = lib.mkForce "daily";
+    extraArgs = lib.mkForce "--keep 3";
+  };
+
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
   # networking.firewall.allowedUDPPorts = [ ... ];

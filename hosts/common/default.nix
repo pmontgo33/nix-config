@@ -43,12 +43,14 @@
   '';
 
   # Automatic Garbage Collection
-  nix.gc = {
-    automatic = true;
-    dates = "weekly";
-    options = "--delete-older-than 14d";
+  programs.nh = {
+    enable = true;
+    clean = {
+      enable = true;
+      dates = "weekly";  # Run every day
+      extraArgs = "--keep-since 14d --keep 5";
+    };
+    flake = "github:pmontgo33/nix-config";
   };
-
-  
 
 }
