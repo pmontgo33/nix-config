@@ -21,7 +21,7 @@
     enable = true;
     # package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.pocket-id;
     settings = {
-      APP_URL = https://auth2.montycasa.com;
+      APP_URL = https://auth.montycasa.com;
       ANALYTICS_DISABLED = true;
       PORT = "1411";
     };

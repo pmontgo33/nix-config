@@ -80,11 +80,11 @@
 
       "auth.montycasa.com" = { 
         protocol = "http"; 
-        upstream = "http://pocketid:1411"; 
+        upstream = "http://pocket-id:1411"; 
       };
       "auth2.montycasa.com" = { 
         protocol = "http"; 
-        upstream = "http://pocket-id:1411"; 
+        upstream = "http://pocketid:1411"; 
       };
 
       "office.montycasa.com" = { 

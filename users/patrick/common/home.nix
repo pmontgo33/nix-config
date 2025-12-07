@@ -43,7 +43,29 @@
         search = {
           force = true;
           default = "ddg";
-          order = [ "ddg" "google" ];
+          order = [ "ddg" "google" "NixOS Packages" "NixOS Options" ];
+          engines = {
+            "NixOS Packages" = {
+              urls = [{
+                template = "https://search.nixos.org/packages";
+                params = [
+                  { name = "query"; value = "{searchTerms}"; }
+                ];
+              }];
+              icon = "https://nixos.org/logo/nixos-haskell.png";
+              definedAliases = [ "@np" ];
+            };
+            "NixOS Options" = {
+              urls = [{
+                template = "https://search.nixos.org/options";
+                params = [
+                  { name = "query"; value = "{searchTerms}"; }
+                ];
+              }];
+              icon = "https://nixos.org/logo/nixos-haskell.png";
+              definedAliases = [ "@no" ];
+            };
+          };
         };
 
         #TODO Add extensions: Need bitwarden and ublock-origin

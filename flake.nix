@@ -417,7 +417,7 @@
     nixosConfigurations.pocket-id = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/dev/pocket-id
+        ./hosts/nxc/pocket-id
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
