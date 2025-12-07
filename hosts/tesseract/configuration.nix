@@ -48,7 +48,6 @@
       "intel_pstate=active"      # Intel Pstate for better power management
       "i915.enable_fbc=1"        # Framebuffer compression
       "i915.enable_psr=1"        # Panel self refresh
-      "i915.fastboot=1"          # Faster boot times
       "pcie_aspm=force"          # Force PCIe Active State Power Management
       "resume_offset=533760"    # IMPORTANT: Recalculate after install with: sudo btrfs inspect-internal map-swapfile -r /swap/swapfile
       "nvme_core.default_ps_max_latency_us=5000"  # NVMe power saving (0=disabled, 5000=moderate savings) - test for stability
@@ -75,7 +74,6 @@
     extraModprobeConfig = ''
       options i915 enable_guc=3
       options i915 enable_fbc=1
-      options i915 fastboot=1
 
       # Bluetooth fixes for resume from suspend/hibernate
       options btusb enable_autosuspend=0
@@ -144,7 +142,6 @@
       powerOnBoot = true;
       settings = {
         General = {
-          Enable = "Source,Sink,Media,Socket";
           # Disable experimental features that can cause resume issues
           Experimental = false;
         };
@@ -252,11 +249,10 @@
     # udev rules for better power management
     udev.extraRules = ''
       # Disable Bluetooth autosuspend to prevent resume issues
-      ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0aaa", ATTR{power/control}="on"
-      ACTION=="add", SUBSYSTEM=="usb", DRIVER=="btusb", ATTR{power/control}="on"
-
-      # Alternative: Disable autosuspend for all Bluetooth devices
-      ACTION=="add", SUBSYSTEM=="bluetooth", ATTR{power/control}="on"
+      # TEST condition ensures power/control exists before setting it
+      ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0aaa", TEST=="power/control", ATTR{power/control}="on"
+      ACTION=="add", SUBSYSTEM=="usb", DRIVER=="btusb", TEST=="power/control", ATTR{power/control}="on"
+      ACTION=="add", SUBSYSTEM=="bluetooth", TEST=="power/control", ATTR{power/control}="on"
     '';
 
     # Thermal management
@@ -294,15 +290,13 @@
   # Systemd optimizations for faster shutdown/reboot
   systemd.settings.Manager = {
     DefaultTimeoutStopSec = "10s";
-  };
 
-  # Configure watchdog to avoid shutdown delays while keeping hardware protection
-  # RuntimeWatchdogSec=0: Don't ping watchdog during normal operation
-  # RebootWatchdogSec=10min: Still use watchdog to recover from hangs during reboot
-  # This prevents "watchdog did not stop" messages and speeds up shutdown
-  systemd.watchdog = {
-    runtimeTime = "0";      # Disable runtime watchdog pinging
-    rebootTime = "10min";   # Keep reboot protection
+    # Configure watchdog to avoid shutdown delays while keeping hardware protection
+    # RuntimeWatchdogSec=0: Don't ping watchdog during normal operation
+    # RebootWatchdogSec=10min: Still use watchdog to recover from hangs during reboot
+    # This prevents "watchdog did not stop" messages and speeds up shutdown
+    RuntimeWatchdogSec = "0";      # Disable runtime watchdog pinging
+    RebootWatchdogSec = "10min";   # Keep reboot protection
   };
 
   # Enable systemd-oomd for better memory pressure handling
