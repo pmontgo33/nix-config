@@ -61,11 +61,12 @@
         ports = [
           "5216:5216"
         ];
-        extraOptions = [
-          "--pull=always"
-        ];
         volumes = [
           "/var/lib/myspeed:/myspeed/data"
+        ];
+        extraOptions = [
+          "--dns=1.1.1.1"
+          "--dns=1.0.0.1"
         ];
       };
     };
