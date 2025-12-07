@@ -34,6 +34,7 @@
         # Management public keys
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEr9aBBJ73I/tXOT00krxHglmAqZ0A8xt7Hk5s2zMwCo patrick@hp-nixos"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+WBmDc0ACtIS4DZl2fHyFCxxAMIa6c5PuMgvuSBD5R patrick@nix-fury"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMa5HxhMxXea3SH+hxZbr0XAxenGnl42GgQTzdXNbQSW Pixel 9"
       ];
   };
 
