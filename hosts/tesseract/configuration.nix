@@ -296,6 +296,15 @@
     DefaultTimeoutStopSec = "10s";
   };
 
+  # Configure watchdog to avoid shutdown delays while keeping hardware protection
+  # RuntimeWatchdogSec=0: Don't ping watchdog during normal operation
+  # RebootWatchdogSec=10min: Still use watchdog to recover from hangs during reboot
+  # This prevents "watchdog did not stop" messages and speeds up shutdown
+  systemd.watchdog = {
+    runtimeTime = "0";      # Disable runtime watchdog pinging
+    rebootTime = "10min";   # Keep reboot protection
+  };
+
   # Enable systemd-oomd for better memory pressure handling
   systemd.oomd = {
     enable = true;
