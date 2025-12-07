@@ -76,6 +76,14 @@
       options i915 enable_guc=3
       options i915 enable_fbc=1
       options i915 fastboot=1
+
+      # Bluetooth fixes for resume from suspend/hibernate
+      options btusb enable_autosuspend=0
+      options bluetooth disable_ertm=1
+
+      # Intel WiFi (iwlwifi) fixes for resume from suspend/hibernate
+      options iwlwifi power_save=0
+      options iwlmvm power_scheme=1
     '';
   };
 
@@ -84,7 +92,7 @@
     networkmanager = {
       enable = true;
       wifi = {
-        powersave = true;
+        powersave = false;  # Disabled for reliable resume - change to true if battery life is critical
         scanRandMacAddress = true;
       };
       # Ensure WiFi is managed by NetworkManager
@@ -137,6 +145,12 @@
       settings = {
         General = {
           Enable = "Source,Sink,Media,Socket";
+          # Disable experimental features that can cause resume issues
+          Experimental = false;
+        };
+        Policy = {
+          # Auto-enable Bluetooth controllers
+          AutoEnable = true;
         };
       };
     };
@@ -188,11 +202,8 @@
     priority = 100;  # Higher priority = used first (before disk swap)
   };
 
-  # Disk swap configuration with lower priority (fallback)
-  swapDevices = [{
-    device = "/swap/swapfile";
-    priority = 10;  # Lower priority = used after zram is full
-  }];
+  # Disk swap is managed by disko (see disk-config.nix)
+  # swapDevices removed to prevent duplicate entry error
 
   services = {
     
@@ -239,13 +250,14 @@
     };
 
     # udev rules for better power management
-    # udev.extraRules = ''
-    #   # Disable wake-on-LAN to save power
-    #   ACTION=="add", SUBSYSTEM=="net", KERNEL=="eth*", RUN+="${pkgs.ethtool}/bin/ethtool -s $name wol d"
+    udev.extraRules = ''
+      # Disable Bluetooth autosuspend to prevent resume issues
+      ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0aaa", ATTR{power/control}="on"
+      ACTION=="add", SUBSYSTEM=="usb", DRIVER=="btusb", ATTR{power/control}="on"
 
-    #   # Auto-suspend USB devices for better battery life
-    #   ACTION=="add", SUBSYSTEM=="usb", TEST=="power/control", ATTR{power/control}="auto"
-    # '';
+      # Alternative: Disable autosuspend for all Bluetooth devices
+      ACTION=="add", SUBSYSTEM=="bluetooth", ATTR{power/control}="on"
+    '';
 
     # Thermal management
     thermald.enable = true;
