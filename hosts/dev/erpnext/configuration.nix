@@ -12,7 +12,7 @@ in
 
   extra-services.tailscale = {
     enable = true;
-    userspace-networking = true;
+    lxc = true;
   };
   
   services.openssh.enable = true;
