@@ -10,7 +10,7 @@
 
   extra-services.tailscale = {
     enable = true;
-    tags = ["tag:receive-only"];
+    # tags = ["tag:receive-only"];
   };
   
   fileSystems."/home" = {

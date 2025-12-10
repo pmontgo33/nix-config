@@ -66,10 +66,51 @@ in {
         "--accept-dns=false"
       ]) ++ (optionals (!cfg.lxc) [
         "--accept-dns=true"
-      ]) ++ (optionals (cfg.tags != []) [
-        "--advertise-tags=${concatStringsSep "," cfg.tags}"
-      ]) ++ cfg.extraFlags;
+      ]); #++ (optionals (cfg.tags != []) [
+      #   "--advertise-tags=${concatStringsSep "," cfg.tags}"
+      # ]) ++ cfg.extraFlags;
     };
+
+    # # Service to update Tailscale when tags or flags change
+    # systemd.services.tailscale-update-config = let
+    #   # Create a config file that changes when tags/flags change
+    #   configFile = pkgs.writeText "tailscale-config" ''
+    #     tags=${lib.concatStringsSep "," cfg.tags}
+    #     extraFlags=${lib.concatStringsSep " " cfg.extraFlags}
+    #   '';
+    # in {
+    #   description = "Update Tailscale configuration when settings change";
+    #   after = [ "tailscaled.service" ];
+    #   wants = [ "tailscaled.service" ];
+    #   wantedBy = [ "multi-user.target" ];
+
+    #   # This ensures the service only runs when the config actually changes
+    #   restartIfChanged = true;
+
+    #   serviceConfig = {
+    #     Type = "oneshot";
+    #     RemainAfterExit = true;
+    #   };
+
+    #   script = let
+    #     tailscaleBin = "${config.services.tailscale.package}/bin/tailscale";
+    #     upFlags = lib.escapeShellArgs config.services.tailscale.extraUpFlags;
+    #   in ''
+    #     # Reference the config file to ensure service restarts when it changes
+    #     cat ${configFile} > /dev/null
+
+    #     # Wait for tailscaled to be ready
+    #     for i in {1..30}; do
+    #       if ${tailscaleBin} status &>/dev/null; then
+    #         break
+    #       fi
+    #       sleep 1
+    #     done
+
+    #     # Run tailscale up with the configured flags
+    #     ${tailscaleBin} up ${upFlags}
+    #   '';
+    # };
 
     # LXC-specific fixes
     networking.firewall.checkReversePath = mkIf cfg.lxc "loose";
