@@ -3,6 +3,7 @@
   imports = [ ../../common ];
 
   extra-services.auto-upgrade.enable = true;
+  extra-services.host-checkin.enable = true;
   nix.settings.auto-optimise-store = true;
 
   environment.systemPackages = with pkgs; [
