@@ -15,6 +15,29 @@
     # gnome-calendar
     gnome-screenshot
     system-config-printer
+
+    # SSH client wrappers - require sudo for non-root users
+    (writeShellScriptBin "ssh" ''
+      if [ "$(id -u)" -ne 0 ]; then
+        echo "Error: SSH requires elevated privileges. Please use: sudo ssh $*" >&2
+        exit 1
+      fi
+      exec ${openssh}/bin/ssh "$@"
+    '')
+    (writeShellScriptBin "scp" ''
+      if [ "$(id -u)" -ne 0 ]; then
+        echo "Error: SCP requires elevated privileges. Please use: sudo scp $*" >&2
+        exit 1
+      fi
+      exec ${openssh}/bin/scp "$@"
+    '')
+    (writeShellScriptBin "sftp" ''
+      if [ "$(id -u)" -ne 0 ]; then
+        echo "Error: SFTP requires elevated privileges. Please use: sudo sftp $*" >&2
+        exit 1
+      fi
+      exec ${openssh}/bin/sftp "$@"
+    '')
   ];
 
   services.flatpak.enable = true;
@@ -90,7 +113,7 @@
 
   # List services that you want to enable:
 
-  # Enable the OpenSSH daemon.
+  # Enable the OpenSSH daemon
   services.openssh.enable = true;
 
   zramSwap.enable = true;
