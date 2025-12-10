@@ -36,8 +36,13 @@
     ];
   };
 
+  # Configure sudo to use root's password for emma
+  security.sudo.extraConfig = ''
+    Defaults:emma rootpw
+  '';
+
   environment.systemPackages = with pkgs; [
-    
+
   ];
 
   system.stateVersion = "25.05";

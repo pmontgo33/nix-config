@@ -35,8 +35,13 @@
     ];
   };
 
+  # Configure sudo to use root's password for cora
+  security.sudo.extraConfig = ''
+    Defaults:cora rootpw
+  '';
+
   environment.systemPackages = with pkgs; [
-    
+
   ];
 
   system.stateVersion = "25.05";

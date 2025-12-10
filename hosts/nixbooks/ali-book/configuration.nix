@@ -28,15 +28,20 @@
   users.users.aleandra = {
     isNormalUser = true;
     description = "Aleandra";
-    extraGroups = [ "networkmanager" "wheel" "storage" ];
+    extraGroups = [ "networkmanager" "storage" "wheel" ];
     packages = with pkgs; [
       simplex-chat-desktop
       cowsay
     ];
   };
 
+  # Configure sudo to use root's password for aleandra
+  security.sudo.extraConfig = ''
+    Defaults:aleandra rootpw
+  '';
+
   environment.systemPackages = with pkgs; [
-    
+
   ];
 
   system.stateVersion = "25.05";
