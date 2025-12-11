@@ -356,12 +356,6 @@ EOF
             local current_repo_digest="$2"
             local current_tag="$3"
 
-            # Skip check for latest tag or if no tag specified
-            if [ "$current_tag" = "latest" ] || [ -z "$current_tag" ]; then
-              echo "?"
-              return
-            fi
-
             # Extract repository
             local repo=$(echo "$image" | cut -d':' -f1)
 
@@ -371,6 +365,37 @@ EOF
             fi
             if [[ ! "$repo" =~ ^[a-z0-9.-]+\/ ]]; then
               repo="docker.io/$repo"
+            fi
+
+            # For 'latest' tag, use digest comparison
+            if [ "$current_tag" = "latest" ]; then
+              if [ -z "$current_repo_digest" ] || [ "$current_repo_digest" = "null" ]; then
+                echo "?"
+                return
+              fi
+
+              # Get the latest digest from registry
+              local latest_digest=""
+              if command -v ${pkgs.skopeo}/bin/skopeo &> /dev/null; then
+                latest_digest=$(${pkgs.skopeo}/bin/skopeo inspect --no-tags "docker://$repo:latest" 2>/dev/null | \
+                  ${pkgs.jq}/bin/jq -r '.Digest' 2>/dev/null || echo "")
+              fi
+
+              # Compare digests
+              if [ -n "$latest_digest" ] && [ "$current_repo_digest" != "$latest_digest" ]; then
+                echo "⚠️"
+              elif [ -n "$latest_digest" ]; then
+                echo "✓"
+              else
+                echo "?"
+              fi
+              return
+            fi
+
+            # For versioned tags, use version comparison
+            if [ -z "$current_tag" ]; then
+              echo "?"
+              return
             fi
 
             # Get all tags and find the latest stable version
@@ -389,27 +414,17 @@ EOF
             # Normalize current version (remove 'v' prefix if present)
             local current_version=$(echo "$current_tag" | ${pkgs.gnused}/bin/sed 's/^v//')
 
-            # Debug logging
-            echo "DEBUG: image=$image, repo=$repo" >> /tmp/container-update-debug.log
-            echo "DEBUG: current_tag=$current_tag, current_version=$current_version" >> /tmp/container-update-debug.log
-            echo "DEBUG: latest_version=$latest_version" >> /tmp/container-update-debug.log
-
             # Compare versions
             if [ -z "$latest_version" ]; then
-              echo "DEBUG: No latest version found" >> /tmp/container-update-debug.log
               echo "?"
             elif [ "$current_version" = "$latest_version" ]; then
-              echo "DEBUG: Versions match - up to date" >> /tmp/container-update-debug.log
               echo "✓"
             else
               # Use sort -V to compare versions properly
               local newer=$(printf "%s\n%s" "$current_version" "$latest_version" | ${pkgs.coreutils}/bin/sort -V | ${pkgs.coreutils}/bin/tail -n1)
-              echo "DEBUG: newer=$newer (comparing $current_version vs $latest_version)" >> /tmp/container-update-debug.log
               if [ "$newer" = "$latest_version" ]; then
-                echo "DEBUG: Update available" >> /tmp/container-update-debug.log
                 echo "⚠️"
               else
-                echo "DEBUG: Current version is newer or same" >> /tmp/container-update-debug.log
                 echo "✓"
               fi
             fi

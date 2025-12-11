@@ -70,6 +70,7 @@
           "--device=/dev/net/tun:/dev/net/tun"
           "--health-cmd=exit 0"
           "--network=media-network"
+          "--pull=always"
         ];
         environmentFiles = [
           config.sops.secrets.gluetun-env.path
@@ -101,6 +102,7 @@
         dependsOn = [ "gluetun" ];
         extraOptions = [
           "--network=container:gluetun"
+          "--pull=always"
         ];
         environment = {
           PUID = "0";
@@ -119,6 +121,7 @@
         autoStart = true;
         extraOptions = [
           "--network=media-network"
+          "--pull=always"
         ];
         environment = {
           PUID = "0";
@@ -142,6 +145,7 @@
         autoStart = true;
         extraOptions = [
           "--network=media-network"
+          "--pull=always"
         ];
         environment = {
           PUID = "0";
@@ -162,6 +166,7 @@
         dependsOn = [ "gluetun" ];
         extraOptions = [
           "--network=container:gluetun"
+          "--pull=always"
         ];
         environment = {
           PUID = "0";
@@ -181,6 +186,7 @@
         autoStart = true;
         extraOptions = [
           "--network=media-network"
+          "--pull=always"
         ];
         environment = {
           LOG_LEVEL = "info";
@@ -195,6 +201,7 @@
         autoStart = true;
         extraOptions = [
           "--network=media-network"
+          "--pull=always"
         ];
         environment = {
           PUID = "0";
@@ -215,6 +222,7 @@
         autoStart = true;
         extraOptions = [
           "--network=media-network"
+          "--pull=always"
         ];
         environment = {
           PUID = "0";
@@ -235,6 +243,7 @@
         autoStart = true;
         extraOptions = [
           "--network=media-network"
+          "--pull=always"
         ];
         environment = {
           PUID = "0";
@@ -255,6 +264,7 @@
         autoStart = true;
         extraOptions = [
           "--network=media-network"
+          "--pull=always"
         ];
         environment = {
           TZ = "America/New_York";
@@ -273,6 +283,7 @@
         autoStart = true;
         extraOptions = [
           "--network=media-network"
+          "--pull=always"
         ];
         ports = [
           "9705:9705"
@@ -292,6 +303,7 @@
         extraOptions = [
           "--security-opt=no-new-privileges:true"
           "--network=media-network"
+          "--pull=always"
         ];
         environmentFiles = [
           config.sops.secrets.unpackerr-env.path
