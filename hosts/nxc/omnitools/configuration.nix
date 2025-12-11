@@ -30,7 +30,7 @@
     backend = "podman";
     containers = {
       omni-tools = {
-        image = "iib0011/omni-tools:latest";
+        image = "iib0011/omni-tools:0.6.0";
         autoStart = true;
         ports = [
           "8080:80"

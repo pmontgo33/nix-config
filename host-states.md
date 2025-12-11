@@ -18,7 +18,7 @@ Last updated: 2025-12-10
 | local-proxy | 25.11 (Xantusia) | 2025-12-10 | 2025-12-05 | None | Upgraded to 25.11 |
 | nextcloud | 25.11 (Xantusia) | 2025-12-10 | 2025-12-04 | None | Upgraded to 25.11 |
 | nix-fury | 25.11 (Xantusia) | 2025-12-10 | 2025-12-07 | None | Upgraded to 25.11 |
-| omnitools | 25.11 (Xantusia) | 2025-12-10 | 2025-12-06 | None | Upgraded to 25.11 |
+| omnitools | 25.11 (Xantusia) | 2025-12-10 | 2025-12-10 | **omni-tools**: latest ? | Upgraded to 25.11 |
 | plasma-vm-nixos | 25.11 (Xantusia) | 2025-12-10 | 2025-12-05 | None | Upgraded to 25.11 |
 | pocket-id | 25.11 (Xantusia) | 2025-12-10 | 2025-12-06 | None | Upgraded to 25.11 |
 | tesseract | 25.11 (Xantusia) | 2025-12-10 | 2025-12-10 | None | Upgraded to 25.11 |
