@@ -1,28 +1,28 @@
 # NixOS Host States
 
-This file tracks the current state of all NixOS hosts in the infrastructure, including their NixOS version, last verification date, and last rebuild date. This helps identify which hosts need updates or maintenance.
+This file tracks the current state of all NixOS hosts in the infrastructure, including their NixOS version, last verification date, last rebuild date, and OCI container status. This helps identify which hosts need updates or maintenance.
 
-Last updated: 2025-12-09 
+Last updated: 2025-12-10
 
 ## Host Status Table
 
-| Host Name | Status | NixOS Version | Last Verified | Last Rebuild | Notes |
-|-----------|--------|---------------|---------------|--------------|-------|
-| bifrost | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-06 | Upgraded to 25.11 |
-| emma-book | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-09 | Upgraded to 25.11 |
-| endurain | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-04 | Upgraded to 25.11 |
-| forgejo | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-04 | Upgraded to 25.11 |
-| grist | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-04 | Upgraded to 25.11 |
-| homepage | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-04 | Upgraded to 25.11 |
-| jellyfin | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-04 | Upgraded to 25.11 |
-| local-proxy | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-05 | Upgraded to 25.11 |
-| nextcloud | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-04 | Upgraded to 25.11 |
-| nix-fury | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-07 | Upgraded to 25.11 |
-| omnitools | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-06 | Upgraded to 25.11 |
-| plasma-vm-nixos | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-05 | Upgraded to 25.11 |
-| pocket-id | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-06 | Upgraded to 25.11 |
-| tesseract | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-06 | Upgraded to 25.11 |
-| yondu | ✅ Online | 25.11 (Xantusia) | 2025-12-09 | 2025-12-04 | Upgraded to 25.11 |
+| Host Name | NixOS Version | Last Verified | Last Rebuild | Containers | Notes |
+|-----------|---------------|---------------|--------------|------------|-------|
+| bifrost | 25.11 (Xantusia) | 2025-12-10 | 2025-12-10 | None | Upgraded to 25.11 |
+| emma-book | 25.11 (Xantusia) | 2025-12-09 | 2025-12-09 | None | Upgraded to 25.11 |
+| endurain | 25.11 (Xantusia) | 2025-12-10 | 2025-12-10 | **endurain**: v0.16.0 ✓ | Upgraded to 25.11 |
+| forgejo | 25.11 (Xantusia) | 2025-12-10 | 2025-12-04 | None | Upgraded to 25.11 |
+| grist | 25.11 (Xantusia) | 2025-12-10 | 2025-12-10 | **grist**: latest ? | Upgraded to 25.11 |
+| homepage | 25.11 (Xantusia) | 2025-12-10 | 2025-12-04 | None | Upgraded to 25.11 |
+| jellyfin | 25.11 (Xantusia) | 2025-12-10 | 2025-12-04 | None | Upgraded to 25.11 |
+| local-proxy | 25.11 (Xantusia) | 2025-12-10 | 2025-12-05 | None | Upgraded to 25.11 |
+| nextcloud | 25.11 (Xantusia) | 2025-12-10 | 2025-12-04 | None | Upgraded to 25.11 |
+| nix-fury | 25.11 (Xantusia) | 2025-12-10 | 2025-12-07 | None | Upgraded to 25.11 |
+| omnitools | 25.11 (Xantusia) | 2025-12-10 | 2025-12-06 | None | Upgraded to 25.11 |
+| plasma-vm-nixos | 25.11 (Xantusia) | 2025-12-10 | 2025-12-05 | None | Upgraded to 25.11 |
+| pocket-id | 25.11 (Xantusia) | 2025-12-10 | 2025-12-06 | None | Upgraded to 25.11 |
+| tesseract | 25.11 (Xantusia) | 2025-12-10 | 2025-12-10 | None | Upgraded to 25.11 |
+| yondu | 25.11 (Xantusia) | 2025-12-10 | 2025-12-04 | None | Upgraded to 25.11 |
 
 ## Development/Special Hosts (Not Tracked)
 

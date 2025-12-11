@@ -38,18 +38,69 @@ let
     NIXOS_VERSION=$(${pkgs.coreutils}/bin/cat /run/current-system/nixos-version)
     LAST_REBUILD=$(${pkgs.coreutils}/bin/stat -c %y /run/current-system | ${pkgs.coreutils}/bin/cut -d' ' -f1)
 
+    # Collect container information (podman or docker)
+    CONTAINER_INFO="[]"
+    if command -v ${pkgs.podman}/bin/podman &> /dev/null; then
+      CONTAINER_INFO=$(${pkgs.podman}/bin/podman ps --format json 2>/dev/null | ${pkgs.jq}/bin/jq -c '
+        [.[] | select(.Image != null) |
+        select(.Image | test("postgres|mysql|mariadb|mongodb|redis|cassandra|elasticsearch"; "i") | not) |
+        {
+          name: (.Names[0] // .Names // "unknown"),
+          image: .Image,
+          image_name: (.Image | split("@")[0] | split(":")[0]),
+          current_version: (.Image | split(":")[1] // "latest")
+        }]
+      ' || echo "[]")
+
+      # Enrich with RepoDigests for each container
+      if [ "$CONTAINER_INFO" != "[]" ]; then
+        TEMP_INFO="[]"
+        for container in $(echo "$CONTAINER_INFO" | ${pkgs.jq}/bin/jq -c '.[]'); do
+          img_name=$(echo "$container" | ${pkgs.jq}/bin/jq -r '.image_name')
+          repo_digest=$(${pkgs.podman}/bin/podman image inspect "$img_name" 2>/dev/null | \
+            ${pkgs.jq}/bin/jq -r '.[0].RepoDigests[0] // ""' 2>/dev/null | cut -d'@' -f2 || echo "")
+          TEMP_INFO=$(echo "$TEMP_INFO" | ${pkgs.jq}/bin/jq --argjson container "$container" --arg digest "$repo_digest" \
+            '. += [$container + {repo_digest: $digest}]')
+        done
+        CONTAINER_INFO="$TEMP_INFO"
+      fi
+    elif command -v ${pkgs.docker}/bin/docker &> /dev/null; then
+      CONTAINER_INFO=$(${pkgs.docker}/bin/docker ps --format "{{.Names}}\t{{.Image}}" 2>/dev/null | \
+        while IFS=$'\t' read -r name image; do
+          if ! echo "$image" | ${pkgs.gnugrep}/bin/grep -qiE "(postgres|mysql|mariadb|mongodb|redis|cassandra|elasticsearch)"; then
+            # Extract tag
+            tag=$(echo "$image" | cut -d':' -f2)
+            if [ -z "$tag" ] || [ "$tag" = "$image" ]; then
+              tag="latest"
+            fi
+
+            # Get RepoDigest from image inspection
+            repo_digest=$(${pkgs.docker}/bin/docker image inspect "$image" 2>/dev/null | \
+              ${pkgs.jq}/bin/jq -r '.[0].RepoDigests[0] // ""' 2>/dev/null | cut -d'@' -f2 || echo "")
+
+            ${pkgs.jq}/bin/jq -n \
+              --arg name "$name" \
+              --arg image "$image" \
+              --arg repo_digest "$repo_digest" \
+              --arg version "$tag" \
+              '{name: $name, image: $image, repo_digest: $repo_digest, current_version: $version}'
+          fi
+        done | ${pkgs.jq}/bin/jq -s -c '.' || echo "[]")
+    fi
+
     # Create JSON payload with host information
     PAYLOAD=$(${pkgs.jq}/bin/jq -n \
       --arg hostname "$HOSTNAME" \
       --arg timestamp "$TIMESTAMP" \
       --arg version "$NIXOS_VERSION" \
       --arg rebuild "$LAST_REBUILD" \
+      --argjson containers "$CONTAINER_INFO" \
       '{
         hostname: $hostname,
         timestamp: $timestamp,
         nixos_version: $version,
         last_rebuild: $rebuild,
-        status: "online"
+        containers: $containers
       }')
 
     # Send to bifrost via SSH
@@ -70,18 +121,69 @@ let
     NIXOS_VERSION=$(${pkgs.coreutils}/bin/cat /run/current-system/nixos-version)
     LAST_REBUILD=$(${pkgs.coreutils}/bin/stat -c %y /run/current-system | ${pkgs.coreutils}/bin/cut -d' ' -f1)
 
+    # Collect container information (podman or docker)
+    CONTAINER_INFO="[]"
+    if command -v ${pkgs.podman}/bin/podman &> /dev/null; then
+      CONTAINER_INFO=$(${pkgs.podman}/bin/podman ps --format json 2>/dev/null | ${pkgs.jq}/bin/jq -c '
+        [.[] | select(.Image != null) |
+        select(.Image | test("postgres|mysql|mariadb|mongodb|redis|cassandra|elasticsearch"; "i") | not) |
+        {
+          name: (.Names[0] // .Names // "unknown"),
+          image: .Image,
+          image_name: (.Image | split("@")[0] | split(":")[0]),
+          current_version: (.Image | split(":")[1] // "latest")
+        }]
+      ' || echo "[]")
+
+      # Enrich with RepoDigests for each container
+      if [ "$CONTAINER_INFO" != "[]" ]; then
+        TEMP_INFO="[]"
+        for container in $(echo "$CONTAINER_INFO" | ${pkgs.jq}/bin/jq -c '.[]'); do
+          img_name=$(echo "$container" | ${pkgs.jq}/bin/jq -r '.image_name')
+          repo_digest=$(${pkgs.podman}/bin/podman image inspect "$img_name" 2>/dev/null | \
+            ${pkgs.jq}/bin/jq -r '.[0].RepoDigests[0] // ""' 2>/dev/null | cut -d'@' -f2 || echo "")
+          TEMP_INFO=$(echo "$TEMP_INFO" | ${pkgs.jq}/bin/jq --argjson container "$container" --arg digest "$repo_digest" \
+            '. += [$container + {repo_digest: $digest}]')
+        done
+        CONTAINER_INFO="$TEMP_INFO"
+      fi
+    elif command -v ${pkgs.docker}/bin/docker &> /dev/null; then
+      CONTAINER_INFO=$(${pkgs.docker}/bin/docker ps --format "{{.Names}}\t{{.Image}}" 2>/dev/null | \
+        while IFS=$'\t' read -r name image; do
+          if ! echo "$image" | ${pkgs.gnugrep}/bin/grep -qiE "(postgres|mysql|mariadb|mongodb|redis|cassandra|elasticsearch)"; then
+            # Extract tag
+            tag=$(echo "$image" | cut -d':' -f2)
+            if [ -z "$tag" ] || [ "$tag" = "$image" ]; then
+              tag="latest"
+            fi
+
+            # Get RepoDigest from image inspection
+            repo_digest=$(${pkgs.docker}/bin/docker image inspect "$image" 2>/dev/null | \
+              ${pkgs.jq}/bin/jq -r '.[0].RepoDigests[0] // ""' 2>/dev/null | cut -d'@' -f2 || echo "")
+
+            ${pkgs.jq}/bin/jq -n \
+              --arg name "$name" \
+              --arg image "$image" \
+              --arg repo_digest "$repo_digest" \
+              --arg version "$tag" \
+              '{name: $name, image: $image, repo_digest: $repo_digest, current_version: $version}'
+          fi
+        done | ${pkgs.jq}/bin/jq -s -c '.' || echo "[]")
+    fi
+
     # Create JSON payload with host information
     PAYLOAD=$(${pkgs.jq}/bin/jq -n \
       --arg hostname "$HOSTNAME" \
       --arg timestamp "$TIMESTAMP" \
       --arg version "$NIXOS_VERSION" \
       --arg rebuild "$LAST_REBUILD" \
+      --argjson containers "$CONTAINER_INFO" \
       '{
         hostname: $hostname,
         timestamp: $timestamp,
         nixos_version: $version,
         last_rebuild: $rebuild,
-        status: "online"
+        containers: $containers
       }')
 
     # Write locally
@@ -235,18 +337,83 @@ in {
           cat > "$OUTPUT_FILE" << 'EOF'
 # NixOS Host States
 
-This file tracks the current state of all NixOS hosts in the infrastructure, including their NixOS version, last verification date, and last rebuild date. This helps identify which hosts need updates or maintenance.
+This file tracks the current state of all NixOS hosts in the infrastructure, including their NixOS version, last verification date, last rebuild date, and OCI container status. This helps identify which hosts need updates or maintenance.
 
 Last updated: TIMESTAMP_PLACEHOLDER
 
 ## Host Status Table
 
-| Host Name | Status | NixOS Version | Last Verified | Last Rebuild | Notes |
-|-----------|--------|---------------|---------------|--------------|-------|
+| Host Name | NixOS Version | Last Verified | Last Rebuild | Containers | Notes |
+|-----------|---------------|---------------|--------------|------------|-------|
 EOF
 
           # Replace timestamp placeholder
           ${pkgs.gnused}/bin/sed -i "s/TIMESTAMP_PLACEHOLDER/$TIMESTAMP/" "$OUTPUT_FILE"
+
+          # Function to check if container has updates available
+          check_container_update() {
+            local image="$1"
+            local current_repo_digest="$2"
+            local current_tag="$3"
+
+            # Skip check for latest tag or if no tag specified
+            if [ "$current_tag" = "latest" ] || [ -z "$current_tag" ]; then
+              echo "?"
+              return
+            fi
+
+            # Extract repository
+            local repo=$(echo "$image" | cut -d':' -f1)
+
+            # Add docker.io prefix if no registry specified
+            if [[ ! "$repo" =~ \. ]] && [[ ! "$repo" =~ localhost ]] && [[ ! "$repo" =~ / ]]; then
+              repo="library/$repo"
+            fi
+            if [[ ! "$repo" =~ ^[a-z0-9.-]+\/ ]]; then
+              repo="docker.io/$repo"
+            fi
+
+            # Get all tags and find the latest stable version
+            local latest_version=""
+            if command -v ${pkgs.skopeo}/bin/skopeo &> /dev/null; then
+              # List all tags, filter for semantic versions, exclude pre-releases
+              latest_version=$(${pkgs.skopeo}/bin/skopeo list-tags "docker://$repo" 2>/dev/null | \
+                ${pkgs.jq}/bin/jq -r '.Tags[]' 2>/dev/null | \
+                ${pkgs.gnugrep}/bin/grep -E '^v?[0-9]+\.[0-9]+(\.[0-9]+)?$' 2>/dev/null | \
+                ${pkgs.gnugrep}/bin/grep -v -E '(-rc|-RC|-beta|-alpha|-dev|-pre)' 2>/dev/null | \
+                ${pkgs.gnused}/bin/sed 's/^v//' 2>/dev/null | \
+                ${pkgs.coreutils}/bin/sort -V 2>/dev/null | \
+                ${pkgs.coreutils}/bin/tail -n1 2>/dev/null || echo "")
+            fi
+
+            # Normalize current version (remove 'v' prefix if present)
+            local current_version=$(echo "$current_tag" | ${pkgs.gnused}/bin/sed 's/^v//')
+
+            # Debug logging
+            echo "DEBUG: image=$image, repo=$repo" >> /tmp/container-update-debug.log
+            echo "DEBUG: current_tag=$current_tag, current_version=$current_version" >> /tmp/container-update-debug.log
+            echo "DEBUG: latest_version=$latest_version" >> /tmp/container-update-debug.log
+
+            # Compare versions
+            if [ -z "$latest_version" ]; then
+              echo "DEBUG: No latest version found" >> /tmp/container-update-debug.log
+              echo "?"
+            elif [ "$current_version" = "$latest_version" ]; then
+              echo "DEBUG: Versions match - up to date" >> /tmp/container-update-debug.log
+              echo "✓"
+            else
+              # Use sort -V to compare versions properly
+              local newer=$(printf "%s\n%s" "$current_version" "$latest_version" | ${pkgs.coreutils}/bin/sort -V | ${pkgs.coreutils}/bin/tail -n1)
+              echo "DEBUG: newer=$newer (comparing $current_version vs $latest_version)" >> /tmp/container-update-debug.log
+              if [ "$newer" = "$latest_version" ]; then
+                echo "DEBUG: Update available" >> /tmp/container-update-debug.log
+                echo "⚠️"
+              else
+                echo "DEBUG: Current version is newer or same" >> /tmp/container-update-debug.log
+                echo "✓"
+              fi
+            fi
+          }
 
           # Process all check-in files
           for checkin_file in "$CHECKIN_DIR"/*.json; do
@@ -268,7 +435,34 @@ EOF
                 NOTES="Unknown version"
               fi
 
-              echo "| $HOSTNAME | ✅ Online | $VERSION_SHORT | $VERIFIED | $REBUILD | $NOTES |" >> "$OUTPUT_FILE"
+              # Process container information
+              CONTAINERS=$(${pkgs.jq}/bin/jq -r '.containers' "$checkin_file" 2>/dev/null || echo "[]")
+              CONTAINER_COUNT=$(echo "$CONTAINERS" | ${pkgs.jq}/bin/jq 'length' 2>/dev/null || echo "0")
+
+              CONTAINER_INFO=""
+              if [ "$CONTAINER_COUNT" -gt 0 ]; then
+                # Build container info string
+                CONTAINER_LIST=""
+                for i in $(seq 0 $((CONTAINER_COUNT - 1))); do
+                  CONTAINER_NAME=$(echo "$CONTAINERS" | ${pkgs.jq}/bin/jq -r ".[$i].name" 2>/dev/null)
+                  CONTAINER_IMAGE=$(echo "$CONTAINERS" | ${pkgs.jq}/bin/jq -r ".[$i].image" 2>/dev/null)
+                  CONTAINER_REPO_DIGEST=$(echo "$CONTAINERS" | ${pkgs.jq}/bin/jq -r ".[$i].repo_digest" 2>/dev/null)
+                  CURRENT_VERSION=$(echo "$CONTAINERS" | ${pkgs.jq}/bin/jq -r ".[$i].current_version" 2>/dev/null)
+
+                  # Check for updates
+                  UPDATE_STATUS=$(check_container_update "$CONTAINER_IMAGE" "$CONTAINER_REPO_DIGEST" "$CURRENT_VERSION")
+
+                  if [ -n "$CONTAINER_LIST" ]; then
+                    CONTAINER_LIST="$CONTAINER_LIST<br>"
+                  fi
+                  CONTAINER_LIST="$CONTAINER_LIST**$CONTAINER_NAME**: $CURRENT_VERSION $UPDATE_STATUS"
+                done
+                CONTAINER_INFO="$CONTAINER_LIST"
+              else
+                CONTAINER_INFO="None"
+              fi
+
+              echo "| $HOSTNAME | $VERSION_SHORT | $VERIFIED | $REBUILD | $CONTAINER_INFO | $NOTES |" >> "$OUTPUT_FILE"
             fi
           done
 
