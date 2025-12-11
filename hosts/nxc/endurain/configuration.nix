@@ -54,7 +54,7 @@
       ${pkgs.podman}/bin/podman network inspect endurain-net >/dev/null 2>&1 || \
       ${pkgs.podman}/bin/podman network create endurain-net
     '';
-    before = [ 
+    before = [
       "podman-endurain-db.service"
       "podman-endurain.service"
     ];
@@ -94,7 +94,7 @@
       };
       
       endurain = {
-        image = "ghcr.io/joaovitoriasilva/endurain:latest";
+        image = "ghcr.io/joaovitoriasilva/endurain:v0.16.0";
         autoStart = true;
         dependsOn = [ "endurain-db" ];
         ports = [
