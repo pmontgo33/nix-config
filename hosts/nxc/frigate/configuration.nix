@@ -61,11 +61,11 @@
         enabled = true;
       };
 
-      # Detector configuration - OpenVINO with GPU
+      # Detector configuration - Using CPU temporarily
+      # TODO: Re-enable OpenVINO GPU detection once model path is configured
       detectors = {
-        ov = {
-          type = "openvino";
-          device = "GPU";
+        cpu = {
+          type = "cpu";
         };
       };
 
@@ -149,12 +149,12 @@
       };
 
       face_recognition = {
-        enabled = true;
+        enabled = false;  # Disabled temporarily - causing segfault
         model_size = "small";
       };
 
       lpr = {
-        enabled = true;
+        enabled = false;  # Disabled temporarily - causing segfault
       };
 
       classification = {
