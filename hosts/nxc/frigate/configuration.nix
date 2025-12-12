@@ -448,22 +448,22 @@
   # Fix Frigate's broken auth by overriding the /auth endpoint
   # The Frigate module generates auth_request directives even when auth is disabled
   # We override just the /auth location to return success
-  services.nginx.virtualHosts."${config.services.frigate.hostname}".locations."/auth" = {
-    return = "200";
-  };
+  # services.nginx.virtualHosts."${config.services.frigate.hostname}".locations."/auth" = {
+  #   return = "200";
+  # };
 
-  # Use socat to forward port 5001 to Frigate's port 5000
-  # This avoids nginx virtualHost conflicts that break the frigate-api upstream
-  systemd.services.frigate-port-forward = {
-    description = "Port forward 5001 to Frigate port 5000";
-    wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" ];
-    serviceConfig = {
-      ExecStart = "${pkgs.socat}/bin/socat TCP-LISTEN:5001,fork,reuseaddr TCP:127.0.0.1:5000";
-      Restart = "always";
-      RestartSec = "5s";
-    };
-  };
+  # # Use socat to forward port 5001 to Frigate's port 5000
+  # # This avoids nginx virtualHost conflicts that break the frigate-api upstream
+  # systemd.services.frigate-port-forward = {
+  #   description = "Port forward 5001 to Frigate port 5000";
+  #   wantedBy = [ "multi-user.target" ];
+  #   after = [ "network.target" ];
+  #   serviceConfig = {
+  #     ExecStart = "${pkgs.socat}/bin/socat TCP-LISTEN:5001,fork,reuseaddr TCP:127.0.0.1:5000";
+  #     Restart = "always";
+  #     RestartSec = "5s";
+  #   };
+  # };
 
   # Open firewall ports for Frigate
   networking.firewall.allowedTCPPorts = [
