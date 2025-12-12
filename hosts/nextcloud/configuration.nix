@@ -28,6 +28,18 @@
     group = "nextcloud";
     mode = "0400";
   };
+  sops.secrets."onlyoffice-jwt-secret" = {
+    owner = "onlyoffice";
+    group = "onlyoffice";
+    mode = "0440";
+    restartUnits = [ "onlyoffice-docservice.service" ];
+  };
+  sops.secrets."onlyoffice-security-nonce" = {
+    owner = "onlyoffice";
+    group = "onlyoffice";
+    mode = "0440";
+    restartUnits = [ "onlyoffice-docservice.service" ];
+  };
 
   # Enable the OpenSSH daemon.
   services.openssh.enable = true;
@@ -98,6 +110,14 @@
     phpOptions."opcache.interned_strings_buffer" = "16";
   };
 
+  # OnlyOffice Document Server
+  services.onlyoffice = {
+    enable = true;
+    hostname = "theoffice.montycasa.com";
+    jwtSecretFile = config.sops.secrets."onlyoffice-jwt-secret".path;
+    securityNonceFile = config.sops.secrets."onlyoffice-security-nonce".path;
+  };
+
   # Enable podman w/ docker socket for AppAPI
   virtualisation.podman = {
     enable = true;
@@ -107,7 +127,7 @@
   };
   users.users.nextcloud.extraGroups = [ "podman" ];
 
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
+  networking.firewall.allowedTCPPorts = [ 80 443 8000 ];
 
   system.stateVersion = "25.05";
 }

@@ -91,6 +91,10 @@
         protocol = "http"; 
         upstream = "http://onlyoffice:80"; 
       };
+      "theoffice.montycasa.com" = {
+        protocol = "http";
+        upstream = "http://nextcloud:80";
+      };
 
       "endurain.montycasa.com" = { 
         protocol = "http";
