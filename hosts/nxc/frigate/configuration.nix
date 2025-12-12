@@ -21,7 +21,7 @@
   extra-services.host-checkin.enable = true;
 
   systemd.tmpfiles.rules = [
-    "d /mnt/media 0750 jellyfin jellyfin -"
+    "d /mnt/media 0755 root root -"
     "d /var/lib/frigate/cache 0755 frigate frigate -"
   ];
 
