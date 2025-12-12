@@ -35,6 +35,9 @@
     enable = true;
     hostname = "frigate.local";
 
+    # Disable config check since we use runtime env vars for secrets
+    checkConfig = false;
+
     # Enable Intel QuickSync hardware acceleration
     vaapiDriver = "iHD";
 
