@@ -445,27 +445,17 @@
         - stun:8555
   '';
 
-  # Nginx proxy to expose Frigate on all interfaces for Caddy
-  services.nginx.virtualHosts."frigate-external" = {
-    listen = [
-      { addr = "0.0.0.0"; port = 5001; }
-    ];
-    locations."/" = {
-      proxyPass = "http://127.0.0.1:5000";
-      proxyWebsockets = true;
-      extraConfig = ''
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-      '';
+  # Use socat to forward port 5001 to Frigate's port 5000
+  # This avoids nginx virtualHost conflicts that break the frigate-api upstream
+  systemd.services.frigate-port-forward = {
+    description = "Port forward 5001 to Frigate port 5000";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "network.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.socat}/bin/socat TCP-LISTEN:5001,fork,reuseaddr TCP:127.0.0.1:5000";
+      Restart = "always";
+      RestartSec = "5s";
     };
-  };
-
-  # Fix Frigate's auth endpoint to always succeed (since auth is disabled)
-  # This overrides the Frigate module's /auth location
-  services.nginx.virtualHosts."${config.services.frigate.hostname}" = {
-    locations."/auth".return = "200";
   };
 
   # Open firewall ports for Frigate
