@@ -355,12 +355,31 @@
     };
   };
 
+  # GPU access for LXC - match host device GIDs
+  users.groups.renderaccess = {
+    gid = 104;  # Match host render device GID
+    members = [ "frigate" ];
+  };
+  users.groups.videoaccess = {
+    gid = 44;   # Match host video device GID
+    members = [ "frigate" ];
+  };
+
+  # Enable hardware graphics support
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs; [
+      intel-media-driver             # VAAPI driver for newer Intel (iHD)
+      intel-vaapi-driver             # Legacy VAAPI driver
+      libva-vdpau-driver
+      vpl-gpu-rt                     # Video Processing Library
+    ];
+  };
+
   # Configure Intel GPU hardware acceleration and load secrets
   systemd.services.frigate = {
     serviceConfig = {
-      # Use numeric GIDs from host for LXC device passthrough
-      # GID 44 = video (host), GID 104 = render (host)
-      SupplementaryGroups = ["44" "104"];
+      SupplementaryGroups = ["render" "video"];
       AmbientCapabilities = "CAP_PERFMON";
       # Load secrets from SOPS
       EnvironmentFile = config.sops.secrets.frigate-env.path;
