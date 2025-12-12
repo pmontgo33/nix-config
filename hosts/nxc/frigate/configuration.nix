@@ -33,7 +33,7 @@
   # Frigate NVR Configuration
   services.frigate = {
     enable = true;
-    hostname = "frigate-1.skink-galaxy.ts.net";
+    hostname = "frigate";
 
     # Disable config check since we use runtime env vars for secrets
     checkConfig = false;
@@ -42,6 +42,9 @@
     vaapiDriver = "iHD";
 
     settings = {
+      # Bind to all interfaces for Caddy reverse proxy access
+      bind_addr = "0.0.0.0";
+
       # MQTT Configuration for Home Assistant integration
       mqtt = {
         enabled = true;
