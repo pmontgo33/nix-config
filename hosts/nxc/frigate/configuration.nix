@@ -23,7 +23,6 @@
   systemd.tmpfiles.rules = [
     "d /mnt/media 0755 root root -"
     "d /var/lib/frigate/cache 0755 frigate frigate -"
-    "L+ /var/lib/frigate/go2rtc.yaml - - - - /etc/frigate-go2rtc.yaml"
   ];
 
   extra-services.mount_media.enable = true;
@@ -403,10 +402,16 @@
     wantedBy = [ "multi-user.target" ];
     before = [ "frigate.service" ];
 
+    path = [ pkgs.ffmpeg-headless pkgs.getent pkgs.envsubst ];
+
     serviceConfig = {
       Type = "simple";
       User = "frigate";
       Group = "frigate";
+      ExecStartPre = pkgs.writeShellScript "go2rtc-prep" ''
+        # Substitute environment variables in config
+        ${pkgs.envsubst}/bin/envsubst < /etc/frigate-go2rtc.yaml > /var/lib/frigate/go2rtc.yaml
+      '';
       ExecStart = "${pkgs.go2rtc}/bin/go2rtc -c /var/lib/frigate/go2rtc.yaml";
       Restart = "on-failure";
       RestartSec = "5s";
@@ -414,23 +419,23 @@
     };
   };
 
-  # Create go2rtc configuration file
+  # Create go2rtc configuration file template
   environment.etc."frigate-go2rtc.yaml".text = ''
     streams:
       front_door:
-        - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.54:554/cam/realmonitor?channel=1&subtype=0
+        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.54:554/cam/realmonitor?channel=1&subtype=0
         - "ffmpeg:front_door#audio=opus"
       back_door:
-        - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.53:554/cam/realmonitor?channel=1&subtype=0
+        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.53:554/cam/realmonitor?channel=1&subtype=0
         - "ffmpeg:back_door#audio=opus"
       bella_room:
-        - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.51:554/cam/realmonitor?channel=1&subtype=0
+        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.51:554/cam/realmonitor?channel=1&subtype=0
         - "ffmpeg:bella_room#audio=opus"
       girls_room:
-        - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.50:554/cam/realmonitor?channel=1&subtype=0
+        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.50:554/cam/realmonitor?channel=1&subtype=0
         - "ffmpeg:girls_room#audio=opus"
       nursery:
-        - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.52:554/cam/realmonitor?channel=1&subtype=0
+        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.52:554/cam/realmonitor?channel=1&subtype=0
         - "ffmpeg:nursery#audio=opus"
 
     webrtc:
