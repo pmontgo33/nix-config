@@ -42,9 +42,6 @@
     vaapiDriver = "iHD";
 
     settings = {
-      # Bind to all interfaces for Caddy reverse proxy access
-      bind_addr = "0.0.0.0";
-
       # MQTT Configuration for Home Assistant integration
       mqtt = {
         enabled = true;
