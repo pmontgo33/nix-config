@@ -408,11 +408,12 @@
       Type = "simple";
       User = "frigate";
       Group = "frigate";
+      RuntimeDirectory = "go2rtc";
       ExecStartPre = pkgs.writeShellScript "go2rtc-prep" ''
         # Substitute environment variables in config
-        ${pkgs.envsubst}/bin/envsubst < /etc/frigate-go2rtc.yaml > /var/lib/frigate/go2rtc.yaml
+        ${pkgs.envsubst}/bin/envsubst < /etc/frigate-go2rtc.yaml > /run/go2rtc/config.yaml
       '';
-      ExecStart = "${pkgs.go2rtc}/bin/go2rtc -c /var/lib/frigate/go2rtc.yaml";
+      ExecStart = "${pkgs.go2rtc}/bin/go2rtc -c /run/go2rtc/config.yaml";
       Restart = "on-failure";
       RestartSec = "5s";
       EnvironmentFile = config.sops.secrets.frigate-env.path;
