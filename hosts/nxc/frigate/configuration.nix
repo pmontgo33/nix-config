@@ -448,9 +448,27 @@
         - stun:8555
   '';
 
+  # Nginx proxy to expose Frigate on all interfaces for Caddy
+  services.nginx.virtualHosts."frigate-external" = {
+    listen = [
+      { addr = "0.0.0.0"; port = 5001; }
+    ];
+    locations."/" = {
+      proxyPass = "http://127.0.0.1:5000";
+      proxyWebsockets = true;
+      extraConfig = ''
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      '';
+    };
+  };
+
   # Open firewall ports for Frigate
   networking.firewall.allowedTCPPorts = [
-    5000   # Web UI
+    5000   # Web UI (localhost only)
+    5001   # External Web UI access (for Caddy)
     8554   # RTSP feeds
     8555   # WebRTC TCP
     1984   # Go2RTC

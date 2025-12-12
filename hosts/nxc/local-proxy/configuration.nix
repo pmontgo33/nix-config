@@ -114,7 +114,7 @@
 
       "frigate.montycasa.net" = { 
         protocol = "http"; 
-        upstream = "192.168.86.123:5000"; 
+        upstream = "192.168.86.123:5001"; 
       };
 
       "dockge.montycasa.net" = { 
