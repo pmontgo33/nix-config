@@ -34,7 +34,7 @@
   # Frigate NVR Configuration
   services.frigate = {
     enable = true;
-    hostname = "frigate.local";
+    hostname = "frigate-1.skink-galaxy.ts.net";
 
     # Disable config check since we use runtime env vars for secrets
     checkConfig = false;
