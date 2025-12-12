@@ -445,20 +445,39 @@
         - stun:8555
   '';
 
+  # Add global nginx config to create a fake /auth endpoint that always succeeds
+  # This is needed because Frigate's nginx has auth_request directives even when auth is disabled
+  services.nginx.appendHttpConfig = ''
+    # This map creates a fake successful auth response for all servers
+    map $request_uri $auth_passed {
+      default 1;
+    }
+  '';
+
   # Nginx proxy to expose Frigate on all interfaces for Caddy
-  # Proxies directly to Frigate API (port 5002) to bypass nginx auth layer
   services.nginx.virtualHosts."frigate-external" = {
     listen = [
       { addr = "0.0.0.0"; port = 5001; }
     ];
     locations."/" = {
-      proxyPass = "http://127.0.0.1:5002";
+      proxyPass = "http://127.0.0.1:5000";
       proxyWebsockets = true;
       extraConfig = ''
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+      '';
+    };
+  };
+
+  # Try to add /auth endpoint to the Frigate internal server
+  # The Frigate module uses hostname as the virtualHost name
+  services.nginx.virtualHosts."0.0.0.0" = {
+    locations."/auth" = {
+      return = "200";
+      extraConfig = ''
+        internal;
       '';
     };
   };
