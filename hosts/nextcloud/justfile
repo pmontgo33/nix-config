@@ -1,0 +1,77 @@
+# Nextcloud OCC Commands
+
+# Show Nextcloud status
+occ-status:
+  sudo -u nextcloud nextcloud-occ status
+
+# Enable maintenance mode
+occ-maintenance-on:
+  sudo -u nextcloud nextcloud-occ maintenance:mode --on
+
+# Disable maintenance mode
+occ-maintenance-off:
+  sudo -u nextcloud nextcloud-occ maintenance:mode --off
+
+# Scan all files for all users
+occ-files-scan:
+  sudo -u nextcloud nextcloud-occ files:scan --all
+
+# Scan files for a specific user
+occ-files-scan-user user:
+  sudo -u nextcloud nextcloud-occ files:scan {{user}}
+
+# Run Nextcloud upgrade
+occ-upgrade:
+  sudo -u nextcloud nextcloud-occ upgrade
+
+# List all apps
+occ-app-list:
+  sudo -u nextcloud nextcloud-occ app:list
+
+# Enable an app
+occ-app-enable app:
+  sudo -u nextcloud nextcloud-occ app:enable {{app}}
+
+# Disable an app
+occ-app-disable app:
+  sudo -u nextcloud nextcloud-occ app:disable {{app}}
+
+# Update all apps
+occ-app-update:
+  sudo -u nextcloud nextcloud-occ app:update --all
+
+# List system configuration
+occ-config-list:
+  sudo -u nextcloud nextcloud-occ config:list system
+
+# Add missing database indices
+occ-db-indices:
+  sudo -u nextcloud nextcloud-occ db:add-missing-indices
+
+# Add missing database columns
+occ-db-columns:
+  sudo -u nextcloud nextcloud-occ db:add-missing-columns
+
+# Convert database to big int
+occ-db-bigint:
+  sudo -u nextcloud nextcloud-occ db:convert-filecache-bigint
+
+# List users
+occ-user-list:
+  sudo -u nextcloud nextcloud-occ user:list
+
+# Create a new user
+occ-user-add username:
+  sudo -u nextcloud nextcloud-occ user:add {{username}}
+
+# Reset user password
+occ-user-resetpw username:
+  sudo -u nextcloud nextcloud-occ user:resetpassword {{username}}
+
+# Check background jobs
+occ-bg-jobs:
+  sudo -u nextcloud nextcloud-occ background:queue:status
+
+# Clear Nextcloud cache
+occ-cache-clear:
+  sudo -u nextcloud nextcloud-occ maintenance:repair --include-expensive

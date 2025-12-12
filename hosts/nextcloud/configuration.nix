@@ -6,6 +6,9 @@
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
   ];
 
+  # Add host-specific justfile with Nextcloud OCC commands
+  hostSpecificJustfile = ./justfile;
+
   extra-services.tailscale = {
     enable = true;
     lxc = true;
