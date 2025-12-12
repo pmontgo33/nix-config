@@ -66,17 +66,7 @@
         ov = {
           type = "openvino";
           device = "GPU";
-          model_path = "/openvino-model/ssdlite_mobilenet_v2.xml";
         };
-      };
-
-      # Model configuration for OpenVINO
-      model = {
-        width = 300;
-        height = 300;
-        input_tensor = "nhwc";
-        input_pixel_format = "bgr";
-        labelmap_path = "/openvino-model/coco_91cl_bkgr.txt";
       };
 
       # FFmpeg Intel QuickSync hardware acceleration
