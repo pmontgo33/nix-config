@@ -358,7 +358,9 @@
   # Configure Intel GPU hardware acceleration and load secrets
   systemd.services.frigate = {
     serviceConfig = {
-      SupplementaryGroups = ["render" "video"];
+      # Use numeric GIDs from host for LXC device passthrough
+      # GID 44 = video (host), GID 104 = render (host)
+      SupplementaryGroups = ["44" "104"];
       AmbientCapabilities = "CAP_PERFMON";
       # Load secrets from SOPS
       EnvironmentFile = config.sops.secrets.frigate-env.path;
