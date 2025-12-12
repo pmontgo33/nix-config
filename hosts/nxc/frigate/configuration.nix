@@ -445,6 +445,14 @@
         - stun:8555
   '';
 
+  # Fix Frigate's broken auth by overriding the /auth endpoint
+  # The Frigate module generates auth_request directives even when auth is disabled
+  # We override just the /auth location to return success
+  services.nginx.virtualHosts."${config.services.frigate.hostname}".locations."/auth" = {
+    return = "200";
+    extraConfig = "internal;";
+  };
+
   # Use socat to forward port 5001 to Frigate's port 5000
   # This avoids nginx virtualHost conflicts that break the frigate-api upstream
   systemd.services.frigate-port-forward = {
