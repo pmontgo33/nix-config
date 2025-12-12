@@ -33,7 +33,7 @@
   # Frigate NVR Configuration
   services.frigate = {
     enable = true;
-    hostname = "frigate";
+    hostname = "0.0.0.0";
 
     # Disable config check since we use runtime env vars for secrets
     checkConfig = false;
