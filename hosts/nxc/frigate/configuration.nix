@@ -56,9 +56,9 @@
         path = "/var/lib/frigate/frigate.db";
       };
 
-      # Authentication
+      # Authentication - disabled for proxy compatibility
       auth = {
-        enabled = true;
+        enabled = false;
       };
 
       # Detector configuration - Using CPU temporarily
