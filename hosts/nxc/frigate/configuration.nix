@@ -69,9 +69,9 @@
         };
       };
 
-      # FFmpeg Intel QuickSync hardware acceleration
+      # FFmpeg hardware acceleration using VAAPI (Intel QuickSync)
       ffmpeg = {
-        hwaccel_args = "preset-intel-qsv-h264";
+        hwaccel_args = "preset-vaapi";
       };
 
       # Go2RTC configuration for WebRTC streams
