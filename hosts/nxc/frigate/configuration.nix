@@ -476,9 +476,6 @@
   services.nginx.virtualHosts."0.0.0.0" = {
     locations."/auth" = {
       return = "200";
-      extraConfig = ''
-        internal;
-      '';
     };
   };
 
