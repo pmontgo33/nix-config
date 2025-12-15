@@ -21,6 +21,8 @@
     "d /mnt/media 0755 root root -"
     "d /var/lib/frigate/cache 0755 frigate frigate -"
     "d /var/lib/frigate/model_cache 0755 frigate frigate -"
+    "d /media 0755 root root -"
+    "L+ /media/frigate - - - - /var/lib/frigate"
   ];
 
   extra-services.mount_media.enable = true;
@@ -179,7 +181,7 @@
       };
 
       lpr = {
-        enabled = true;
+        enabled = false;
       };
 
       # Bird classification

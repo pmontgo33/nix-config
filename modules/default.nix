@@ -10,6 +10,7 @@
     ./simplex-smp-server.nix
     ./caddy-proxy.nix
     ./host-checkin.nix
+    ./frigate-gpu.nix
     # ./proxy-target.nix
   ];
 }
