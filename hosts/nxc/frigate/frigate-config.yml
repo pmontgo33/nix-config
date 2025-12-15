@@ -1,0 +1,208 @@
+mqtt:
+  enabled: true
+  host: 192.168.86.100
+  port: 1883
+  user: homeassistant
+  password: "{FRIGATE_MQTT_PASSWORD}"
+
+auth:
+  enabled: false
+
+database:
+  path: /media/frigate/frigate.db
+
+detectors:
+  cpu:
+    type: cpu
+
+model:
+  width: 300
+  height: 300
+
+ffmpeg:
+  hwaccel_args: preset-vaapi
+
+record:
+  enabled: true
+  retain:
+    days: 0
+  alerts:
+    retain:
+      days: 10
+  detections:
+    retain:
+      days: 10
+
+snapshots:
+  enabled: true
+  retain:
+    default: 10
+
+timestamp_style:
+  position: tr
+
+detect:
+  enabled: true
+
+face_recognition:
+  enabled: false
+
+lpr:
+  enabled: false
+
+classification:
+  bird:
+    enabled: false
+
+go2rtc:
+  rtsp:
+    listen: :8554
+  webrtc:
+    listen: :8555
+  api:
+    listen: :1984
+  streams:
+    front_door:
+      - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.54:554/cam/realmonitor?channel=1&subtype=0
+      - "ffmpeg:front_door#audio=opus"
+    back_door:
+      - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.53:554/cam/realmonitor?channel=1&subtype=0
+      - "ffmpeg:back_door#audio=opus"
+    bella_room:
+      - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.51:554/cam/realmonitor?channel=1&subtype=0
+      - "ffmpeg:bella_room#audio=opus"
+    girls_room:
+      - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.50:554/cam/realmonitor?channel=1&subtype=0
+      - "ffmpeg:girls_room#audio=opus"
+    nursery:
+      - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.52:554/cam/realmonitor?channel=1&subtype=0
+      - "ffmpeg:nursery#audio=opus"
+
+cameras:
+  front_door:
+    ffmpeg:
+      output_args:
+        record: preset-record-generic-audio-copy
+      inputs:
+        - path: rtsp://127.0.0.1:8554/front_door
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.54:554/cam/realmonitor?channel=1&subtype=1
+          roles:
+            - detect
+    record:
+      enabled: true
+      retain:
+        days: 3
+      alerts:
+        retain:
+          days: 10
+      detections:
+        retain:
+          days: 10
+    detect:
+      enabled: true
+    objects:
+      track:
+        - person
+    zones:
+      Front_Porch:
+        coordinates: 0.723,0.24,0.436,0.736,0.321,0.998,0.996,0.99,0.987,0.016,0.712,0.003
+        loitering_time: 0
+      Front_Lawn:
+        coordinates: 0.721,0.197,0.475,0.199,0.331,0.297,0.137,0.477,0.075,0.546,0.084,0.999,0.319,0.998,0.721,0.241
+        loitering_time: 0
+
+  back_door:
+    ffmpeg:
+      output_args:
+        record: preset-record-generic-audio-copy
+      inputs:
+        - path: rtsp://127.0.0.1:8554/back_door
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.53:554/cam/realmonitor?channel=1&subtype=1
+          roles:
+            - detect
+    record:
+      enabled: true
+      retain:
+        days: 3
+      alerts:
+        retain:
+          days: 10
+      detections:
+        retain:
+          days: 10
+    detect:
+      enabled: true
+    objects:
+      track:
+        - person
+        - dog
+      filters:
+        person:
+          mask: 0.573,0.17,0.571,0.362,0.619,0.366,0.618,0.17
+    zones:
+      Back_Stoop:
+        coordinates: 0.001,0.702,0,0,0.186,0,0.198,0.646,0.361,0.92,0.326,0.998,0.179,0.997,0.072,0.779
+        loitering_time: 0
+
+  bella_room:
+    ffmpeg:
+      output_args:
+        record: preset-record-generic-audio-copy
+      inputs:
+        - path: rtsp://127.0.0.1:8554/bella_room
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.51:554/cam/realmonitor?channel=1&subtype=1
+          roles:
+            - detect
+    record:
+      enabled: true
+      retain:
+        days: 0.125
+    detect:
+      enabled: false
+
+  girls_room:
+    ffmpeg:
+      output_args:
+        record: preset-record-generic-audio-copy
+      inputs:
+        - path: rtsp://127.0.0.1:8554/girls_room
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.50:554/cam/realmonitor?channel=1&subtype=1
+          roles:
+            - detect
+    record:
+      enabled: true
+      retain:
+        days: 0.125
+    detect:
+      enabled: false
+
+  nursery:
+    ffmpeg:
+      output_args:
+        record: preset-record-generic-audio-copy
+      inputs:
+        - path: rtsp://127.0.0.1:8554/nursery
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+        - path: rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.52:554/cam/realmonitor?channel=1&subtype=1
+          roles:
+            - detect
+    record:
+      enabled: true
+      retain:
+        days: 0.25
+    detect:
+      enabled: false
