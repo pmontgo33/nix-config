@@ -126,7 +126,9 @@
         path = "/var/lib/frigate/frigate.db";
       };
 
-      # Detector configuration - Using CPU
+      # Detector configuration - Using CPU temporarily
+      # OpenVINO requires model files that aren't packaged with NixOS Frigate
+      # To use OpenVINO: extract models from Frigate Docker image or use openvino-dev tools
       detectors = {
         cpu = {
           type = "cpu";
@@ -401,6 +403,8 @@
       intel-vaapi-driver
       libva-vdpau-driver
       vpl-gpu-rt
+      intel-compute-runtime
+      openvino
     ];
   };
 

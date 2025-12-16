@@ -9,18 +9,23 @@ auth:
   enabled: false
 
 database:
-  path: /media/frigate/frigate.db
+  path: /var/lib/frigate/frigate.db
 
 detectors:
-  cpu:
-    type: cpu
+  ov:
+    type: openvino
+    device: AUTO
 
 model:
+  path: /openvino-model/ssdlite_mobilenet_v2.xml
   width: 300
   height: 300
+  input_tensor: nhwc
+  input_pixel_format: bgr
+  labelmap_path: /openvino-model/coco_91cl_bkgr.txt
 
 ffmpeg:
-  hwaccel_args: preset-vaapi
+  hwaccel_args: preset-intel-qsv-h264
 
 record:
   enabled: true
@@ -37,6 +42,12 @@ snapshots:
   enabled: true
   retain:
     default: 10
+
+review:
+  alerts:
+    required_zones: []
+  detections:
+    required_zones: []
 
 timestamp_style:
   position: tr

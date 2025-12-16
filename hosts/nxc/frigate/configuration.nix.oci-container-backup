@@ -53,14 +53,15 @@
         "--device=/dev/dri/card0:/dev/dri/card0"
         "--group-add=104"  # renderaccess
         "--group-add=44"   # videoaccess
+        "--cap-add=CAP_PERFMON"  # Performance monitoring capability
+        "--tmpfs=/tmp/cache:size=1G"  # Tmpfs for cache (reduces disk wear)
       ];
 
       volumes = [
-        "/var/lib/frigate:/media/frigate"
-        "/var/lib/frigate/recordings:/media/frigate/recordings"
-        "/var/lib/frigate/exports:/media/frigate/exports"
+        "/var/lib/frigate:/var/lib/frigate"
         "/run/frigate-config:/config"
         "/var/lib/frigate/model_cache:/config/model_cache"
+        "/etc/localtime:/etc/localtime:ro"  # Match host timezone
       ];
 
       environment = {
@@ -147,7 +148,8 @@
     5000   # Web UI
     8554   # RTSP feeds
     8555   # WebRTC TCP
-    1984   # Go2RTC
+    1984   # Go2RTC API
+    8971   # Additional Go2RTC port
   ];
   networking.firewall.allowedUDPPorts = [
     8555   # WebRTC UDP

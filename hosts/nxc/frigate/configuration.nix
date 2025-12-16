@@ -30,357 +30,74 @@
   # Configure SOPS secrets for Frigate
   sops.secrets.frigate-env = {};
 
-  # Go2RTC service (standalone)
-  services.go2rtc = {
+  # Go2RTC is now managed by the Frigate container
+
+  # Enable Podman for running Frigate OCI container
+  virtualisation.podman = {
     enable = true;
-    settings = {
-      streams = {
-        front_door = [
-          "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.54:554/cam/realmonitor?channel=1&subtype=0"
-          "ffmpeg:front_door#audio=opus"
-        ];
-        back_door = [
-          "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.53:554/cam/realmonitor?channel=1&subtype=0"
-          "ffmpeg:back_door#audio=opus"
-        ];
-        bella_room = [
-          "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.51:554/cam/realmonitor?channel=1&subtype=0"
-          "ffmpeg:bella_room#audio=opus"
-        ];
-        girls_room = [
-          "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.50:554/cam/realmonitor?channel=1&subtype=0"
-          "ffmpeg:girls_room#audio=opus"
-        ];
-        nursery = [
-          "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.52:554/cam/realmonitor?channel=1&subtype=0"
-          "ffmpeg:nursery#audio=opus"
-        ];
+    # Required for containers to access host network
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
+  # Frigate NVR as OCI Container
+  virtualisation.oci-containers = {
+    backend = "podman";
+    containers.frigate = {
+      image = "ghcr.io/blakeblackshear/frigate:0.16.0";
+
+      # Use host network mode for easier access to go2rtc
+      extraOptions = [
+        "--network=host"
+        "--shm-size=256m"
+        "--device=/dev/dri/renderD128:/dev/dri/renderD128"
+        "--device=/dev/dri/card0:/dev/dri/card0"
+        "--group-add=104"  # renderaccess
+        "--group-add=44"   # videoaccess
+        "--cap-add=CAP_PERFMON"  # Performance monitoring capability
+        "--tmpfs=/tmp/cache:size=1G"  # Tmpfs for cache (reduces disk wear)
+      ];
+
+      volumes = [
+        "/var/lib/frigate:/var/lib/frigate"
+        "/var/lib/frigate:/media/frigate"  # Backward compatibility for old database paths
+        "/run/frigate-config:/config"
+        "/var/lib/frigate/model_cache:/config/model_cache"
+        "/etc/localtime:/etc/localtime:ro"  # Match host timezone
+      ];
+
+      environment = {
+        LIBVA_DRIVER_NAME = "iHD";
+        FRIGATE_MQTT_PASSWORD = "\${FRIGATE_MQTT_PASSWORD}";
+        FRIGATE_CAMERA_PASSWORD = "\${FRIGATE_CAMERA_PASSWORD}";
       };
-      rtsp.listen = ":8554";
-      webrtc.listen = ":8555";
-      api.listen = ":1984";
+
+      environmentFiles = [
+        config.sops.secrets.frigate-env.path
+      ];
     };
   };
 
-  # Load secrets into go2rtc service and substitute environment variables
-  systemd.services.go2rtc = {
-    serviceConfig = {
-      EnvironmentFile = config.sops.secrets.frigate-env.path;
-      RuntimeDirectory = "go2rtc";
-      ExecStartPre = pkgs.lib.mkForce "${pkgs.writeShellScript "go2rtc-subst-env" ''
-        ${pkgs.envsubst}/bin/envsubst < ${config.environment.etc."go2rtc-template.yaml".source} > /run/go2rtc/config.yaml
-      ''}";
-      ExecStart = pkgs.lib.mkForce "${pkgs.go2rtc}/bin/go2rtc -config /run/go2rtc/config.yaml";
-    };
-  };
+  # Create runtime config directory and substitute secrets
+  systemd.services.podman-frigate = {
+    preStart = ''
+      # Create config directory
+      mkdir -p /run/frigate-config
 
-  # Create go2rtc config template for variable substitution
-  environment.etc."go2rtc-template.yaml".text = ''
-    api:
-      listen: :1984
-    rtsp:
-      listen: :8554
-    webrtc:
-      listen: :8555
-    streams:
-      front_door:
-        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.54:554/cam/realmonitor?channel=1&subtype=0
-        - "ffmpeg:front_door#audio=opus"
-      back_door:
-        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.53:554/cam/realmonitor?channel=1&subtype=0
-        - "ffmpeg:back_door#audio=opus"
-      bella_room:
-        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.51:554/cam/realmonitor?channel=1&subtype=0
-        - "ffmpeg:bella_room#audio=opus"
-      girls_room:
-        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.50:554/cam/realmonitor?channel=1&subtype=0
-        - "ffmpeg:girls_room#audio=opus"
-      nursery:
-        - rtsp://admin:$FRIGATE_CAMERA_PASSWORD@192.168.10.52:554/cam/realmonitor?channel=1&subtype=0
-        - "ffmpeg:nursery#audio=opus"
-  '';
+      # Load environment variables
+      set -a
+      source ${config.sops.secrets.frigate-env.path}
+      set +a
 
-  # Minimal Frigate NVR Configuration
-  services.frigate = {
-    enable = true;
-    hostname = "frigate";
+      # Substitute environment variables in config
+      ${pkgs.gnused}/bin/sed \
+        -e "s/{FRIGATE_MQTT_PASSWORD}/$FRIGATE_MQTT_PASSWORD/g" \
+        -e "s/{FRIGATE_CAMERA_PASSWORD}/$FRIGATE_CAMERA_PASSWORD/g" \
+        ${./frigate-config.yml} > /run/frigate-config/config.yml
+    '';
 
-    # Disable config check since we use runtime env vars for secrets
-    checkConfig = false;
-
-    # Enable Intel QuickSync hardware acceleration
-    vaapiDriver = "iHD";
-
-    settings = {
-      # MQTT Configuration for Home Assistant integration
-      mqtt = {
-        enabled = true;
-        host = "192.168.86.100";
-        port = 1883;
-        user = "homeassistant";
-        password = "{FRIGATE_MQTT_PASSWORD}";
-      };
-
-      # Database configuration
-      database = {
-        path = "/var/lib/frigate/frigate.db";
-      };
-
-      # Detector configuration - Using CPU
-      detectors = {
-        cpu = {
-          type = "cpu";
-        };
-      };
-
-      # FFmpeg hardware acceleration using VAAPI (Intel QuickSync)
-      ffmpeg = {
-        hwaccel_args = "preset-vaapi";
-      };
-
-      # Global recording configuration
-      record = {
-        enabled = true;
-        retain = {
-          days = 0;
-        };
-        alerts = {
-          retain = {
-            days = 10;
-          };
-        };
-        detections = {
-          retain = {
-            days = 10;
-          };
-        };
-      };
-
-      # Snapshots configuration
-      snapshots = {
-        enabled = true;
-        retain = {
-          default = 10;
-        };
-      };
-
-      # Timestamp styling
-      timestamp_style = {
-        position = "tr";
-      };
-
-      # Global detection settings
-      detect = {
-        enabled = true;
-      };
-
-      # Additional features
-      face_recognition = {
-        enabled = true;
-        model_size = "small";
-      };
-
-      lpr = {
-        enabled = false;
-      };
-
-      # Bird classification
-      classification = {
-        bird = {
-          enabled = true;
-        };
-      };
-
-      # Camera configurations
-      cameras = {
-        front_door = {
-          ffmpeg = {
-            output_args = {
-              record = "preset-record-generic-audio-copy";
-            };
-            inputs = [
-              {
-                path = "rtsp://127.0.0.1:8554/front_door";
-                input_args = "preset-rtsp-restream";
-                roles = ["record"];
-              }
-              {
-                path = "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.54:554/cam/realmonitor?channel=1&subtype=1";
-                roles = ["detect"];
-              }
-            ];
-          };
-          record = {
-            enabled = true;
-            retain = {
-              days = 3;
-            };
-            alerts = {
-              retain = {
-                days = 10;
-              };
-            };
-            detections = {
-              retain = {
-                days = 10;
-              };
-            };
-          };
-          detect = {
-            enabled = true;
-          };
-          objects = {
-            track = ["person"];
-          };
-          zones = {
-            Front_Porch = {
-              coordinates = "0.723,0.24,0.436,0.736,0.321,0.998,0.996,0.99,0.987,0.016,0.712,0.003";
-              loitering_time = 0;
-            };
-            Front_Lawn = {
-              coordinates = "0.721,0.197,0.475,0.199,0.331,0.297,0.137,0.477,0.075,0.546,0.084,0.999,0.319,0.998,0.721,0.241";
-              loitering_time = 0;
-            };
-          };
-        };
-
-        back_door = {
-          ffmpeg = {
-            output_args = {
-              record = "preset-record-generic-audio-copy";
-            };
-            inputs = [
-              {
-                path = "rtsp://127.0.0.1:8554/back_door";
-                input_args = "preset-rtsp-restream";
-                roles = ["record"];
-              }
-              {
-                path = "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.53:554/cam/realmonitor?channel=1&subtype=1";
-                roles = ["detect"];
-              }
-            ];
-          };
-          record = {
-            enabled = true;
-            retain = {
-              days = 3;
-            };
-            alerts = {
-              retain = {
-                days = 10;
-              };
-            };
-            detections = {
-              retain = {
-                days = 10;
-              };
-            };
-          };
-          detect = {
-            enabled = true;
-          };
-          objects = {
-            track = ["person" "dog"];
-            filters = {
-              person = {
-                mask = "0.573,0.17,0.571,0.362,0.619,0.366,0.618,0.17";
-              };
-            };
-          };
-          zones = {
-            Back_Stoop = {
-              coordinates = "0.001,0.702,0,0,0.186,0,0.198,0.646,0.361,0.92,0.326,0.998,0.179,0.997,0.072,0.779";
-              loitering_time = 0;
-            };
-          };
-        };
-
-        bella_room = {
-          ffmpeg = {
-            output_args = {
-              record = "preset-record-generic-audio-copy";
-            };
-            inputs = [
-              {
-                path = "rtsp://127.0.0.1:8554/bella_room";
-                input_args = "preset-rtsp-restream";
-                roles = ["record"];
-              }
-              {
-                path = "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.51:554/cam/realmonitor?channel=1&subtype=1";
-                roles = ["detect"];
-              }
-            ];
-          };
-          record = {
-            enabled = true;
-            retain = {
-              days = 0.125;
-            };
-          };
-          detect = {
-            enabled = false;
-          };
-        };
-
-        girls_room = {
-          ffmpeg = {
-            output_args = {
-              record = "preset-record-generic-audio-copy";
-            };
-            inputs = [
-              {
-                path = "rtsp://127.0.0.1:8554/girls_room";
-                input_args = "preset-rtsp-restream";
-                roles = ["record"];
-              }
-              {
-                path = "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.50:554/cam/realmonitor?channel=1&subtype=1";
-                roles = ["detect"];
-              }
-            ];
-          };
-          record = {
-            enabled = true;
-            retain = {
-              days = 0.125;
-            };
-          };
-          detect = {
-            enabled = false;
-          };
-        };
-
-        nursery = {
-          ffmpeg = {
-            output_args = {
-              record = "preset-record-generic-audio-copy";
-            };
-            inputs = [
-              {
-                path = "rtsp://127.0.0.1:8554/nursery";
-                input_args = "preset-rtsp-restream";
-                roles = ["record"];
-              }
-              {
-                path = "rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.52:554/cam/realmonitor?channel=1&subtype=1";
-                roles = ["detect"];
-              }
-            ];
-          };
-          record = {
-            enabled = true;
-            retain = {
-              days = 0.25;
-            };
-          };
-          detect = {
-            enabled = false;
-          };
-        };
-      };
-    };
+    # Ensure NFS mount is available before starting Frigate
+    requires = [ "mnt-media.mount" ];
+    after = [ "mnt-media.mount" ];
   };
 
   # GPU access for LXC - match host device GIDs
@@ -417,36 +134,6 @@
     options = [ "bind" ];
   };
 
-  # Configure Intel GPU hardware acceleration and load secrets
-  systemd.services.frigate = {
-    serviceConfig = {
-      SupplementaryGroups = ["renderaccess" "videoaccess"];
-      AmbientCapabilities = "CAP_PERFMON";
-      EnvironmentFile = config.sops.secrets.frigate-env.path;
-      # Add environment variable substitution after config is copied
-      ExecStartPre = pkgs.lib.mkAfter [
-        (pkgs.writeShellScript "frigate-subst-env" ''
-          # Load environment variables
-          set -a
-          source ${config.sops.secrets.frigate-env.path}
-          set +a
-
-          # Substitute {VAR} format variables
-          ${pkgs.gnused}/bin/sed \
-            -e "s/{FRIGATE_MQTT_PASSWORD}/$FRIGATE_MQTT_PASSWORD/g" \
-            -e "s/{FRIGATE_CAMERA_PASSWORD}/$FRIGATE_CAMERA_PASSWORD/g" \
-            /run/frigate/frigate.yml > /run/frigate/frigate.yml.tmp
-          mv /run/frigate/frigate.yml.tmp /run/frigate/frigate.yml
-        '')
-      ];
-    };
-    environment = {
-      LIBVA_DRIVER_NAME = "iHD";
-    };
-    # Ensure NFS mount is available before starting Frigate
-    requires = [ "mnt-media.mount" ];
-    after = [ "mnt-media.mount" ];
-  };
 
   # Mount tmpfs for cache (reduces SSD wear)
   fileSystems."/var/lib/frigate/cache" = {
@@ -455,24 +142,15 @@
     options = [ "size=1G" "mode=0755" ];
   };
 
-  # Configure nginx to listen on all interfaces for Frigate
-  services.nginx.virtualHosts."${config.services.frigate.hostname}" = {
-    listen = [
-      { addr = "0.0.0.0"; port = 5000; }
-      { addr = "[::]"; port = 5000; }
-    ];
-    # Add location to serve old /media/frigate paths from /var/lib/frigate
-    locations."/media/frigate/" = {
-      alias = "/var/lib/frigate/";
-    };
-  };
+  # Frigate container exposes port 5000 directly via --network=host
 
   # Open firewall ports for Frigate
   networking.firewall.allowedTCPPorts = [
     5000   # Web UI
     8554   # RTSP feeds
     8555   # WebRTC TCP
-    1984   # Go2RTC
+    1984   # Go2RTC API
+    8971   # Additional Go2RTC port
   ];
   networking.firewall.allowedUDPPorts = [
     8555   # WebRTC UDP
