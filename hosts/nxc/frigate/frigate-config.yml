@@ -14,7 +14,7 @@ database:
 detectors:
   ov:
     type: openvino
-    device: AUTO
+    device: GPU
 
 model:
   path: /openvino-model/ssdlite_mobilenet_v2.xml

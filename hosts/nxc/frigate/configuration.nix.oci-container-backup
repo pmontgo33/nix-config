@@ -59,6 +59,7 @@
 
       volumes = [
         "/var/lib/frigate:/var/lib/frigate"
+        "/var/lib/frigate:/media/frigate"  # Backward compatibility for old database paths
         "/run/frigate-config:/config"
         "/var/lib/frigate/model_cache:/config/model_cache"
         "/etc/localtime:/etc/localtime:ro"  # Match host timezone

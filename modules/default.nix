@@ -11,6 +11,7 @@
     ./caddy-proxy.nix
     ./host-checkin.nix
     ./frigate-gpu.nix
+    ./frigate.nix
     # ./proxy-target.nix
   ];
 }
