@@ -107,6 +107,51 @@
     description = "Molly Socket";
   };
 
+  sops.secrets."proxmox-storage-monitoring-tokenSecret" = {
+      owner = "root";
+      mode = "0400";
+  };
+  sops.secrets."proxmox-storage-montoring-gotify-token" = {
+      owner = "root";
+      mode = "0400";
+  };
+
+  extra-services.proxmox-storage-monitor = {
+    enable = true;
+    
+    proxmoxHosts = [
+      {
+        name = "stark";
+        host = "stark";
+        user = "root@pam";
+        tokenId = "monitoring";
+        tokenSecretFile = config.sops.secrets."proxmox-storage-monitoring-tokenSecret".path;
+      }
+      {
+        name = "starlord";
+        host = "starlord";
+        user = "root@pam";
+        tokenId = "monitoring";
+        tokenSecretFile = config.sops.secrets."proxmox-storage-monitoring-tokenSecret".path;
+      }
+      {
+        name = "loki";
+        host = "loki";
+        user = "root@pam";
+        tokenId = "monitoring";
+        tokenSecretFile = config.sops.secrets."proxmox-storage-monitoring-tokenSecret".path;
+      }
+    ];
+    
+    gotify = {
+      url = "https://notify.montycasa.com";
+      tokenFile = config.sops.secrets."proxmox-storage-montoring-gotify-token".path;
+    };
+    
+    storageThreshold = 80;
+    checkInterval = "hourly";
+  };
+
   # extra-services.simplex-smp-server = {
   #   enable = true;
   #   environmentFile = config.sops.secrets.simplex-smp-env.path;

@@ -12,6 +12,7 @@
     ./host-checkin.nix
     ./frigate-gpu.nix
     ./frigate.nix
+    ./proxmox-storage-monitor.nix
     # ./proxy-target.nix
   ];
 }
