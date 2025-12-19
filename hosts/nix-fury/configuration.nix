@@ -127,20 +127,20 @@
         tokenId = "monitoring";
         tokenSecretFile = config.sops.secrets."proxmox-storage-monitoring-tokenSecret".path;
       }
-      {
-        name = "starlord";
-        host = "starlord";
-        user = "root@pam";
-        tokenId = "monitoring";
-        tokenSecretFile = config.sops.secrets."proxmox-storage-monitoring-tokenSecret".path;
-      }
-      {
-        name = "loki";
-        host = "loki";
-        user = "root@pam";
-        tokenId = "monitoring";
-        tokenSecretFile = config.sops.secrets."proxmox-storage-monitoring-tokenSecret".path;
-      }
+      # {
+      #   name = "starlord";
+      #   host = "starlord";
+      #   user = "root@pam";
+      #   tokenId = "monitoring";
+      #   tokenSecretFile = config.sops.secrets."proxmox-storage-monitoring-tokenSecret".path;
+      # }
+      # {
+      #   name = "loki";
+      #   host = "loki";
+      #   user = "root@pam";
+      #   tokenId = "monitoring";
+      #   tokenSecretFile = config.sops.secrets."proxmox-storage-monitoring-tokenSecret".path;
+      # }
     ];
     
     gotify = {

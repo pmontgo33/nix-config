@@ -89,7 +89,19 @@
 #    - Go to Datacenter → Permissions → API Tokens
 #    - Click "Add" and create a token (e.g., "monitoring")
 #    - Save the token secret (you won't be able to see it again)
-#    - Grant the token appropriate permissions (VM.Audit, Datastore.Audit)
+#    - Grant the token appropriate permissions:
+#      * VM.Audit - Required to list VMs and LXCs
+#      * VM.Monitor - Required to access QEMU guest agent (for VM disk monitoring)
+#      * Datastore.Audit - Optional, for storage info
+#
+# 1b. Enable QEMU Guest Agent on VMs (required for VM disk monitoring):
+#    - Install qemu-guest-agent inside each VM:
+#      * Debian/Ubuntu: apt install qemu-guest-agent
+#      * RHEL/CentOS: yum install qemu-guest-agent
+#      * Windows: Install from VirtIO ISO
+#    - Enable agent in VM options (Proxmox UI):
+#      VM → Options → QEMU Guest Agent → Edit → Enable
+#    - Note: LXC containers don't need guest agent, they work automatically
 #
 # 2. Set up Gotify:
 #    - Install/access your Gotify server

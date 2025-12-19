@@ -10,6 +10,12 @@
   - Configurable storage threshold (default 80%)
   - Send notifications via Gotify
   - Periodic monitoring via systemd timer
+  - Supports SOPS for secure secret management
+
+  Requirements:
+  - API Token with VM.Audit and VM.Monitor permissions
+  - For VMs: QEMU Guest Agent must be installed and enabled
+  - LXC containers work without additional setup
 
   Usage:
     extra-services.proxmox-storage-monitor = {
@@ -112,14 +118,26 @@ let
         return 1
       fi
 
+      # Use printf to properly interpret escape sequences
+      local formatted_message=$(printf "%b" "$message")
+
       ${pkgs.curl}/bin/curl -X POST "$GOTIFY_URL/message" \
         -H "X-Gotify-Key: $GOTIFY_TOKEN" \
         -H "Content-Type: application/json" \
         -d "$(${pkgs.jq}/bin/jq -n \
           --arg title "$title" \
-          --arg message "$message" \
+          --arg message "$formatted_message" \
           --argjson priority "$priority" \
-          '{title: $title, message: $message, priority: $priority}')" \
+          '{
+            title: $title,
+            message: $message,
+            priority: $priority,
+            extras: {
+              "client::display": {
+                contentType: "text/markdown"
+              }
+            }
+          }')" \
         --silent --show-error --fail || echo "Failed to send notification"
     }
 
@@ -182,35 +200,50 @@ let
             continue
           fi
 
-          # Get VM disk info
-          local vm_config=$(${pkgs.curl}/bin/curl $curl_opts \
+          # Try to get disk info from QEMU guest agent
+          local fs_info=$(${pkgs.curl}/bin/curl $curl_opts \
             -H "Authorization: $auth_header" \
-            "$api_base/nodes/$node/qemu/$vmid/config" | ${pkgs.jq}/bin/jq '.data' 2>/dev/null || echo "{}")
+            "$api_base/nodes/$node/qemu/$vmid/agent/get-fsinfo" 2>/dev/null | ${pkgs.jq}/bin/jq '.data' 2>/dev/null || echo "null")
 
-          # Get RRD data for disk usage (last 5 minutes average)
-          local rrd_data=$(${pkgs.curl}/bin/curl $curl_opts \
-            -H "Authorization: $auth_header" \
-            "$api_base/nodes/$node/qemu/$vmid/rrddata?timeframe=hour" | ${pkgs.jq}/bin/jq '.data[-1]' 2>/dev/null || echo "{}")
+          # Check if guest agent data is available
+          if [ "$fs_info" != "null" ] && [ "$fs_info" != "" ]; then
+            # Parse filesystems from guest agent
+            local filesystems=$(echo "$fs_info" | ${pkgs.jq}/bin/jq -c '.result[]?' 2>/dev/null || echo "")
 
-          # Check disk usage
-          local maxdisk=$(echo "$rrd_data" | ${pkgs.jq}/bin/jq -r '.maxdisk // 0')
-          local disk=$(echo "$rrd_data" | ${pkgs.jq}/bin/jq -r '.disk // 0')
+            while IFS= read -r filesystem; do
+              [ -z "$filesystem" ] && continue
 
-          if [ "$maxdisk" != "0" ] && [ "$maxdisk" != "null" ]; then
-            local usage=$(echo "scale=2; ($disk / $maxdisk) * 100" | ${pkgs.bc}/bin/bc)
-            local usage_int=$(echo "$usage / 1" | ${pkgs.bc}/bin/bc)
+              local mount=$(echo "$filesystem" | ${pkgs.jq}/bin/jq -r '.mountpoint // .name')
+              local total=$(echo "$filesystem" | ${pkgs.jq}/bin/jq -r '.total-bytes // 0')
+              local used=$(echo "$filesystem" | ${pkgs.jq}/bin/jq -r '.used-bytes // 0')
 
-            echo "    VM $vmid ($name): ''${usage}% used"
+              # Skip if no data or system/boot partitions
+              if [ "$total" = "0" ] || [ "$total" = "null" ] || \
+                 [[ "$mount" == "/boot"* ]] || [[ "$mount" == "/efi"* ]] || [[ "$mount" == "/sys"* ]]; then
+                continue
+              fi
 
-            if [ "$usage_int" -ge "$THRESHOLD" ]; then
-              local disk_gb=$(echo "scale=2; $disk / 1024 / 1024 / 1024" | ${pkgs.bc}/bin/bc)
-              local maxdisk_gb=$(echo "scale=2; $maxdisk / 1024 / 1024 / 1024" | ${pkgs.bc}/bin/bc)
+              # Calculate usage percentage
+              if [ "$total" != "0" ]; then
+                local usage=$(echo "scale=2; ($used / $total) * 100" | ${pkgs.bc}/bin/bc)
+                local usage_int=$(echo "$usage / 1" | ${pkgs.bc}/bin/bc)
 
-              send_notification \
-                "Proxmox Storage Alert: VM $name" \
-                "Host: $pve_name\\nNode: $node\\nVM: $name (ID: $vmid)\\nStorage Usage: ''${usage}%\\nUsed: ''${disk_gb}GB / ''${maxdisk_gb}GB\\n\\nThreshold: ''${THRESHOLD}%" \
-                8
-            fi
+                echo "    VM $vmid ($name) [$mount]: ''${usage}% used"
+
+                if [ "$usage_int" -ge "$THRESHOLD" ]; then
+                  local used_gb=$(echo "scale=2; $used / 1024 / 1024 / 1024" | ${pkgs.bc}/bin/bc)
+                  local total_gb=$(echo "scale=2; $total / 1024 / 1024 / 1024" | ${pkgs.bc}/bin/bc)
+
+                  send_notification \
+                    "Proxmox Storage Alert: VM $name" \
+                    "**Host:** $pve_name  \\n**Node:** $node  \\n**VM:** $name (ID: $vmid)  \\n**Mount:** $mount  \\n**Storage Usage:** ''${usage}%  \\n**Used:** ''${used_gb}GB / ''${total_gb}GB\\n\\n⚠️ Threshold exceeded: ''${THRESHOLD}%" \
+                    8
+                fi
+              fi
+            done <<< "$filesystems"
+          else
+            # Guest agent not available, skip with note
+            echo "    VM $vmid ($name): skipped (guest agent not available or no VM.Monitor permission)"
           fi
         done <<< "$vms"
 
@@ -252,7 +285,7 @@ let
 
               send_notification \
                 "Proxmox Storage Alert: LXC $name" \
-                "Host: $pve_name\\nNode: $node\\nLXC: $name (ID: $vmid)\\nStorage Usage: ''${usage}%\\nUsed: ''${disk_gb}GB / ''${maxdisk_gb}GB\\n\\nThreshold: ''${THRESHOLD}%" \
+                "**Host:** $pve_name  \\n**Node:** $node  \\n**LXC:** $name (ID: $vmid)  \\n**Storage Usage:** ''${usage}%  \\n**Used:** ''${disk_gb}GB / ''${maxdisk_gb}GB\\n\\n⚠️ Threshold exceeded: ''${THRESHOLD}%" \
                 8
             fi
           fi
