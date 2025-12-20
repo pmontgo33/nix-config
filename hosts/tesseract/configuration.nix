@@ -265,11 +265,10 @@
     # Firmware updates
     fwupd.enable = true;
 
-    # Auto-suspend-then-hibernate on lid close
     logind.settings.Login = {
       HandleLidSwitch = "suspend-then-hibernate";  # Suspend first, then hibernate after timeout
       HandleLidSwitchDocked = "ignore";
-      HandleLidSwitchExternalPower = "suspend-then-hibernate";
+      HandleLidSwitchExternalPower = "suspend";
     };
   };
 

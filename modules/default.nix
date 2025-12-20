@@ -10,7 +10,6 @@
     ./simplex-smp-server.nix
     ./caddy-proxy.nix
     ./host-checkin.nix
-    ./frigate-gpu.nix
     ./frigate.nix
     ./proxmox-storage-monitor.nix
     # ./proxy-target.nix
