@@ -30,6 +30,7 @@
     "d /var/lib/radarr/config 0755 root root -"
     "d /var/lib/bazarr/config 0755 root root -"
     "d /var/lib/pinchflat 0755 root root -"
+    "d /var/lib/dispatcharr 0755 root root -"
     "d /var/lib/huntarr 0755 root root -"
     "d /mnt/media 0755 root root -"
     "d /mnt/media/downloads 0755 root root -"
@@ -256,6 +257,28 @@
         volumes = [
           "/var/lib/bazarr/config:/config"
           "/mnt/media:/mnt/media"
+        ];
+      };
+
+      dispatcharr = {
+        image = "ghcr.io/dispatcharr/dispatcharr:latest";
+        autoStart = true;
+        extraOptions = [
+          "--network=media-network"
+          "--pull=always"
+        ];
+        environment = {
+          TZ = "America/New_York";
+          DISPATCHARR_ENV = "aio";
+          REDIS_HOST = "localhost";
+          CELERY_BROKER_URL = "redis://localhost:6379/0";
+          DISPATCHARR_LOG_LEVEL = "info";
+        };
+        ports = [
+          "9191:9191"
+        ];
+        volumes = [
+          "/var/lib/dispatcharr:/data"
         ];
       };
 
