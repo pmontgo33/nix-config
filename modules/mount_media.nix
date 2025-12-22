@@ -18,7 +18,7 @@ in {
     fileSystems."/mnt/media" = {
       device = "192.168.86.99:/mnt/HDD-Mirror-01/media";
       fsType = "nfs";
-      options = [ "x-systemd.automount" "x-systemd.after=network-online.target" ] ++ (if cfg.readOnly then [ "ro" ] else []);
+      options = [ "x-systemd.after=network-online.target" "x-systemd.requires=network-online.target" ] ++ (if cfg.readOnly then [ "ro" ] else []);
     };
     # optional, but ensures rpc-statsd is running for on demand mounting
     boot.supportedFilesystems = [ "nfs" ];
