@@ -18,20 +18,10 @@ in {
     fileSystems."/mnt/home_media" = {
       device = "192.168.86.99:/mnt/HDD-Mirror-01/home_media";
       fsType = "nfs";
-      options = [ "x-systemd.automount" ] ++ (if cfg.readOnly then [ "ro" ] else []);
+      options = [ "x-systemd.automount" "x-systemd.after=network-online.target" ] ++ (if cfg.readOnly then [ "ro" ] else []);
     };
     # optional, but ensures rpc-statsd is running for on demand mounting
     boot.supportedFilesystems = [ "nfs" ];
 
-    systemd.services."remount-home_media" = {
-      description = "Remount NFS share after network is up";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = "/run/current-system/sw/bin/mount /mnt/home_media";
-      };
-      wantedBy = [ "multi-user.target" ];
-    };
   };
 }

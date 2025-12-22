@@ -20,8 +20,14 @@
     "d /mnt/home_media 0750 jellyfin jellyfin -"
   ];
 
-  extra-services.mount_media.enable = true;
-  extra-services.mount_home_media.enable = true;
+  extra-services.mount_media = {
+    enable = true;
+    readOnly = true;
+  };
+  extra-services.mount_home_media = {
+    enable = true;
+    readOnly = true;
+  };
 
   extra-services.tailscale = {
     enable = true;
@@ -58,7 +64,6 @@
     enable = true;
 
     extraPackages = with pkgs; [
-      intel-ocl                      # Generic OpenCL support
       intel-media-driver             # VAAPI driver for Broadwell and newer (iHD)
       intel-vaapi-driver             # Legacy VAAPI driver for older CPUs (i965)
       libva-vdpau-driver             # Additional VAAPI support
