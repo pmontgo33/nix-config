@@ -114,6 +114,8 @@ in {
     systemd.timers.proxmox-backup-homes = {
       description = "Daily Proxmox home directories backup";
       wantedBy = [ "timers.target" ];
+      wants = [ "network-online.target" ];
+      after = [ "network-online.target" ];
       timerConfig = {
         OnCalendar = "daily";  # Run once per day
         Persistent = true;     # If the system was off during a scheduled run, execute on next boot
@@ -140,14 +142,16 @@ in {
       requires = [ "network-online.target" ];  # Fail if network not available
       # Prevent service from running during nixos-rebuild switch
       restartIfChanged = false;
+      # Limit retry attempts to avoid infinite loops
+      unitConfig = {
+        StartLimitBurst = 3;
+        StartLimitIntervalSec = "1h";
+      };
       serviceConfig = {
         Type = "oneshot";
         User = "root";
         Restart = "on-failure";
         RestartSec = "5min";
-        # Limit retry attempts to avoid infinite loops
-        StartLimitBurst = 3;
-        StartLimitIntervalSec = "1h";
         ExecStart = "${pkgs.writeShellScript "proxmox-backup-homes" ''
           #!${pkgs.bash}/bin/bash
           set -euo pipefail  # Exit on any error, undefined variable, or pipe failure
