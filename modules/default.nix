@@ -6,12 +6,8 @@
     ./mount_home_media.nix
     ./mount_media.nix
     ./pbs-home-dirs.nix
-    ./simplexmq-relay.nix
-    ./simplex-smp-server.nix
     ./caddy-proxy.nix
     ./host-checkin.nix
-    ./frigate.nix
     ./proxmox-storage-monitor.nix
-    # ./proxy-target.nix
   ];
 }
