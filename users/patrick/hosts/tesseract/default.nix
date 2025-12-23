@@ -17,9 +17,11 @@
     fsType = "nfs";
     options = [
       "x-systemd.automount"
-      "x-systemd.requires=network-online.target"
       "noauto"
+      "nofail"
+      "_netdev"
       "x-systemd.idle-timeout=600"
+      "x-systemd.device-timeout=5"
     ];
   };
 
@@ -29,9 +31,11 @@
     fsType = "nfs";
     options = [
       "x-systemd.automount"
-      "x-systemd.requires=network-online.target"
       "noauto"
+      "nofail"
+      "_netdev"
       "x-systemd.idle-timeout=600"
+      "x-systemd.device-timeout=5"
     ];
   };
 

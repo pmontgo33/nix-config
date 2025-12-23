@@ -82,6 +82,11 @@ in
           NumLock = 0; # 0 = turn on, 1 = turn off, 2 = leave unchanged
         };
       };
+      ksmserverrc = {
+        General = {
+          loginMode = "restorePreviousLogout"; # Restore previous session on login
+        };
+      };
     };
   };
 
