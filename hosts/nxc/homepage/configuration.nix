@@ -766,6 +766,13 @@
               };
             };
           }
+          {
+            "Youtarr" = {
+              href = "https://youtarr.montycasa.net";
+              siteMonitor = "https://youtarr.montycasa.net";
+              icon = "sh-youtarr.png";
+            };
+          }
         ];
       }
       {

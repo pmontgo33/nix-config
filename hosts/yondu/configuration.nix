@@ -32,6 +32,12 @@
     "d /var/lib/pinchflat 0755 root root -"
     "d /var/lib/dispatcharr 0755 root root -"
     "d /var/lib/huntarr 0755 root root -"
+    "d /var/lib/youtarr 0755 root root -"
+    "d /var/lib/youtarr/db 0755 root root -"
+    "d /var/lib/youtarr/data 0755 root root -"
+    "d /var/lib/youtarr/images 0755 root root -"
+    "d /var/lib/youtarr/config 0755 root root -"
+    "d /var/lib/youtarr/jobs 0755 root root -"
     "d /mnt/media 0755 root root -"
     "d /mnt/media/downloads 0755 root root -"
     "d /mnt/media/web 0755 root root -"
@@ -41,6 +47,7 @@
 
   sops.secrets.gluetun-env = {};
   sops.secrets.unpackerr-env = {};
+  sops.secrets.youtarr-env = {};
 
   virtualisation.podman = {
     enable = true;
@@ -363,6 +370,65 @@
         };
         volumes = [
           "/mnt/media/downloads:/mnt/media/downloads"
+        ];
+      };
+
+      youtarr-db = {
+        image = "mariadb:10.3";
+        autoStart = true;
+        extraOptions = [
+          "--network=media-network"
+          "--pull=always"
+        ];
+        environmentFiles = [
+          config.sops.secrets.youtarr-env.path
+          # MYSQL_ROOT_PASSWORD
+        ];
+        environment = {
+          MYSQL_DATABASE = "youtarr";
+          TZ = "America/New_York";
+        };
+        cmd = [
+          "--character-set-server=utf8mb4"
+          "--collation-server=utf8mb4_unicode_ci"
+        ];
+        volumes = [
+          "/var/lib/youtarr/db:/var/lib/mysql"
+        ];
+      };
+
+      youtarr = {
+        image = "dialmaster/youtarr:latest";
+        autoStart = true;
+        dependsOn = [ "youtarr-db" ];
+        extraOptions = [
+          "--network=media-network"
+          "--pull=always"
+        ];
+        environmentFiles = [
+          config.sops.secrets.youtarr-env.path
+          # MYSQL_ROOT_PASSWORD
+          # DB_PASSWORD
+          # AUTH_PRESET_USERNAME
+          # AUTH_PRESET_PASSWORD
+        ];
+        environment = {
+          PUID = "0";
+          PGID = "0";
+          TZ = "America/New_York";
+          DB_HOST = "youtarr-db";
+          DB_PORT = "3306";
+          DB_USER = "root";
+          DB_NAME = "youtarr";
+        };
+        ports = [
+          "3087:3011"
+        ];
+        volumes = [
+          "/mnt/media/web:/usr/src/app/data"
+          "/var/lib/youtarr/images:/app/server/images"
+          "/var/lib/youtarr/config:/app/config"
+          "/var/lib/youtarr/jobs:/app/jobs"
         ];
       };
     };

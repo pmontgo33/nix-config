@@ -4,6 +4,10 @@ nrs host="$HOSTNAME":
 nrs-r host:
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --target-host root@{{host}}
 
+nrb-r host:
+  sudo nixos-rebuild boot --flake /home/patrick/nix-config#{{host}} --target-host root@{{host}}
+
+
 nrsb-r host:
   nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --build-host root@nix-fury --target-host root@{{host}}
 

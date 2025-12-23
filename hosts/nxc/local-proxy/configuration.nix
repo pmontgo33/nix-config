@@ -111,6 +111,11 @@
         protocol = "http"; 
         upstream = "192.168.86.114:9696"; 
       };
+      
+      "youtarr.montycasa.net" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.114:3087"; 
+      };
 
       "frigate.montycasa.net" = { 
         protocol = "http"; 
