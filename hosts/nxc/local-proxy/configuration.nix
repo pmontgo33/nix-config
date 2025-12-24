@@ -69,7 +69,7 @@
 
       "omada.montycasa.net" = { 
         protocol = "https"; 
-        upstream = "192.168.86.111:8043"; 
+        upstream = "192.168.86.135:8043"; 
       };
 
       "router.montycasa.net" = { 
