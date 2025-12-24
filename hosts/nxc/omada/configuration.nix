@@ -29,7 +29,7 @@
     backend = "podman";
     containers = {
       omada-controller = {
-        image = "mbentley/omada-controller:latest";
+        image = "mbentley/omada-controller:6.0.0.25";
         ports = [
           "8088:8088"   # HTTP portal
           "8043:8043"   # HTTPS portal
