@@ -37,6 +37,9 @@
       OIDC_SIGNUP_ENABLED = true;
       OIDC_CONFIGURATION_URL = "https://auth.montycasa.com/.well-known/openid-configuration";
       OAUTH_PROVIDER_NAME = "Pocket ID";
+
+      # Force redirect URL for OIDC
+      OIDC_REDIRECT_URL = "https://mealie.montycasa.com/login";
     };
 
     # Credentials file for sensitive values (OIDC_CLIENT_ID, OIDC_CLIENT_SECRET)
