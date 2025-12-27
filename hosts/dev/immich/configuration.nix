@@ -13,7 +13,6 @@
 
   # sops secrets configuration
   sops.secrets."immich-secrets" = {
-    # sopsFile = ../../secrets/secrets.yaml;
     owner = "immich";
     group = "immich";
     mode = "0400";
@@ -38,8 +37,8 @@
     # port = 2283;
     openFirewall = true;
     mediaLocation = "/mnt/home_media/immich";
-    accelerationDevices = null;
-    # secretsFile = config.sops.secrets."immich-secrets".path;
+    accelerationDevices = [ "/dev/dri" ];
+    secretsFile = config.sops.secrets."immich-secrets".path;
     environment = {
       TZ = "America/New_York";
     };
@@ -70,5 +69,5 @@
 
   # networking.firewall.allowedTCPPorts = [ 2283 ];
 
-  system.stateVersion = "25.05";
+  system.stateVersion = "25.11";
 }
