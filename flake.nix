@@ -391,6 +391,25 @@
       ];
     };
 
+    ## mealie ##
+    nixosConfigurations.mealie = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; };
+      modules = [
+        ./hosts/nxc/mealie
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
     ## ERPNext ##
     nixosConfigurations.erpnext = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
