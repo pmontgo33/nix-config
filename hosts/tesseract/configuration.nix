@@ -76,7 +76,8 @@
       options i915 enable_fbc=1
 
       # Bluetooth fixes for resume from suspend/hibernate
-      options btusb enable_autosuspend=0
+      # Aggressive power management disable to prevent HCI errors
+      options btusb enable_autosuspend=0 reset_resume=1
       options bluetooth disable_ertm=1
 
       # Intel WiFi (iwlwifi) fixes for resume from suspend/hibernate
@@ -325,6 +326,27 @@
     "d /.snapshots 0755 root root -"
     "d /home/.snapshots 0755 root root -"
   ];
+
+  # Fix Bluetooth and fingerprint reader after resume from sleep/hibernate
+  systemd.services.fix-bluetooth-resume = {
+    description = "Restart Bluetooth after resume to fix HCI errors";
+    wantedBy = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target" ];
+    after = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.systemd}/bin/systemctl restart bluetooth.service";
+    };
+  };
+
+  systemd.services.fix-fprintd-resume = {
+    description = "Restart fingerprint reader after resume";
+    wantedBy = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target" ];
+    after = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.systemd}/bin/systemctl restart fprintd.service";
+    };
+  };
 
   security.tpm2 = {
     enable = true;
