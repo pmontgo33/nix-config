@@ -152,16 +152,16 @@
     checkInterval = "hourly";
   };
 
-  # extra-services.simplex-smp-server = {
-  #   enable = true;
-  #   environmentFile = config.sops.secrets.simplex-smp-env.path;
-  # };
-
-  # nixpkgs.config.allowBroken = true;
-  # extra-services.simplexmq-relay = {
-  #   enable = true;
-  #   host = "smp.montycasa.com";
-  # };
+  extra-services.simplex-relay = {
+    enable = true;
+    # Generate a random obscure hostname and set it here
+    # For example: smp7a3f9e2b.montycasa.com
+    # Run: echo "smp$(openssl rand -hex 4).montycasa.com" to generate
+    host = "smp28.montycasa.com";  # Set this to your obscure hostname after generating
+    port = 5223;
+    # Don't open public firewall - only accessible via Tailscale from bifrost
+    openFirewall = false;
+  };
 
   networking.firewall.allowedTCPPorts = [ 8080 3001 5216 ];
 

@@ -9,5 +9,6 @@
     ./caddy-proxy.nix
     ./host-checkin.nix
     ./proxmox-storage-monitor.nix
+    ./simplex-relay.nix
   ];
 }
