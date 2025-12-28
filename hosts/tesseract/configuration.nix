@@ -246,6 +246,29 @@
       fileSystems = [ "/" ];
     };
 
+    # Btrfs snapshots with btrbk
+    btrbk.instances.btrbk = {
+      onCalendar = "hourly";
+      settings = {
+        timestamp_format = "long";
+        snapshot_preserve_min = "latest";
+        # Keep: 48 hourly, 7 daily, 4 weekly, 6 monthly
+        snapshot_preserve = "48h 7d 4w 6m";
+
+        # Snapshot root subvolume
+        volume."/" = {
+          snapshot_dir = ".snapshots";
+          subvolume = ".";
+        };
+
+        # Snapshot home subvolume
+        volume."/home" = {
+          snapshot_dir = ".snapshots";
+          subvolume = ".";
+        };
+      };
+    };
+
     # udev rules for better power management
     udev.extraRules = ''
       # Disable Bluetooth autosuspend to prevent resume issues
@@ -276,6 +299,32 @@
   systemd.sleep.extraConfig = ''
     HibernateDelaySec=2h
   '';
+
+  # Btrfs automatic balance for metadata optimization
+  # Runs monthly to prevent metadata fragmentation and maintain performance
+  systemd.services.btrfs-balance = {
+    description = "Balance btrfs filesystem";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.btrfs-progs}/bin/btrfs balance start -dusage=50 -musage=50 /";
+    };
+  };
+
+  systemd.timers.btrfs-balance = {
+    description = "Monthly btrfs balance";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "monthly";
+      Persistent = true;
+      RandomizedDelaySec = "1h";
+    };
+  };
+
+  # Create snapshot directories for btrbk
+  systemd.tmpfiles.rules = [
+    "d /.snapshots 0755 root root -"
+    "d /home/.snapshots 0755 root root -"
+  ];
 
   security.tpm2 = {
     enable = true;

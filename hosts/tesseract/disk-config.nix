@@ -75,7 +75,7 @@
                     "/nix" = {
                       mountpoint = "/nix";
                       mountOptions = [
-                        "compress=no"
+                        "compress=zstd:1"  # Light compression for Nix store (saves 20-30% with minimal CPU cost)
                         "noatime"
                         "space_cache=v2"
                       ];
