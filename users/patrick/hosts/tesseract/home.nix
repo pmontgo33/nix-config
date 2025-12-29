@@ -19,6 +19,7 @@ in
     kdePackages.kate
     google-chrome
     signal-desktop
+    simplex-chat-desktop
     # inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.signal-desktop
     #cowsay
     obsidian

@@ -328,25 +328,20 @@
   ];
 
   # Fix Bluetooth and fingerprint reader after resume from sleep/hibernate
-  systemd.services.fix-bluetooth-resume = {
-    description = "Restart Bluetooth after resume to fix HCI errors";
-    wantedBy = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target" ];
-    after = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = "${pkgs.systemd}/bin/systemctl restart bluetooth.service";
-    };
-  };
-
-  systemd.services.fix-fprintd-resume = {
-    description = "Restart fingerprint reader after resume";
-    wantedBy = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target" ];
-    after = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" "suspend-then-hibernate.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = "${pkgs.systemd}/bin/systemctl restart fprintd.service";
-    };
-  };
+  environment.etc."systemd/system-sleep/fix-bluetooth-fprintd".source = pkgs.writeShellScript "fix-bluetooth-fprintd" ''
+    #!/bin/sh
+    # Fix Bluetooth and fingerprint reader on resume
+    case $1 in
+      post)
+        # Wait a bit for devices to settle
+        sleep 2
+        # Restart Bluetooth to fix HCI errors
+        systemctl restart bluetooth.service
+        # Restart fingerprint reader
+        systemctl restart fprintd.service
+        ;;
+    esac
+  '';
 
   security.tpm2 = {
     enable = true;
