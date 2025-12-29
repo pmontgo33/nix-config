@@ -7,6 +7,8 @@
       ../../secrets
   ];
 
+  extra-services.auto-upgrade.enable = true;
+
   environment.systemPackages = with pkgs; [
     wget
     git

@@ -2,7 +2,11 @@
 {
   imports = [ ../../common ];
 
-  extra-services.auto-upgrade.enable = true;
+  extra-services.auto-upgrade = {
+    enable = true;
+    buildHost = "root@nix-fury";
+  };
+  
   extra-services.host-checkin.enable = true;
   nix.settings.auto-optimise-store = true;
 

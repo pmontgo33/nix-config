@@ -129,9 +129,17 @@ in
       
       globalConfig = ''
         ${optionalString hasSniServices ''
+          # When using layer4, Caddy's HTTPS needs to listen on alternate port
+          https_port 8443
+
           layer4 {
             :443 {
               ${concatStringsSep "\n          " (mapAttrsToList mkLayer4SniConfig cfg.layer4SniServices)}
+
+              # Pass all non-matching traffic to Caddy's HTTPS server
+              route {
+                proxy localhost:8443
+              }
             }
           }
         ''}
