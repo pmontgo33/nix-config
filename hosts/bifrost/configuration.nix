@@ -138,16 +138,11 @@
     };
 
     layer4SniServices = {
-      # SimpleX relay server - TCP proxy via SNI
-      "smp28.montycasa.com" = {
-        protocol = "tcp";
-        upstream = "nix-fury:5223";
-      };
-
-    #   "git.montycasa.net" = {
-    #     protocol = "tcp";
-    #     upstream = "192.168.86.120:22";
-    #   };
+      # Uncomment to add layer4 SNI services
+      # "example.com" = {
+      #   protocol = "tcp";
+      #   upstream = "host:port";
+      # };
     };
   };
 
