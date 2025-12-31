@@ -1,0 +1,64 @@
+- name: add line to lxc config
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/{{ pve_id }}.conf
+    regexp: '^lxc.cgroup2.devices.allow: c 226:0 rwm'
+    line: 'lxc.cgroup2.devices.allow: c 226:0 rwm'
+  delegate_to: "{{ pve_host }}"
+  vars:
+    ansible_user: root
+  register: config1
+
+- name: add line to lxc config
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/{{ pve_id }}.conf
+    regexp: '^lxc.cgroup2.devices.allow: c 226:128 rwm'
+    line: 'lxc.cgroup2.devices.allow: c 226:128 rwm'
+  delegate_to: "{{ pve_host }}"
+  vars:
+    ansible_user: root
+  register: config2
+
+- name: add line to lxc config
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/{{ pve_id }}.conf
+    regexp: '^lxc.cgroup2.devices.allow: c 29:0 rwm'
+    line: 'lxc.cgroup2.devices.allow: c 29:0 rwm'
+  delegate_to: "{{ pve_host }}"
+  vars:
+    ansible_user: root
+  register: config3
+
+- name: add line to lxc config
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/{{ pve_id }}.conf
+    regexp: '^lxc.mount.entry: /dev/fb0 dev/fb0 none bind,optional,create=file'
+    line: 'lxc.mount.entry: /dev/fb0 dev/fb0 none bind,optional,create=file'
+  delegate_to: "{{ pve_host }}"
+  vars:
+    ansible_user: root
+  register: config4
+
+- name: add line to lxc config
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/{{ pve_id }}.conf
+    regexp: '^lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir'
+    line: 'lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir'
+  delegate_to: "{{ pve_host }}"
+  vars:
+    ansible_user: root
+  register: config5
+
+- name: add line to lxc config
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/{{ pve_id }}.conf
+    regexp: '^lxc.mount.entry: /dev/dri/renderD128 dev/dri/renderD128 none bind,optional,create=file'
+    line: 'lxc.mount.entry: /dev/dri/renderD128 dev/dri/renderD128 none bind,optional,create=file'
+  delegate_to: "{{ pve_host }}"
+  vars:
+    ansible_user: root
+  register: config6
+  
+- name: reboot machine to accept new config file
+  become: true
+  ansible.builtin.reboot:
+  when: config1.changed or config2.changed or config3.changed or config4.changed or config5.changed or config6.changed

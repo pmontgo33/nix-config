@@ -12,6 +12,7 @@
   };
 
   # Mount media NFS Share in home directory
+  # These mounts go over Tailscale, so we need to ensure Tailscale is connected first
   fileSystems."/home/patrick/mnt/media" = {
     device = "truenas:/mnt/HDD-Mirror-01/media";
     fsType = "nfs";
@@ -22,6 +23,11 @@
       "_netdev"
       "x-systemd.idle-timeout=600"
       "x-systemd.device-timeout=5"
+      "x-systemd.requires=tailscaled-autoconnect.service"
+      "x-systemd.after=tailscaled-autoconnect.service"
+      "soft"  # Fail faster if NFS server is unreachable
+      "timeo=10"  # 1 second timeout (value is in deciseconds)
+      "retrans=2"  # Only retry twice
     ];
   };
 
@@ -36,6 +42,11 @@
       "_netdev"
       "x-systemd.idle-timeout=600"
       "x-systemd.device-timeout=5"
+      "x-systemd.requires=tailscaled-autoconnect.service"
+      "x-systemd.after=tailscaled-autoconnect.service"
+      "soft"
+      "timeo=10"
+      "retrans=2"
     ];
   };
 
@@ -50,6 +61,11 @@
       "_netdev"
       "x-systemd.idle-timeout=600"
       "x-systemd.device-timeout=5"
+      "x-systemd.requires=tailscaled-autoconnect.service"
+      "x-systemd.after=tailscaled-autoconnect.service"
+      "soft"
+      "timeo=10"
+      "retrans=2"
     ];
   };
 

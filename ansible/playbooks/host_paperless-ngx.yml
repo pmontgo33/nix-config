@@ -1,0 +1,17 @@
+- name: PROVISION PAPERLESS-NGX LXC
+  hosts: paperless-ngx
+  become: yes
+  
+  pre_tasks:
+    - name: UPDATE SYSTEM
+      include_tasks: tasks/update_system.yml
+  
+  tasks:
+    - name: SET TIMEZONE
+      include_tasks: tasks/set_timezone.yml
+    - name: MOUNT GENERAL NFS
+      include_tasks: tasks/mount_general_nfs.yml
+    - name: CONFIGURE PAPERLESS-NGX
+      include_tasks: tasks/configure_paperless-ngx.yml
+    - name: TAILSCALE
+      include_tasks: tasks/install_and_setup_tailscale.yml

@@ -1,0 +1,13 @@
+collections:
+  # Install / Update Docker Collection
+  - name: community.docker
+  # Configure OPNSense
+  - name: ansibleguy.opnsense
+  # Install a tailscale role from the Ansible Galaxy
+  - name: artis3n.tailscale
+
+roles:
+  # Install Docker
+  - src: geerlingguy.docker
+  # Install Lazydocker
+  - src: darkwizard242.lazydocker

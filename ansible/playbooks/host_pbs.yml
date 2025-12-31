@@ -1,0 +1,20 @@
+# $ ansible-playbook playbooks/provision_pbs_truenas.yml
+
+
+- name: PROVISION PROXMOX BACKUP SERVER LXC
+  hosts: pbs
+  become: yes
+  
+  pre_tasks:
+    - name: TAILSCALE
+      include_tasks: tasks/install_and_setup_tailscale.yml
+    - name: UPDATE SYSTEM
+      include_tasks: tasks/update_system.yml
+  
+  tasks:
+    - name: INSTALL PACKAGES
+      include_tasks: tasks/install_packages.yml
+    - name: MOUNT BACKUPS NFS SHARE
+      include_tasks: tasks/mount_backups_nfs.yml
+
+    

@@ -1,0 +1,43 @@
+# May need to allow root ssh login before running this:
+#   nano /etc/ssh/sshd_config
+#   "PermitRootLogin yes"
+#   systemctl restart ssh
+
+- include_vars: vars/homelab_vars.yml
+- include_vars: vars/homelab_secret_vars.yml
+
+- name: ensure sudo is installed
+  apt:
+    name:
+      - sudo
+    state: latest
+
+- name: create primary user
+  ansible.builtin.user:
+    name: "{{ primary_user }}"
+    password: "{{ primary_user_password }}"
+    shell: /bin/bash
+  when: primary_user != "root"
+
+- name: add primary_user to sudoers
+  community.general.sudoers:
+    name: "{{ primary_user }}"
+    state: present
+    user: "{{ primary_user }}"
+    commands: ALL
+
+- name: create ansible user
+  ansible.builtin.user:
+    name: ansible
+    groups: root
+    shell: /bin/bash
+
+- name: add ansible user to sudoers
+  community.general.sudoers:
+    name: ansible
+    state: present
+    user: ansible
+    commands: ALL
+
+- name: TAILSCALE 
+  include_tasks: install_and_setup_tailscale.yml

@@ -1,0 +1,17 @@
+- name: docker compose pull, up, remove-orphans
+  community.docker.docker_compose_v2:
+    project_src: "{{ item }}"
+    pull: always
+    remove_orphans: true
+  become: true
+  loop: "{{ docker_compose_dirs }}"
+  register: output
+
+- name: Show docker results
+  ansible.builtin.debug:
+    var: output
+    
+- name: docker image prune
+  community.docker.docker_prune:
+    images: true
+    timeout: 300

@@ -1,0 +1,5 @@
+- name: docker compose down
+  ansible.builtin.shell:
+    cmd: docker compose down
+    chdir: "{{ item }}"
+  loop: "{{ docker_compose_dirs }}"

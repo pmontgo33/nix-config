@@ -1,0 +1,21 @@
+# $ ansible-playbook playbooks/provision_truenas.yml
+
+- name: PROVISION TRUENAS
+  hosts: truenas_machines
+  become: yes
+  vars:
+    - ansible_user: "{{ primary_user }}"
+  
+  # pre_tasks:
+    # - name: UPDATE SYSTEM
+      # include_tasks: tasks/update_system.yml
+  
+  tasks:
+    # - name: SSH KEYS
+    #   include_tasks: tasks/ssh_keys.yml
+    - name: Install & Configure tmux
+      include_tasks: tasks/install_config_tmux.yml
+      vars:
+        skip_install: true
+    - name: ADD HOST TO DNS SERVER
+      include_tasks: tasks/add_hostname_to_pihole_dns.yml

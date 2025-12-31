@@ -1,0 +1,25 @@
+- name: Add ansible id from a keyserver
+  ansible.builtin.apt_key:
+    keyserver: keyserver.ubuntu.com
+    id: 93C4A3FD7BB9C367
+
+- name: add ansible repository to apt
+  apt_repository:
+    repo: deb http://ppa.launchpad.net/ansible/ansible/ubuntu focal main
+    state: present
+
+- name: install packages ansible
+  apt:
+    name:
+      - ansible
+      - sshpass
+    state: present
+    update_cache: true
+  become: true
+
+- name: Update ansible
+  ansible.builtin.apt:
+    name: ansible
+    state: latest
+    update_cache: yes
+    

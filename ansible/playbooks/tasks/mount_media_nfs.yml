@@ -1,0 +1,32 @@
+- name: Include Homelab Vars
+  include_vars: vars/homelab_vars.yml
+- name: Include Homelab Secret Vars
+  include_vars: vars/homelab_secret_vars.yml
+
+- name: install nfs-common 
+  apt:
+    name: 
+      - nfs-common
+    state: present
+    update_cache: true
+  become: true
+
+- name: make media directory
+  file:
+    path: /mnt/media
+    state: directory
+
+- name: Mount media NFS share on TrueNAS
+  ansible.posix.mount:
+    src: 192.168.86.99:/mnt/HDD-Mirror-01/media
+    path: /mnt/media
+    fstype: nfs
+    opts: rw,sync,hard
+    state: present
+  become: true
+  register: fstab
+  
+- name: mount all drives
+  command: mount -a
+  become: true
+  when: fstab.changed

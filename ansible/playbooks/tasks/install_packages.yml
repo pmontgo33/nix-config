@@ -1,0 +1,45 @@
+- name: install packages - git, software-properties-common, fail2ban, unattended-upgrades, rsync, sudo, vim-nox, iperf
+  apt:
+    name:
+      - git
+      - software-properties-common
+      - fail2ban
+      - unattended-upgrades
+      - rsync
+      - sudo
+      - vim-nox
+      - iperf3
+     # - just
+    state: latest
+    update_cache: true
+  become: true
+  register: packages
+
+- name: ensure old packages are removed
+  apt:
+    name:
+      - crowdsec
+    state: absent
+  become: true
+
+- name: Start unattended-upgrades service, if not started
+  ansible.builtin.service:
+    name: unattended-upgrades
+    state: started
+
+- name: Install & Configure tmux
+  include_tasks: tasks/install_config_tmux.yml
+  
+- name: install qemu-guest-agent
+  apt:
+    name:
+      - qemu-guest-agent
+    state: latest
+    update_cache: true
+  become: true
+  when: ansible_virtualization_type == "kvm" and ansible_virtualization_role == "guest"
+  register: qemu
+  
+- name: reboot host if qmeu-guest-agent is installed
+  ansible.builtin.reboot:
+  when: qemu.changed

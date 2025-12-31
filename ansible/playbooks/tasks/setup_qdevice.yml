@@ -1,0 +1,28 @@
+- name: Include Homelab Vars
+  include_vars: vars/homelab_vars.yml
+- name: Include Homelab Secret Vars
+  include_vars: vars/homelab_secret_vars.yml
+
+- name: install corosync-qdevice on cluster nodes
+  apt:
+    name: 
+      - corosync-qdevice 
+    state: present
+    update_cache: true
+  become: true
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['local_cluster_nodes'] }}"
+  
+- name: install corosync-qdevice and corosync-qnetd on qdevice
+  apt:
+    name:
+      - corosync-qnetd
+    state: present
+    update_cache: true
+  become: true
+  #become_user: root
+
+# - name: qdevice setup commmand
+#   ansible.builtin.shell:
+#     cmd: "pvecm qdevice setup {{ ip }}"
+#   delegate_to: "{{ groups['local_cluster_nodes'] | random }}"

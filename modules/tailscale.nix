@@ -71,6 +71,14 @@ in {
       # ]) ++ cfg.extraFlags;
     };
 
+    # Make tailscaled-autoconnect non-blocking to prevent boot delays
+    # The service will still run and connect Tailscale in the background,
+    # but won't delay the desktop from loading (saves ~50 seconds on boot)
+    systemd.services.tailscaled-autoconnect = {
+      wantedBy = mkForce [ ];  # Remove from boot dependencies
+      after = [ "multi-user.target" ];  # Run after boot is complete
+    };
+
     # # Service to update Tailscale when tags or flags change
     # systemd.services.tailscale-update-config = let
     #   # Create a config file that changes when tags/flags change

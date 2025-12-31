@@ -1,0 +1,30 @@
+# $ ansible-playbook playbooks/host_cluster_nodes.yml
+
+- name: ENSURE PRIMARY & ANSIBLE USERS ARE PRESENT AND CONFIGURED
+  hosts: cluster_nodes
+  become: yes
+  vars:
+    - ansible_user: "{{ primary_user }}"
+  tasks:
+    - include_tasks: tasks/create_primary_ansible_users.yml
+
+- name: PROVISION CLUSTER NODES
+  hosts: cluster_nodes
+  become: yes
+  tasks:
+    - name: TAILSCALE
+      include_tasks: tasks/install_and_setup_tailscale.yml
+      vars:
+        ts_args: "--advertise-routes={{tailscale_routes|default('192.168.86.0/24')}} --advertise-exit-node"
+    - name: UPDATE SYSTEM
+      include_tasks: tasks/update_system.yml
+    - name: INSTALL PACKAGES
+      include_tasks: tasks/install_packages.yml
+    - name: SETUP PROXMOX NOTIFICATIONS
+      include_tasks: tasks/setup_proxmox_ve_notifications.yml
+      when: proxmox_notifications is defined and proxmox_notifications|bool is true
+    - name: TAILSCALE
+      include_tasks: tasks/install_and_setup_tailscale.yml
+      vars:
+        ts_args: "--advertise-routes={{tailscale_routes|default('192.168.86.0/24')}} --advertise-exit-node"
+      

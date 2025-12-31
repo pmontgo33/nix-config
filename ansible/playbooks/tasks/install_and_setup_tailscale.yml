@@ -1,0 +1,65 @@
+- include_vars: vars/homelab_vars.yml
+- include_vars: vars/homelab_secret_vars.yml
+
+- name:  add lxc.cgroup2.devices.allow to pve config
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/{{ pve_id }}.conf
+    regexp: '^lxc.cgroup2.devices.allow: c 10:200 rwm'
+    line: 'lxc.cgroup2.devices.allow: c 10:200 rwm'
+  delegate_to: "{{ pve_host }}"
+  vars:
+    ansible_user: root
+    ansible_host: "{{ hostvars[inventory_hostname].pve_host }}"
+  when: ansible_virtualization_type == "lxc"
+  register: config_cgroup2
+
+- name: mount tun in pve config
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/{{ pve_id }}.conf
+    regexp: '^lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file'
+    line: 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file'
+  delegate_to: "{{ pve_host }}"
+  vars:
+    ansible_user: root
+    ansible_host: "{{ hostvars[inventory_hostname].pve_host }}"
+  when: ansible_virtualization_type == "lxc"
+  register: config_tun
+
+- name: reboot machine to accept new config file
+  ansible.builtin.reboot:
+  when: config_cgroup2.changed or config_tun.changed
+
+- name: check if /etc/sysctl.d directory exists
+  stat:
+    path: /etc/sysctl.d
+  register: sysctld_dir
+
+- name: Enable IP forwarding step 1 for subnet routers when /etc/sysctl.d dir is present
+  ansible.posix.sysctl:
+    sysctl_file: /etc/sysctl.d/99-tailscale.conf
+    name: net.ipv4.ip_forward
+    value: 1
+  when: '"advertise-routes" in ts_args|default("") and sysctld_dir.stat.exists'
+
+- name: Enable IP forwarding step 2 for subnet routers when /etc/sysctl.d dir is present
+  ansible.posix.sysctl:
+    sysctl_file: /etc/sysctl.d/99-tailscale.conf
+    name: net.ipv6.conf.all.forwarding
+    value: 1
+  when: '"advertise-routes" in ts_args|default("") and sysctld_dir.stat.exists'
+
+- name: Install and Setup Tailscale for non-virtualization hosts
+  include_role:
+    name: artis3n.tailscale.machine
+  vars:
+    #tailscale_args: "{{ ts_args | default('') }} --ssh --reset"
+    tailscale_args: "{{ ts_args | default('') }} --reset --force-reauth --ssh"
+  when: ansible_virtualization_role != "host"
+
+- name: Install and Setup Tailscale for virtualization hosts
+  include_role:
+    name: artis3n.tailscale.machine
+  vars:
+   # tailscale_args: "{{ ts_args | default('') }} --ssh --accept-dns=false --reset"
+    tailscale_args: "{{ ts_args | default('') }} --accept-dns=false --reset --force-reauth --ssh"
+  when: ansible_virtualization_role == "host"

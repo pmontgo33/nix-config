@@ -1,0 +1,10 @@
+- name: apt update
+  apt:
+    update_cache: true
+  changed_when: false
+
+- name: apt full upgrade, autoclean, autoremove
+  apt:
+    upgrade: full
+    autoremove: true
+    autoclean: true

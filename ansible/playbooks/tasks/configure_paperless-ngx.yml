@@ -1,0 +1,11 @@
+- name: Update PAPERLESS_CONSUMPTION_DIR in paperless.conf
+  ansible.builtin.lineinfile:
+    path: /opt/paperless/paperless.conf
+    regexp: '^PAPERLESS_CONSUMPTION_DIR='
+    line: 'PAPERLESS_CONSUMPTION_DIR=/mnt/general/paperless-ngx/consume'
+
+- name: Update PAPERLESS_MEDIA_DIR in paperless.conf
+  ansible.builtin.lineinfile:
+    path: /opt/paperless/paperless.conf
+    regexp: '^PAPERLESS_MEDIA_ROOT='
+    line: 'PAPERLESS_MEDIA_ROOT=/mnt/general/paperless-ngx/media'

@@ -1,0 +1,21 @@
+# $ ansible-playbook playbooks/run_tasks.yml
+
+- name: "RUN TASKS: {{ tasks }}"
+  hosts: "{{ hosts }}"
+  become: yes
+
+  vars_prompt:
+    - name: tasks
+      prompt: "Which task would you like to run (no .yml)?"
+      private: no
+
+    - name: hosts
+      prompt: "Which hosts should we run that task on?"
+      private: no
+
+  tasks:
+    - name: Ansible User
+      ansible.builtin.debug:
+        msg: "{{ ansible_user_id }}"
+    
+    - include_tasks: "tasks/{{ tasks }}.yml"

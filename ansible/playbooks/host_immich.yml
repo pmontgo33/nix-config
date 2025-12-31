@@ -1,0 +1,34 @@
+# $ ansible-playbook playbooks/provision_immich_lxc.yml
+
+- name: PROVISION IMMICH LXC
+  hosts: immich
+  become: yes
+  
+  vars_prompt:
+    - name: update_docker
+      prompt: "Would you like to update docker containers? (yes/no)"
+      default: "no"
+      private: no
+
+  pre_tasks:
+    - name: UPDATE SYSTEM
+      include_tasks: tasks/update_system.yml
+  
+  tasks:
+    # - name: SSH KEYS
+    #   include_tasks: tasks/ssh_keys.yml
+    - name: SET TIMEZONE
+      include_tasks: tasks/set_timezone.yml
+    - name: MOUNT MEDIA NFS
+      include_tasks: tasks/mount_media_nfs.yml
+    - name: MOUNT HOME MEDIA NFS
+      include_tasks: tasks/mount_home_media_nfs.yml
+    - name: LXC GPU PASSTHROUGH
+      include_tasks: tasks/lxc_gpu_passthrough.yml
+    - name: SETUP SAMBDA SHARES
+      include_tasks: tasks/samba_shares.yml
+    - name: TAILSCALE
+      include_tasks: tasks/install_and_setup_tailscale.yml
+    - name: UPDATE DOCKER
+      include_tasks: tasks/update_docker.yml
+      when: update_docker is defined and update_docker|bool is true

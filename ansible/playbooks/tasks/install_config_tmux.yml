@@ -1,0 +1,14 @@
+- name: install tmux
+  apt:
+    name:
+      - tmux
+    state: present
+    update_cache: true
+  become: true
+  when: skip_install is not defined or skip_install == false
+    
+- name: Copy tmux.conf file
+  ansible.builtin.copy:
+    src: tmux.conf
+    dest: /etc/tmux.conf
+    mode: 0644

@@ -1,0 +1,25 @@
+- name: INSTALL NFS
+  apt:
+    name:
+      - nfs-kernel-server
+    state: present
+    update_cache: true
+  become: true
+  register: packages
+
+# - name: Create storage directory if it does not already exist
+  # ansible.builtin.file:
+    # path: "{{ nfs_dir }}"
+    # state: directory
+    # mode: 0775
+    # recurse: true
+
+- name: Configuring exports
+  template:
+    src: "nas_exports.js"
+    dest: /etc/exports
+  register: exports
+
+- name: reload exports
+  command: exportfs -ar
+  when: exports.changed

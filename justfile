@@ -38,6 +38,14 @@ git-cpush message branch="master":
 git-rpull remote:
   ssh root@{{remote}} "cd /etc/nixos && git pull https://github.com/pmontgo33/nixos-config.git"
 
-# this is a comment
-#another-recipe:
-#  @echo 'This is another recipe.'
+ap host tags="all" vars="":
+  ansible-playbook ansible/playbooks/host_{{host}}.yml --tags "{{tags}}" -e "{{vars}}"
+
+ap-bootstrap host:
+  ansible-playbook ansible/playbooks/bootstrap_new_host.yml -e "host={{host}}"
+
+av-edit-vars:
+  ansible-vault edit ansible/playbooks/vars/homelab_secret_vars.yml
+
+reqs:
+  ansible-galaxy install -r ansible/requirements.yml

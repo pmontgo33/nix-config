@@ -1,0 +1,80 @@
+# Homelab Ansible Variables
+
+# Linux User Vars
+primary_user_password: "{{ vault_primary_user_password }}"
+
+# Samba Vars
+samba_users:
+  - {name: '{{ primary_user }}', groups: '', smbpasswd: '{{ vault_samba_password }}'}
+
+# Tailscale Vars
+# This key will expire on Nov 27, 2023. If youʼll then want to continue using an auth key, youʼll need to generate a new one.
+tailscale_authkey: "{{ vault_tailscale_authkey }}"
+
+#omv SMB Credentials
+omv_username: "{{ vault_omv_username }}"
+omv_password: "{{ vault_omv_password }}"
+
+# Proxmox Cluster Hosts
+cluster_nodes:
+  - starlord
+  - stark
+
+#SMTP Credentials
+gmail_credentials: "{{ vault_gmail_credentials }}"
+
+#Cloudflare Credentials
+cloudflare_domain: "{{ vault_cloudflare_domain }}"
+local_cloudflare_domain: "{{ vault_local_cloudflare_domain }}"
+bc_cloudflare_domain: "{{ vault_bc_cloudflare_domain }}"
+cloudflare_token: "{{ vault_cloudflare_token }}"
+
+#Digital Ocean
+digital_ocean_token: "{{ vault_digital_ocean_token }}"
+
+#Proxmox Terraform
+proxmox_terraform_token_id: "{{ vault_proxmox_terraform_token_id }}"
+proxmox_terraform_token_secret: "{{ vault_proxmox_terraform_token_secret}}"
+proxmox_default_root_passwd: "{{ vault_proxmox_default_root_passwd }}"
+
+#OPNSense
+opnsense_api_key: "{{ vault_opnsense_api_key }}"
+opnsense_api_secret: "{{ vault_opnsense_api_secret }}"
+
+#Homepage
+proxmox_username: "{{ vault_proxmox_username }}"
+proxmox_password: "{{ vault_proxmox_password }}"
+truenas_username: "{{ vault_truenas_username }}"
+truenas_password: "{{ vault_truenas_password }}"
+pbs_username: "{{ vault_pbs_username }}"
+pbs_password: "{{ vault_pbs_password }}"
+wakanda_username: "{{ vault_wakanda_username }}"
+wakanda_password: "{{ vault_wakanda_password }}"
+bucky_username: "{{ vault_bucky_username }}"
+bucky_password: "{{ vault_bucky_password }}"
+opnsense_username: "{{ vault_opnsense_username }}"
+opnsense_password: "{{ vault_opnsense_password }}"
+pihole_key: "{{ vault_pihole_key }}"
+homeassistant_key: "{{ vault_homeassistant_key }}"
+jellyfin_key: "{{ vault_jellyfin_key }}"
+immich_key: "{{ vault_immich_key }}"
+audiobookshelf_key: "{{ vault_audiobookshelf_key }}"
+qbittorrent_username: "{{ vault_qbittorrent_username }}"
+qbittorrent_password: "{{ vault_qbittorrent_password }}"
+radarr_key: "{{ vault_radarr_key }}"
+sonarr_key: "{{ vault_sonarr_key }}"
+readarr_key: "{{ vault_readarr_key }}"
+bazarr_key: "{{ vault_bazarr_key }}"
+prowlarr_key: "{{ vault_prowlarr_key }}"
+transmission_key: "{{ vault_transmission_key }}"
+gotify_client: "{{ vault_gotify_client }}"
+linkwarden_key: "{{ vault_linkwarden_key }}"
+paperlessngx_token: "{{ vault_paperlessngx_token }}"
+nextcloud_username: "{{ vault_nextcloud_username }}"
+nextcloud_password: "{{ vault_nextcloud_password }}"
+mealie_api_token: "{{ vault_mealie_api_token }}"
+omada_username: "{{ vault_omada_username }}" 
+omada_password: "{{ vault_omada_password }}"
+omada_site: "{{ vault_omada_site }}"
+adguard_username: "{{ vault_adguard_username }}"
+adguard_password: "{{ vault_adguard_password }}"
