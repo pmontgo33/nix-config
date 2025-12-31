@@ -3,31 +3,31 @@
 
 - name:  add lxc.cgroup2.devices.allow to pve config
   ansible.builtin.lineinfile:
-    path: /etc/pve/lxc/{{ pve_id }}.conf
+    path: /etc/pve/lxc/{{ pve_id | default('0') }}.conf
     regexp: '^lxc.cgroup2.devices.allow: c 10:200 rwm'
     line: 'lxc.cgroup2.devices.allow: c 10:200 rwm'
-  delegate_to: "{{ pve_host }}"
+  delegate_to: "{{ pve_host | default(inventory_hostname) }}"
   vars:
     ansible_user: root
     ansible_host: "{{ hostvars[inventory_hostname].pve_host }}"
-  when: ansible_virtualization_type == "lxc"
+  when: ansible_virtualization_type == "lxc" and pve_host is defined and pve_id is defined
   register: config_cgroup2
 
 - name: mount tun in pve config
   ansible.builtin.lineinfile:
-    path: /etc/pve/lxc/{{ pve_id }}.conf
+    path: /etc/pve/lxc/{{ pve_id | default('0') }}.conf
     regexp: '^lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file'
     line: 'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file'
-  delegate_to: "{{ pve_host }}"
+  delegate_to: "{{ pve_host | default(inventory_hostname) }}"
   vars:
     ansible_user: root
     ansible_host: "{{ hostvars[inventory_hostname].pve_host }}"
-  when: ansible_virtualization_type == "lxc"
+  when: ansible_virtualization_type == "lxc" and pve_host is defined and pve_id is defined
   register: config_tun
 
 - name: reboot machine to accept new config file
   ansible.builtin.reboot:
-  when: config_cgroup2.changed or config_tun.changed
+  when: (config_cgroup2 is defined and config_cgroup2.changed) or (config_tun is defined and config_tun.changed)
 
 - name: check if /etc/sysctl.d directory exists
   stat:

@@ -1,7 +1,7 @@
 # $ ansible-playbook playbooks/host_cluster_nodes.yml
 
 - name: ENSURE PRIMARY & ANSIBLE USERS ARE PRESENT AND CONFIGURED
-  hosts: cluster_nodes
+  hosts: remote_cluster_nodes
   become: yes
   vars:
     ansible_user: "{{ primary_user }}"
@@ -9,7 +9,7 @@
     - include_tasks: tasks/create_primary_ansible_users.yml
 
 - name: PROVISION CLUSTER NODES
-  hosts: cluster_nodes
+  hosts: remote_cluster_nodes
   become: yes
   tasks:
     - name: TAILSCALE
