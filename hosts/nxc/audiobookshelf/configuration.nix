@@ -11,7 +11,10 @@
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
-  extra-services.mount_media = true;
+  extra-services.mount_media = {
+    enable = true;
+    readOnly = true;
+  };
 
   sops = {
     secrets = {
