@@ -14,6 +14,7 @@
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
+  extra-services.mount_general.enable = true;
 
   # Enable Podman for running paperless-ai OCI container
   virtualisation.podman = {
@@ -85,6 +86,8 @@
   # Create necessary directories
   systemd.tmpfiles.rules = [
     "d /var/lib/paperless-ai 0755 paperless paperless -"
+    "d /mnt/general 0750 paperless paperless -"
+
   ];
 
   # Ensure paperless-ai container starts after paperless service
