@@ -6,6 +6,8 @@
   become: true
   loop: "{{ docker_compose_dirs }}"
   register: output
+  environment:
+    DOCKER_API_VERSION: "1.52"
 
 - name: Show docker results
   ansible.builtin.debug:
@@ -15,3 +17,5 @@
   community.docker.docker_prune:
     images: true
     timeout: 300
+  environment:
+    DOCKER_API_VERSION: "1.52"

@@ -447,7 +447,12 @@
 
   environment.systemPackages = with pkgs; [
     # From hp-nixos
-    ansible
+    # Ansible with Docker SDK support for community.docker modules
+    (ansible.overridePythonAttrs (old: {
+      propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [
+        python3Packages.docker
+      ];
+    }))
     # ansible-lint  # Temporarily disabled due to dependency conflict in nixpkgs 25.05
     terraform
     sshpass
