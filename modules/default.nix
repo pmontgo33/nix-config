@@ -5,6 +5,7 @@
     ./tailscale.nix
     ./mount_home_media.nix
     ./mount_media.nix
+    ./mount_general.nix
     ./pbs-home-dirs.nix
     ./caddy-proxy.nix
     ./host-checkin.nix
