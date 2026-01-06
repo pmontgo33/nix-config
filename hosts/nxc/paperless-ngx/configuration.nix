@@ -7,6 +7,14 @@
 
   networking.hostName = "paperless-ngx";
 
+  # Disable tests for memory-intensive packages to prevent OOM during build
+  nixpkgs.config.packageOverrides = pkgs: {
+    ocrmypdf = pkgs.ocrmypdf.overridePythonAttrs (oldAttrs: {
+      doCheck = false;
+      doInstallCheck = false;
+    });
+  };
+
   services.openssh.enable = true;
 
   extra-services.tailscale = {
