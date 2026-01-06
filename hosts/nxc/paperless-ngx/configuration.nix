@@ -7,13 +7,36 @@
 
   networking.hostName = "paperless-ngx";
 
-  # Disable tests for memory-intensive packages to prevent OOM during build
-  nixpkgs.config.packageOverrides = pkgs: {
-    ocrmypdf = pkgs.ocrmypdf.overridePythonAttrs (oldAttrs: {
-      doCheck = false;
-      doInstallCheck = false;
-    });
+  # Reduce build memory usage
+  nix.settings = {
+    max-jobs = 1;  # Limit parallel builds to reduce memory usage
+    cores = 2;     # Limit cores per build
   };
+
+  # Disable tests for memory-intensive packages to prevent OOM during build
+  nixpkgs.overlays = [
+    (final: prev: {
+      # Disable tests for Python packages that cause OOM
+      python3 = prev.python3.override {
+        packageOverrides = pyfinal: pyprev: {
+          ocrmypdf = pyprev.ocrmypdf.overridePythonAttrs (old: {
+            doCheck = false;
+            doInstallCheck = false;
+            pytestCheckPhase = "true";
+          });
+        };
+      };
+      python313 = prev.python313.override {
+        packageOverrides = pyfinal: pyprev: {
+          ocrmypdf = pyprev.ocrmypdf.overridePythonAttrs (old: {
+            doCheck = false;
+            doInstallCheck = false;
+            pytestCheckPhase = "true";
+          });
+        };
+      };
+    })
+  ];
 
   services.openssh.enable = true;
 
