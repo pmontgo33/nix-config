@@ -290,7 +290,7 @@
     fwupd.enable = true;
 
     logind.settings.Login = {
-      HandleLidSwitch = "suspend-then-hibernate";  # Suspend first, then hibernate after timeout
+      HandleLidSwitch = "suspend";  # Suspend first, then hibernate after timeout
       HandleLidSwitchDocked = "ignore";
       HandleLidSwitchExternalPower = "suspend";
     };
