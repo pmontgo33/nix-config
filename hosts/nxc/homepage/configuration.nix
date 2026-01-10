@@ -437,6 +437,18 @@
             };
           }
           {
+            "Netalertx" = {
+              href = "https://netalertx.montycasa.net";
+              siteMonitor = "https://netalertx.montycasa.net";
+              description = "Network Monitoring";
+              icon = "sh-netalertx.svg";
+              widget = {
+                type = "netalertx";
+                url = "https://netalertx.montycasa.net";
+              };
+            };
+          }
+          {
             "Homelab 10GbE Aggregate Switch" = {
               href = "http://192.168.86.2/";
               siteMonitor = "http://192.168.86.2";

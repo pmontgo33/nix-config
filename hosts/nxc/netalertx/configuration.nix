@@ -20,8 +20,20 @@
     defaultNetwork.settings.dns_enabled = true;
   };
 
+  users.users.netalertx = {
+    isSystemUser = true;
+    group = "netalertx";
+    uid = 20211;
+  };
+
+  users.groups.netalertx = {
+    gid = 20211;
+  };
+
   systemd.tmpfiles.rules = [
-    "d /var/lib/netalertx 0755 root root -"
+    "d /var/lib/netalertx 0755 netalertx netalertx -"
+    "d /var/lib/netalertx/db 0755 netalertx netalertx -"
+    "d /var/lib/netalertx/config 0755 netalertx netalertx -"
   ];
 
   virtualisation.oci-containers = {
@@ -52,8 +64,6 @@
           "/etc/localtime:/etc/localtime:ro"
         ];
         environment = {
-          PUID = "20211";
-          PGID = "20211";
           LISTEN_ADDR = "0.0.0.0";
           PORT = "20211";
           GRAPHQL_PORT = "20212";
@@ -63,6 +73,17 @@
       };
     };
   };
+
+  # Configure VLAN interfaces
+  networking.interfaces.eth1.ipv4.addresses = [{
+    address = "192.168.10.100";
+    prefixLength = 24;
+  }];
+
+  networking.interfaces.eth2.ipv4.addresses = [{
+    address = "192.168.20.100";
+    prefixLength = 24;
+  }];
 
   networking.firewall = {
     allowedTCPPorts = [20211 20212];

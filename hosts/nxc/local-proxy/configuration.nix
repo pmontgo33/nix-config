@@ -76,7 +76,12 @@
         protocol = "http"; 
         upstream = "192.168.86.1:80"; 
       };
-
+      
+      "netalertx.montycasa.net" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.101:20211"; 
+      };
+      
       "blocker.montycasa.net" = { 
         protocol = "http"; 
         upstream = "192.168.86.1:3000"; 
