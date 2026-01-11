@@ -116,7 +116,8 @@
       image = "clusterzx/paperless-ai:latest";
 
       ports = [
-        "8000:8000"  # Paperless-ai API port
+        "3000:3000"  # Paperless-ai Web UI (setup and management)
+        "8000:8000"  # Paperless-ai RAG API port
       ];
 
       volumes = [
@@ -158,7 +159,8 @@
   # Open firewall ports
   networking.firewall.allowedTCPPorts = [
     28981  # Paperless-ngx web UI
-    8000   # Paperless-ai API (if you need external access)
+    3000   # Paperless-ai Web UI (setup and management)
+    8000   # Paperless-ai RAG API
   ];
 
   system.stateVersion = "25.11";
