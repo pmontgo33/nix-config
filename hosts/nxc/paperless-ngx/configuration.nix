@@ -16,6 +16,14 @@
   # Disable tests for memory-intensive packages to prevent OOM during build
   nixpkgs.overlays = [
     (final: prev: {
+      # Disable tests for paperless-ngx itself
+      paperless-ngx = prev.paperless-ngx.overrideAttrs (old: {
+        doCheck = false;
+        doInstallCheck = false;
+        dontCheck = true;
+      });
+
+      # Disable tests for ocrmypdf dependency
       pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
         (pyfinal: pyprev: {
           ocrmypdf = pyprev.ocrmypdf.overridePythonAttrs (old: {
