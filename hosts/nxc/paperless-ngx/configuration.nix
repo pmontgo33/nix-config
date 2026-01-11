@@ -112,8 +112,8 @@
       ];
 
       volumes = [
-        "/var/lib/paperless/media:/data/media:ro"  # Read-only access to paperless documents
-        "/var/lib/paperless-ai:/data/models"       # Storage for AI models
+        "/mnt/general/paperless-ngx/media:/data/media:ro"  # Read-only access to paperless documents on NFS
+        "/var/lib/paperless-ai:/data/models"               # Storage for AI models
       ];
 
       environment = {
