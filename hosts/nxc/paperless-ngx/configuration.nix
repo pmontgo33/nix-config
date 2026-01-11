@@ -65,12 +65,12 @@
     address = "0.0.0.0";
     port = 28981;
 
-    # Enable local PostgreSQL database
-    # Note: The service creates and manages the database automatically
-    # You can customize database settings here if needed
+    # Use NFS-mounted media directory (same as old instance)
+    mediaDir = "/mnt/general/paperless-ngx/media";
+    consumptionDir = "/mnt/general/paperless-ngx/consume";
 
     settings = {
-      PAPERLESS_URL = "https://paperless.montycasa.com";  # Update with your domain
+      PAPERLESS_URL = "https://paperless.montycasa.net";
       PAPERLESS_OCR_LANGUAGE = "eng";
       PAPERLESS_OCR_LANGUAGES = "eng";
       PAPERLESS_TIME_ZONE = "America/New_York";
