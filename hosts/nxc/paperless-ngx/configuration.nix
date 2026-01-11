@@ -46,6 +46,13 @@
 
   services.openssh.enable = true;
 
+  # SOPS secrets configuration
+  sops = {
+    secrets = {
+      "paperless-ai-env" = {};
+    };
+  };
+
   # Enable PostgreSQL for paperless database
   services.postgresql = {
     enable = true;
@@ -129,15 +136,12 @@
         # OLLAMA_URL = "http://host.docker.internal:11434";
       };
 
-      # Uncomment and configure if using API keys
-      # environmentFiles = [
-      #   config.sops.secrets.paperless-ai-env.path
-      # ];
+      # Use sops secret for API token
+      environmentFiles = [
+        config.sops.secrets.paperless-ai-env.path
+      ];
     };
   };
-
-  # SOPS secrets configuration (uncomment when ready to use)
-  # sops.secrets.paperless-ai-env = {};
 
   # Create necessary directories
   systemd.tmpfiles.rules = [
