@@ -46,6 +46,16 @@
 
   services.openssh.enable = true;
 
+  # Enable PostgreSQL for paperless database
+  services.postgresql = {
+    enable = true;
+    ensureDatabases = [ "paperless" ];
+    ensureUsers = [{
+      name = "paperless";
+      ensureDBOwnership = true;
+    }];
+  };
+
   extra-services.tailscale = {
     enable = true;
     lxc = true;
@@ -74,6 +84,11 @@
       PAPERLESS_OCR_LANGUAGE = "eng";
       PAPERLESS_OCR_LANGUAGES = "eng";
       PAPERLESS_TIME_ZONE = "America/New_York";
+
+      # Use PostgreSQL database (via Unix socket)
+      PAPERLESS_DBHOST = "/run/postgresql";
+      PAPERLESS_DBNAME = "paperless";
+      PAPERLESS_DBUSER = "paperless";
 
       # Enable consumption directory polling
       PAPERLESS_CONSUMER_POLLING = 60;
