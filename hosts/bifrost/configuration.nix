@@ -63,6 +63,11 @@
         upstream = "http://nextcloud:80"; 
       };
 
+      "hass.montycasa.com" = {
+        protocol = "http"; 
+        upstream = "http://homeassistant:8123"; 
+      };
+
       "photos.montycasa.com" = {
         protocol = "http"; 
         upstream = "http://immich:2283"; 
