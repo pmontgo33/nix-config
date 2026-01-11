@@ -16,23 +16,16 @@
   # Disable tests for memory-intensive packages to prevent OOM during build
   nixpkgs.overlays = [
     (final: prev: {
-      # Disable tests for Python packages that cause OOM
-      python3 = prev.python3.override {
-        packageOverrides = pyfinal: pyprev: {
-          ocrmypdf = pyprev.ocrmypdf.overridePythonAttrs (old: {
-            doCheck = false;
-            doInstallCheck = false;
-            pytestCheckPhase = "true";
-          });
-        };
-      };
-      python313 = prev.python313.override {
-        packageOverrides = pyfinal: pyprev: {
-          ocrmypdf = pyprev.ocrmypdf.overridePythonAttrs (old: {
-            doCheck = false;
-            doInstallCheck = false;
-            pytestCheckPhase = "true";
-          });
+      # Override paperless-ngx to use a version of ocrmypdf without tests
+      paperless-ngx = prev.paperless-ngx.override {
+        python3 = prev.python3.override {
+          packageOverrides = pyfinal: pyprev: {
+            ocrmypdf = pyprev.ocrmypdf.overridePythonAttrs (old: {
+              doCheck = false;
+              doInstallCheck = false;
+              dontCheck = true;
+            });
+          };
         };
       };
     })
@@ -118,7 +111,6 @@
   systemd.tmpfiles.rules = [
     "d /var/lib/paperless-ai 0755 paperless paperless -"
     "d /mnt/general 0750 paperless paperless -"
-
   ];
 
   # Ensure paperless-ai container starts after paperless service
