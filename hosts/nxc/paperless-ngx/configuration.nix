@@ -22,6 +22,14 @@
             doCheck = false;
             doInstallCheck = false;
             dontCheck = true;
+            # Preserve the override method for paperless-ngx to use
+            passthru = (old.passthru or {}) // {
+              override = args: (pyprev.ocrmypdf.override args).overridePythonAttrs (_: {
+                doCheck = false;
+                doInstallCheck = false;
+                dontCheck = true;
+              });
+            };
           });
         })
       ];
