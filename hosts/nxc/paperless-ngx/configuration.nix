@@ -102,36 +102,39 @@
 
   # Paperless-ai as OCI Container
   # This provides AI-powered document classification and processing
-  # DISABLED: Image pull failing with 403 Forbidden - enable later when needed
-  # virtualisation.oci-containers = {
-  #   backend = "podman";
-  #   containers.paperless-ai = {
-  #     image = "ghcr.io/icereed/paperless-ai:latest";
-  #
-  #     ports = [
-  #       "8000:8000"  # Paperless-ai API port
-  #     ];
-  #
-  #     volumes = [
-  #       "/mnt/general/paperless-ngx/media:/data/media:ro"  # Read-only access to paperless documents on NFS
-  #       "/var/lib/paperless-ai:/data/models"               # Storage for AI models
-  #     ];
-  #
-  #     environment = {
-  #       # OpenAI API configuration (if using OpenAI)
-  #       # OPENAI_API_KEY will be loaded from environment file
-  #
-  #       # Or use local models (ollama, etc.)
-  #       # MODEL_BACKEND = "ollama";
-  #       # OLLAMA_URL = "http://host.docker.internal:11434";
-  #     };
-  #
-  #     # Uncomment and configure if using API keys
-  #     # environmentFiles = [
-  #     #   config.sops.secrets.paperless-ai-env.path
-  #     # ];
-  #   };
-  # };
+  # Source: https://github.com/clusterzx/paperless-ai
+  virtualisation.oci-containers = {
+    backend = "podman";
+    containers.paperless-ai = {
+      image = "clusterzx/paperless-ai:latest";
+
+      ports = [
+        "8000:8000"  # Paperless-ai API port
+      ];
+
+      volumes = [
+        "/mnt/general/paperless-ngx/media:/data/media:ro"  # Read-only access to paperless documents on NFS
+        "/var/lib/paperless-ai:/data/models"               # Storage for AI models
+      ];
+
+      environment = {
+        # Paperless-ngx connection
+        PAPERLESS_URL = "http://localhost:28981";
+
+        # OpenAI API configuration (if using OpenAI)
+        # OPENAI_API_KEY will be loaded from environment file
+
+        # Or use local models (ollama, etc.)
+        # MODEL_BACKEND = "ollama";
+        # OLLAMA_URL = "http://host.docker.internal:11434";
+      };
+
+      # Uncomment and configure if using API keys
+      # environmentFiles = [
+      #   config.sops.secrets.paperless-ai-env.path
+      # ];
+    };
+  };
 
   # SOPS secrets configuration (uncomment when ready to use)
   # sops.secrets.paperless-ai-env = {};
@@ -142,11 +145,11 @@
     "d /mnt/general 0750 paperless paperless -"
   ];
 
-  # Ensure paperless-ai container starts after paperless service (DISABLED)
-  # systemd.services.podman-paperless-ai = {
-  #   requires = [ "paperless-consumer.service" ];
-  #   after = [ "paperless-consumer.service" ];
-  # };
+  # Ensure paperless-ai container starts after paperless service
+  systemd.services.podman-paperless-ai = {
+    requires = [ "paperless-consumer.service" ];
+    after = [ "paperless-consumer.service" ];
+  };
 
   # Open firewall ports
   networking.firewall.allowedTCPPorts = [
