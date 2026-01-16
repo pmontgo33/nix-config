@@ -16,13 +16,6 @@
 
   services.openssh.enable = true;
 
-  # SOPS secrets configuration
-  sops = {
-    secrets = {
-      "wallabag-env" = {};
-    };
-  };
-
   # Enable Podman for running Wallabag OCI containers
   virtualisation.podman = {
     enable = true;
@@ -87,11 +80,6 @@
         # Populate database on first run
         POPULATE_DATABASE = "true";
       };
-
-      # Use sops secret for sensitive configuration
-      environmentFiles = [
-        config.sops.secrets.wallabag-env.path
-      ];
     };
   };
 
