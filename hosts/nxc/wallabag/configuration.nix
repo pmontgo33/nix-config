@@ -6,6 +6,8 @@
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
   ];
 
+  networking.hostName = "wallabag";
+
   extra-services.tailscale = {
     enable = true;
     lxc = true;
@@ -14,7 +16,103 @@
 
   services.openssh.enable = true;
 
-  
+  # SOPS secrets configuration
+  sops = {
+    secrets = {
+      "wallabag-env" = {};
+    };
+  };
+
+  # Enable Podman for running Wallabag OCI containers
+  virtualisation.podman = {
+    enable = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
+  # Wallabag as OCI Containers
+  virtualisation.oci-containers = {
+    backend = "podman";
+
+    # PostgreSQL database for Wallabag
+    containers.wallabag-db = {
+      image = "postgres:15-alpine";
+
+      volumes = [
+        "/var/lib/wallabag/db:/var/lib/postgresql/data"
+      ];
+
+      environment = {
+        POSTGRES_DB = "wallabag";
+        POSTGRES_USER = "wallabag";
+        POSTGRES_PASSWORD = "wallabag";
+      };
+    };
+
+    # Redis for Wallabag caching
+    containers.wallabag-redis = {
+      image = "redis:7-alpine";
+    };
+
+    # Wallabag application
+    containers.wallabag = {
+      image = "wallabag/wallabag:latest";
+
+      ports = [
+        "8080:80"
+      ];
+
+      volumes = [
+        "/var/lib/wallabag/data:/var/www/wallabag/data"
+        "/var/lib/wallabag/images:/var/www/wallabag/web/assets/images"
+      ];
+
+      dependsOn = [
+        "wallabag-db"
+        "wallabag-redis"
+      ];
+
+      environment = {
+        SYMFONY_ENV = "prod";
+        DOMAIN_NAME = "https://wallabag.montycasa.com";
+
+        # Database configuration
+        POSTGRES_DATABASE = "wallabag";
+        POSTGRES_USER = "wallabag";
+        POSTGRES_PASSWORD = "wallabag";
+        POSTGRES_HOST = "wallabag-db";
+
+        # Redis configuration
+        REDIS_HOST = "wallabag-redis";
+
+        # Populate database on first run
+        POPULATE_DATABASE = "true";
+      };
+
+      # Use sops secret for sensitive configuration
+      environmentFiles = [
+        config.sops.secrets.wallabag-env.path
+      ];
+    };
+  };
+
+  # Create necessary directories
+  systemd.tmpfiles.rules = [
+    "d /var/lib/wallabag 0755 root root -"
+    "d /var/lib/wallabag/db 0755 70 70 -"
+    "d /var/lib/wallabag/data 0755 root root -"
+    "d /var/lib/wallabag/images 0755 root root -"
+  ];
+
+  # Ensure proper startup order
+  systemd.services.podman-wallabag = {
+    requires = [ "podman-wallabag-db.service" "podman-wallabag-redis.service" ];
+    after = [ "podman-wallabag-db.service" "podman-wallabag-redis.service" ];
+  };
+
+  # Open firewall ports
+  networking.firewall.allowedTCPPorts = [
+    8080  # Wallabag web interface
+  ];
 
   system.stateVersion = "25.11";
 }
