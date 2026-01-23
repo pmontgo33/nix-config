@@ -15,7 +15,6 @@ let
       "31"
       "33"
       "34"
-      "36"
     ];
     abiVersions = [ "x86_64" ];
     includeEmulator = true;
