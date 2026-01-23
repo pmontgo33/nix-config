@@ -11,6 +11,9 @@ let
       "33.0.1"
       "34.0.0"
     ];
+    ndkVersions = [
+      "28.2.13676358"
+    ];
     platformVersions = [
       "31"
       "33"
