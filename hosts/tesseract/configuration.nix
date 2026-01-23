@@ -18,6 +18,12 @@
   # extra-services.mount_home_media.enable = true;
   extra-services.pbs-home-dirs.enable = true;
   extra-services.auto-upgrade.enable = true;
+  extra-services.flutter = {
+    enable = true;
+    user = "patrick";
+    enableAdb = true;
+    addToKvmGroup = true;
+  };
   extra-services.host-checkin = {
     enable = true;
     checkInInterval = "hourly";

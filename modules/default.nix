@@ -2,6 +2,7 @@
   imports = [
     ./auto-upgrade.nix
     ./desktop.nix
+    ./flutter.nix
     ./tailscale.nix
     ./mount_home_media.nix
     ./mount_media.nix
