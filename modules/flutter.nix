@@ -6,6 +6,7 @@ let
     toolsVersion = "26.1.1";
     platformToolsVersion = "35.0.1";
     buildToolsVersions = [
+      "28.0.3"
       "30.0.3"
       "33.0.1"
       "34.0.0"
@@ -14,6 +15,7 @@ let
       "31"
       "33"
       "34"
+      "36"
     ];
     abiVersions = [ "x86_64" ];
     includeEmulator = true;
@@ -54,21 +56,18 @@ in {
       firebase-tools
     ];
 
-    environment.variables = {
-      ANDROID_SDK_ROOT = "${androidSdk}/libexec/android-sdk";
-      ANDROID_HOME = "${androidSdk}/libexec/android-sdk";
-      JAVA_HOME = "${pkgs.jdk17}";
-      GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/libexec/android-sdk/build-tools/34.0.0/aapt2";
-    };
-
     nixpkgs.config = {
       android_sdk.accept_license = true;
       allowUnfree = true;
     };
 
     environment.shellInit = ''
+      export ANDROID_SDK_ROOT="${androidSdk}/libexec/android-sdk"
+      export ANDROID_HOME="${androidSdk}/libexec/android-sdk"
+      export JAVA_HOME="${pkgs.jdk17}"
+      export GRADLE_OPTS="-Dorg.gradle.project.android.aapt2FromMavenOverride=${androidSdk}/libexec/android-sdk/build-tools/34.0.0/aapt2"
       export PATH=$PATH:${androidSdk}/libexec/android-sdk/platform-tools
-      export PATH=$PATH:${androidSdk}/libexec/android-sdk/cmdline-tools/latest/bin
+      export PATH=$PATH:${androidSdk}/libexec/android-sdk/cmdline-tools/19.0/bin
       export PATH=$PATH:${androidSdk}/libexec/android-sdk/emulator
       export PATH="$PATH":"$HOME/.pub-cache/bin"
     '';
