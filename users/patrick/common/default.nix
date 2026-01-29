@@ -5,7 +5,7 @@
   users.users.patrick = {
     isNormalUser = true;
     description = "Patrick";
-    extraGroups = [ "networkmanager" "wheel" ];
+    extraGroups = [ "networkmanager" "wheel" "dialout" ];
     shell = pkgs.fish;
 
   };

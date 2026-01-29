@@ -482,6 +482,9 @@
     # Intel GPU tools
     intel-gpu-tools
     libva-utils
+
+    android-studio
+    android-tools
   ];
 
   environment.variables = {

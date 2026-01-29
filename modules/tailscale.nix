@@ -71,11 +71,11 @@ in {
       # ]) ++ cfg.extraFlags;
     };
 
-    # Make tailscaled-autoconnect non-blocking to prevent boot delays
-    # The service will still run and connect Tailscale in the background,
-    # but won't delay the desktop from loading (saves ~50 seconds on boot)
-    systemd.services.tailscaled-autoconnect = {
-      wantedBy = mkForce [ ];  # Remove from boot dependencies
+    # Make tailscaled-autoconnect non-blocking to prevent boot delays on desktop systems
+    # For LXC containers (servers), we want it to auto-start
+    # For desktops, we disable auto-start to save ~50 seconds on boot
+    systemd.services.tailscaled-autoconnect = mkIf (!cfg.lxc) {
+      wantedBy = mkForce [ ];  # Remove from boot dependencies (desktop only)
       after = [ "multi-user.target" ];  # Run after boot is complete
     };
 

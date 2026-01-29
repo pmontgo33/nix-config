@@ -29,6 +29,7 @@ in
     pkgs-unstable.code-cursor
     pkgs-unstable.claude-code
     pkgs-unstable.nodejs_22 #required for claude-code
+    pkgs-unstable.opencode
   ];
 
   services.flatpak.enable = true;
