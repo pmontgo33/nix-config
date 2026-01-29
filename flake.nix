@@ -658,6 +658,9 @@
         ./hosts/nxc/moltbot
         sops-nix.nixosModules.sops
 
+        # Add nix-moltbot overlay to provide pkgs.moltbot
+        { nixpkgs.overlays = [ nix-moltbot.overlays.default ]; }
+
         home-manager.nixosModules.home-manager
         {
           home-manager.useGlobalPkgs = true;
