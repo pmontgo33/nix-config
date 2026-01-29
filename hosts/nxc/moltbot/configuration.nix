@@ -47,6 +47,8 @@
       instances.default = {
         enable = true;
 
+        systemd.enable = true;
+
         providers.anthropic = {
           apiKeyFile = config.sops.secrets.moltbot-anthropic-key.path;
         };
