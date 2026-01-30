@@ -12,6 +12,14 @@
 
   networking.hostName = "moltbot";
 
+  # Create moltbot user
+  users.users.moltbot = {
+    isNormalUser = true;
+    description = "Moltbot service user";
+    home = "/home/moltbot";
+    createHome = true;
+  };
+
   services.openssh.enable = true;
 
   extra-services.tailscale = {
@@ -21,17 +29,28 @@
   extra-services.host-checkin.enable = true;
 
   sops.secrets = {
-    moltbot-anthropic-key = {};
-    moltbot-discord-token = {};
+    moltbot-anthropic-key = {
+      owner = "moltbot";
+    };
+    moltbot-discord-token = {
+      owner = "moltbot";
+    };
   };
 
   systemd.tmpfiles.rules = [
     "d /var/lib/moltbot 0755 root root -"
   ];
 
-  home-manager.users.root = { pkgs, ... }: {
+  home-manager.users.moltbot = { pkgs, ... }: {
     home.stateVersion = "25.11";
     programs.home-manager.enable = true;
+
+    # Override systemd service to add Discord token environment file
+    systemd.user.services.moltbot-gateway = {
+      Service = {
+        EnvironmentFile = config.sops.secrets.moltbot-discord-token.path;
+      };
+    };
 
     programs.moltbot = {
       documents = ./documents;
@@ -61,8 +80,14 @@
               policy = "allowlist";  # Options: "open", "allowlist", "disabled"
               allowFrom = [351909064172634112];  # Add Discord user IDs here
             };
-            guilds = {
-              policy = "disabled";  # Options: "open", "allowlist", "disabled" (you wanted DMs only)
+            # guilds is an object of guild IDs, empty = no guild support
+            guilds = {};
+          };
+          # Fix routing config - should be byChannel not byProvider
+          messages.queue = {
+            mode = "interrupt";
+            byChannel = {
+              discord = "queue";
             };
           };
         };
