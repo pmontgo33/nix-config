@@ -53,15 +53,17 @@
           apiKeyFile = config.sops.secrets.moltbot-anthropic-key.path;
         };
 
-        config.channels.discord = {
-          enabled = true;
-          token = builtins.readFile config.sops.secrets.moltbot-discord-token.path;
-          dm = {
-            policy = "allowlist";  # Options: "open", "allowlist", "disabled"
-            allowFrom = [351909064172634112];  # Add Discord user IDs here
-          };
-          guilds = {
-            policy = "disabled";  # Options: "open", "allowlist", "disabled" (you wanted DMs only)
+        configOverrides = {
+          channels.discord = {
+            enabled = true;
+            # Token will be provided via DISCORD_BOT_TOKEN environment variable
+            dm = {
+              policy = "allowlist";  # Options: "open", "allowlist", "disabled"
+              allowFrom = [351909064172634112];  # Add Discord user IDs here
+            };
+            guilds = {
+              policy = "disabled";  # Options: "open", "allowlist", "disabled" (you wanted DMs only)
+            };
           };
         };
 
