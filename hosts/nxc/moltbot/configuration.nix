@@ -8,6 +8,9 @@
 
   environment.systemPackages = with pkgs; [
     git
+    jq
+    signal-cli
+    qrencode
   ];
 
   networking.hostName = "moltbot";
@@ -32,7 +35,7 @@
     moltbot-anthropic-key = {
       owner = "moltbot";
     };
-    moltbot-discord-token = {
+    moltbot-env = {
       owner = "moltbot";
     };
   };
@@ -41,15 +44,48 @@
     "d /var/lib/moltbot 0755 root root -"
   ];
 
-  home-manager.users.moltbot = { pkgs, ... }: {
+  home-manager.users.moltbot = { pkgs, lib, ... }: {
     home.stateVersion = "25.11";
     programs.home-manager.enable = true;
 
-    # Override systemd service to add Discord token environment file
-    systemd.user.services.moltbot-gateway = {
-      Service = {
-        EnvironmentFile = config.sops.secrets.moltbot-discord-token.path;
-      };
+    # Add coreutils for the wrapper script to use cat command
+    home.packages = [ pkgs.coreutils ];
+
+    # Override systemd service to inject Signal phone numbers from secrets
+    systemd.user.services.moltbot-gateway.Service = {
+      Type = "simple";  # Tell systemd this is a long-running service
+      EnvironmentFile = "/run/secrets/moltbot-env";
+      Environment = "PATH=${pkgs.coreutils}/bin:/run/current-system/sw/bin";
+        ExecStartPre = pkgs.writeShellScript "inject-signal-config" ''
+          # Source environment file to get Signal phone number
+          . /run/secrets/moltbot-env
+
+          # Paths to consider (manifest + filtered copies)
+          for target in /home/moltbot/.moltbot/moltbot.json /home/moltbot/.moltbot/moltbot-filtered.json; do
+            if [ -f "$target" ]; then
+              ${pkgs.jq}/bin/jq \
+                --arg account "$SIGNAL_ACCOUNT_PHONE" \
+                --arg allowFrom "$SIGNAL_ALLOWED_PHONE" \
+                'del(.messages.queue.byProvider) |
+                 .channels.signal = {
+                   "enabled": true,
+                   "cliPath": "signal-cli",
+                   "account": $account,
+                   "dmPolicy": "allowlist",
+                   "allowFrom": [$allowFrom]
+                 } |
+                 .plugins = (.plugins // {}) |
+                 .plugins.slots = (.plugins.slots // {}) |
+                 .plugins.slots.memory = "none"
+                ' "$target" > "$target".tmp && \
+              mv "$target".tmp "$target"
+            fi
+          done
+
+          # Remove the filtered cache so the gateway sees the current config only
+          rm -f /home/moltbot/.moltbot/moltbot-filtered.json
+        '';
+
     };
 
     programs.moltbot = {
@@ -72,24 +108,16 @@
           apiKeyFile = config.sops.secrets.moltbot-anthropic-key.path;
         };
 
-        configOverrides = {
-          channels.discord = {
+        # Use the proper config field (not configOverrides)
+        config = {
+          # Signal channel configuration (phone numbers injected via ExecStartPre)
+          channels.signal = {
             enabled = true;
-            # Token will be provided via DISCORD_BOT_TOKEN environment variable
-            dm = {
-              policy = "allowlist";  # Options: "open", "allowlist", "disabled"
-              allowFrom = [351909064172634112];  # Add Discord user IDs here
-            };
-            # guilds is an object of guild IDs, empty = no guild support
-            guilds = {};
+            cliPath = "signal-cli";
+            dmPolicy = "allowlist";
           };
-          # Fix routing config - should be byChannel not byProvider
-          messages.queue = {
-            mode = "interrupt";
-            byChannel = {
-              discord = "queue";
-            };
-          };
+          # Disable memory plugin (not available in nix-moltbot)
+          plugins.slots.memory = "none";
         };
 
         plugins = [
