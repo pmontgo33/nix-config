@@ -32,7 +32,7 @@ in
     pkgs-unstable.opencode
 
     # 3D printing
-    (pkgs.callPackage ../../../packages/elegoo-slicer.nix {})
+    (pkgs.callPackage ../../../../packages/elegoo-slicer.nix {})
   ];
 
   services.flatpak.enable = true;
