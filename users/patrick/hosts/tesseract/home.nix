@@ -30,9 +30,6 @@ in
     pkgs-unstable.claude-code
     pkgs-unstable.nodejs_22 #required for claude-code
     pkgs-unstable.opencode
-
-    # 3D printing
-    (pkgs.callPackage ../../../../packages/elegoo-slicer.nix {})
   ];
 
   services.flatpak.enable = true;

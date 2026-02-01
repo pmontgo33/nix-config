@@ -488,6 +488,7 @@
 
     # 3D printing
     orca-slicer
+    (pkgs.callPackage ../../packages/elegoo-slicer.nix {})
   ];
 
   environment.variables = {
