@@ -1,11 +1,9 @@
-{ stdenv
+{ writeShellScriptBin
 , fetchurl
 , appimage-run
-, makeWrapper
-, webkitgtk_4_1
 }:
 
-stdenv.mkDerivation rec {
+let
   pname = "elegoo-slicer";
   version = "1.3.0.11";
 
@@ -14,22 +12,12 @@ stdenv.mkDerivation rec {
     hash = "sha256-5c3cb581cc101598e8d581270405031edb1ca091e391925dba06c9dc7a7360c8";
   };
 
-  nativeBuildInputs = [ makeWrapper ];
+  # Override appimage-run to include webkitgtk_4_1
+  appimage-run-webkit = appimage-run.override {
+    extraPkgs = pkgs: [ pkgs.webkitgtk_4_1 ];
+  };
+in
 
-  dontUnpack = true;
-  dontBuild = true;
-
-  installPhase =
-    let
-      appimage-run-webkit = appimage-run.override {
-        extraPkgs = p: [ p.webkitgtk_4_1 ];
-      };
-    in
-    ''
-      mkdir -p $out/bin
-      install -m755 ${src} $out/bin/elegoo-slicer.AppImage
-
-      makeWrapper ${appimage-run-webkit}/bin/appimage-run $out/bin/elegoo-slicer \
-        --add-flags "$out/bin/elegoo-slicer.AppImage"
-    '';
-}
+writeShellScriptBin pname ''
+  exec ${appimage-run-webkit}/bin/appimage-run ${src} "$@"
+''
