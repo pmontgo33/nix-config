@@ -489,6 +489,7 @@
     # 3D printing
     orca-slicer
     (pkgs.callPackage ../../packages/elegoo-slicer.nix {})
+    webkitgtk_4_1  # Required by elegoo-slicer AppImage
   ];
 
   environment.variables = {
