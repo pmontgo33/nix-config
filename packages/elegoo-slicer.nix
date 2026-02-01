@@ -1,9 +1,8 @@
-{ lib
+{ stdenv
 , fetchurl
-, appimageTools
 }:
 
-let
+stdenv.mkDerivation rec {
   pname = "elegoo-slicer";
   version = "1.3.0.11";
 
@@ -12,32 +11,12 @@ let
     hash = "sha256-5c3cb581cc101598e8d581270405031edb1ca091e391925dba06c9dc7a7360c8";
   };
 
-  appimageContents = appimageTools.extractType2 {
-    inherit pname version src;
-  };
+  dontUnpack = true;
+  dontBuild = true;
 
-in appimageTools.wrapType2 {
-  inherit pname version src;
-
-  extraPkgs = pkgs: [ pkgs.webkitgtk_4_1 ];
-
-  extraInstallCommands = ''
-    # Install desktop file
-    install -Dm644 ${appimageContents}/ElegooSlicer.desktop $out/share/applications/elegoo-slicer.desktop
-
-    # Install icon
-    install -Dm644 ${appimageContents}/ElegooSlicer.png $out/share/pixmaps/elegoo-slicer.png
-
-    # Fix desktop file to point to the correct executable
-    substituteInPlace $out/share/applications/elegoo-slicer.desktop \
-      --replace-fail 'Exec=AppRun' 'Exec=${pname}'
+  installPhase = ''
+    mkdir -p $out/bin
+    cp ${src} $out/bin/elegoo-slicer
+    chmod +x $out/bin/elegoo-slicer
   '';
-
-  meta = with lib; {
-    description = "Open-source slicer compatible with most FDM printers";
-    homepage = "https://github.com/ELEGOO-3D/ElegooSlicer";
-    license = licenses.agpl3Only;
-    platforms = platforms.linux;
-    mainProgram = pname;
-  };
 }
