@@ -422,6 +422,12 @@
     pulse.enable = true;
   };
 
+  # Enable AppImage support
+  programs.appimage = {
+    enable = true;
+    binfmt = true;
+  };
+
   services.printing = {
     enable = true;
     # drivers = [ pkgs.canon-cups-ufr2 ];  # Disabled - causes build issues and may not be needed
@@ -489,7 +495,6 @@
     # 3D printing
     orca-slicer
     (pkgs.callPackage ../../packages/elegoo-slicer.nix {})
-    webkitgtk_4_1  # Required by elegoo-slicer AppImage
   ];
 
   environment.variables = {
