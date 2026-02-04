@@ -73,12 +73,15 @@
       };
     };
 
-    # Load ANTHROPIC_API_KEY into the systemd service environment
+    # Load ANTHROPIC_API_KEY from SOPS secret into OpenClaw .env file
     systemd.user.services.openclaw-gateway = {
       Service = {
-        Environment = [
-          "ANTHROPIC_API_KEY_FILE=${config.sops.secrets.openclaw-anthropic-key.path}"
-        ];
+        ExecStartPre = pkgs.writeShellScript "setup-openclaw-env" ''
+          mkdir -p /home/openclaw/.openclaw
+          ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-anthropic-key.path} | \
+            ${pkgs.gnused}/bin/sed 's/^/ANTHROPIC_API_KEY=/' > /home/openclaw/.openclaw/.env
+          chmod 600 /home/openclaw/.openclaw/.env
+        '';
       };
     };
   };
