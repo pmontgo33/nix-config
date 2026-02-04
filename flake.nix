@@ -30,12 +30,12 @@
       inputs.home-manager.follows = "home-manager";
     };
 
-    nix-moltbot = {
-      url = "github:moltbot/nix-moltbot";
+    nix-openclaw = {
+      url = "github:openclaw/nix-openclaw";
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-moltbot, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-openclaw, ... }: {
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
@@ -651,15 +651,15 @@
       ];
     };
 
-    ## moltbot ##
-    nixosConfigurations.moltbot = nixpkgs.lib.nixosSystem {
+    ## openclaw ##
+    nixosConfigurations.openclaw = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/nxc/moltbot
+        ./hosts/nxc/openclaw
         sops-nix.nixosModules.sops
 
-        # Add nix-moltbot overlay to provide pkgs.moltbot
-        { nixpkgs.overlays = [ nix-moltbot.overlays.default ]; }
+        # Add nix-openclaw overlay to provide pkgs.openclaw
+        { nixpkgs.overlays = [ nix-openclaw.overlays.default ]; }
 
         home-manager.nixosModules.home-manager
         {
@@ -670,7 +670,7 @@
 
           home-manager.sharedModules = [
             sops-nix.homeManagerModules.sops
-            nix-moltbot.homeManagerModules.moltbot
+            nix-openclaw.homeManagerModules.openclaw
           ];
         }
       ];

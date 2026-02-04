@@ -62,7 +62,7 @@
     "home-manager_2": {
       "inputs": {
         "nixpkgs": [
-          "nix-moltbot",
+          "nix-openclaw",
           "nixpkgs"
         ]
       },
@@ -95,7 +95,7 @@
         "type": "github"
       }
     },
-    "nix-moltbot": {
+    "nix-openclaw": {
       "inputs": {
         "flake-utils": "flake-utils",
         "home-manager": "home-manager_2",
@@ -103,16 +103,16 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1769632573,
-        "narHash": "sha256-T/RCor9fcDRY3a1oQHHV0o24cjDixKoV9HhzgwxGPLg=",
-        "owner": "moltbot",
-        "repo": "nix-moltbot",
-        "rev": "d4e65b3c8bf8fc9af5571d59a0c334c73e3961db",
+        "lastModified": 1770161121,
+        "narHash": "sha256-riqzcqHZijFaAgIZD+oQ7CvjFoBEc05J0QqR2g7IhSM=",
+        "owner": "openclaw",
+        "repo": "nix-openclaw",
+        "rev": "58483027d4d599c8bfe8854f7bd6c6984615c70d",
         "type": "github"
       },
       "original": {
-        "owner": "moltbot",
-        "repo": "nix-moltbot",
+        "owner": "openclaw",
+        "repo": "nix-openclaw",
         "type": "github"
       }
     },
@@ -121,15 +121,15 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1769632524,
-        "narHash": "sha256-lDGYIwZUPXF+FoqE9fATn8sqDjfpM7Iy81KhHvqFjyw=",
-        "owner": "moltbot",
+        "lastModified": 1770161084,
+        "narHash": "sha256-15vMSRoPq1d0rasdcvuJ5XUYuMGX/H69/WWx1qyVJpo=",
+        "owner": "openclaw",
         "repo": "nix-steipete-tools",
-        "rev": "53ead4d5fd722020dddaede861745a32e39d284e",
+        "rev": "9f4ac19975bc62239f4e306d0754bc9303529a52",
         "type": "github"
       },
       "original": {
-        "owner": "moltbot",
+        "owner": "openclaw",
         "repo": "nix-steipete-tools",
         "type": "github"
       }
@@ -226,7 +226,7 @@
         "disko": "disko",
         "home-manager": "home-manager",
         "nix-flatpak": "nix-flatpak",
-        "nix-moltbot": "nix-moltbot",
+        "nix-openclaw": "nix-openclaw",
         "nixpkgs": "nixpkgs_3",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "plasma-manager": "plasma-manager",
