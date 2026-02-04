@@ -56,13 +56,9 @@
             };
           };
 
-          # Environment variables for API keys
-          env.vars = {
-            ANTHROPIC_API_KEY_FILE = config.sops.secrets.openclaw-anthropic-key.path;
-          };
-
           # Telegram channel configuration
           channels.telegram = {
+            enabled = true;
             tokenFile = config.sops.secrets.openclaw-telegram-token.path;
             allowFrom = [ 748642877 ];
             groups = {
@@ -80,11 +76,9 @@
     # Load ANTHROPIC_API_KEY into the systemd service environment
     systemd.user.services.openclaw-gateway = {
       Service = {
-        ExecStartPre = pkgs.writeShellScript "load-api-key" ''
-          if [ -f "${config.sops.secrets.openclaw-anthropic-key.path}" ]; then
-            export ANTHROPIC_API_KEY=$(cat "${config.sops.secrets.openclaw-anthropic-key.path}")
-          fi
-        '';
+        Environment = [
+          "ANTHROPIC_API_KEY_FILE=${config.sops.secrets.openclaw-anthropic-key.path}"
+        ];
       };
     };
   };
