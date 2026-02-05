@@ -30,6 +30,9 @@
     openclaw-anthropic-key = {
       owner = "openclaw";
     };
+    openclaw-opencode-key = {
+      owner = "openclaw";
+    };
   };
 
   systemd.tmpfiles.rules = [
@@ -43,6 +46,16 @@
     programs.openclaw = {
       enable = true;
       documents = ./documents;
+
+      bundledPlugins = {
+        summarize.enable = true;   # Summarize web pages, PDFs, videos
+        peekaboo.enable = true;    # Take screenshots
+        oracle.enable = false;     # Web search
+        sag.enable = false;        # Text-to-speech
+        camsnap.enable = false;    # Camera snapshots
+        # gogcli.enable = false;     # Google Calendar
+        # goplaces.enable = true;    # Google Places API
+      };
 
       instances.default = {
         enable = true;
@@ -73,13 +86,15 @@
       };
     };
 
-    # Load ANTHROPIC_API_KEY from SOPS secret into OpenClaw .env file
+    # Load API keys from SOPS secrets into OpenClaw .env file
     systemd.user.services.openclaw-gateway = {
       Service = {
         ExecStartPre = pkgs.writeShellScript "setup-openclaw-env" ''
           ${pkgs.coreutils}/bin/mkdir -p /home/openclaw/.openclaw
           ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-anthropic-key.path} | \
             ${pkgs.gnused}/bin/sed 's/^/ANTHROPIC_API_KEY=/' > /home/openclaw/.openclaw/.env
+          ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-opencode-key.path} | \
+            ${pkgs.gnused}/bin/sed 's/^/OPENCODE_API_KEY=/' >> /home/openclaw/.openclaw/.env
           ${pkgs.coreutils}/bin/chmod 600 /home/openclaw/.openclaw/.env
         '';
       };
