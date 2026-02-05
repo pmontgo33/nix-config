@@ -88,6 +88,9 @@
 
     # Load API keys from SOPS secrets into OpenClaw .env file
     systemd.user.services.openclaw-gateway = {
+      Unit = {
+        After = [ "network.target" ];
+      };
       Service = {
         ExecStartPre = pkgs.writeShellScript "setup-openclaw-env" ''
           ${pkgs.coreutils}/bin/mkdir -p /home/openclaw/.openclaw
@@ -101,6 +104,9 @@
           } > /home/openclaw/.openclaw/.env
           ${pkgs.coreutils}/bin/chmod 600 /home/openclaw/.openclaw/.env
         '';
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
       };
     };
   };
