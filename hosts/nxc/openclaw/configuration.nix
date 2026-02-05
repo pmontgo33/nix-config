@@ -94,8 +94,10 @@
           {
             ${pkgs.coreutils}/bin/echo -n "ANTHROPIC_API_KEY="
             ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-anthropic-key.path}
+            ${pkgs.coreutils}/bin/echo ""
             ${pkgs.coreutils}/bin/echo -n "OPENCODE_API_KEY="
             ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-opencode-key.path}
+            ${pkgs.coreutils}/bin/echo ""
           } > /home/openclaw/.openclaw/.env
           ${pkgs.coreutils}/bin/chmod 600 /home/openclaw/.openclaw/.env
         '';
