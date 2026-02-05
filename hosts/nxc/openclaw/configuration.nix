@@ -91,10 +91,12 @@
       Service = {
         ExecStartPre = pkgs.writeShellScript "setup-openclaw-env" ''
           ${pkgs.coreutils}/bin/mkdir -p /home/openclaw/.openclaw
-          ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-anthropic-key.path} | \
-            ${pkgs.gnused}/bin/sed 's/^/ANTHROPIC_API_KEY=/' > /home/openclaw/.openclaw/.env
-          ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-opencode-key.path} | \
-            ${pkgs.gnused}/bin/sed 's/^/OPENCODE_API_KEY=/' >> /home/openclaw/.openclaw/.env
+          {
+            ${pkgs.coreutils}/bin/echo -n "ANTHROPIC_API_KEY="
+            ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-anthropic-key.path}
+            ${pkgs.coreutils}/bin/echo -n "OPENCODE_API_KEY="
+            ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-opencode-key.path}
+          } > /home/openclaw/.openclaw/.env
           ${pkgs.coreutils}/bin/chmod 600 /home/openclaw/.openclaw/.env
         '';
       };
