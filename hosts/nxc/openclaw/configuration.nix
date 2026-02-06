@@ -50,7 +50,7 @@
     programs.home-manager.enable = true;
 
     # Clean up old backup files before activation to prevent conflicts
-    home.activation.cleanupOldBackups = lib.hm.dag.entryBefore ["writeBoundary"] ''
+    home.activation.cleanupOldBackups = lib.hm.dag.entryBefore ["checkLinkTargets"] ''
       $DRY_RUN_CMD rm -f ~/.openclaw/*.backup
     '';
 
