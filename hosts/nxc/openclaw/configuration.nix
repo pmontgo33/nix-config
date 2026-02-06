@@ -27,10 +27,7 @@
     openclaw-telegram-token = {
       owner = "openclaw";
     };
-    openclaw-anthropic-key = {
-      owner = "openclaw";
-    };
-    openclaw-opencode-key = {
+    openclaw-env = {
       owner = "openclaw";
     };
   };
@@ -86,7 +83,7 @@
       };
     };
 
-    # Load API keys from SOPS secrets into OpenClaw .env file
+    # Copy .env file from SOPS secret
     systemd.user.services.openclaw-gateway = {
       Unit = {
         After = [ "network.target" ];
@@ -94,14 +91,7 @@
       Service = {
         ExecStartPre = pkgs.writeShellScript "setup-openclaw-env" ''
           ${pkgs.coreutils}/bin/mkdir -p /home/openclaw/.openclaw
-          {
-            ${pkgs.coreutils}/bin/echo -n "ANTHROPIC_API_KEY="
-            ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-anthropic-key.path}
-            ${pkgs.coreutils}/bin/echo ""
-            ${pkgs.coreutils}/bin/echo -n "OPENCODE_API_KEY="
-            ${pkgs.coreutils}/bin/cat ${config.sops.secrets.openclaw-opencode-key.path}
-            ${pkgs.coreutils}/bin/echo ""
-          } > /home/openclaw/.openclaw/.env
+          ${pkgs.coreutils}/bin/cp ${config.sops.secrets.openclaw-env.path} /home/openclaw/.openclaw/.env
           ${pkgs.coreutils}/bin/chmod 600 /home/openclaw/.openclaw/.env
         '';
       };
