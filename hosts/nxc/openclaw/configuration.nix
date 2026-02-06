@@ -43,6 +43,10 @@
 
   home-manager.users.openclaw = { pkgs, lib, ... }: {
     home.stateVersion = "25.11";
+    home.packages = with pkgs; [
+      home-assistant-cli
+    ];
+    
     programs.home-manager.enable = true;
 
     programs.openclaw = {
