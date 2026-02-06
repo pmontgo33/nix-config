@@ -46,8 +46,13 @@
     home.packages = with pkgs; [
       home-assistant-cli
     ];
-    
+
     programs.home-manager.enable = true;
+
+    # Clean up old backup files before activation to prevent conflicts
+    home.activation.cleanupOldBackups = lib.hm.dag.entryBefore ["writeBoundary"] ''
+      $DRY_RUN_CMD rm -f ~/.openclaw/*.backup
+    '';
 
     programs.openclaw = {
       enable = true;

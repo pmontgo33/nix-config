@@ -665,8 +665,7 @@
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
-          # Disable backups for openclaw service user to avoid conflicts
-          home-manager.backupFileExtension = null;
+          home-manager.backupFileExtension = "backup";
           home-manager.extraSpecialArgs = { inherit inputs; };
 
           home-manager.sharedModules = [
