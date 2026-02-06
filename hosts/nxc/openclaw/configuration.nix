@@ -29,6 +29,11 @@
     };
     openclaw-env = {
       owner = "openclaw";
+      
+      # ANTHROPIC_API_KEY
+      # OPENCODE_API_KEY
+      # HASS_SERVER
+      # HASS_TOKEN
     };
   };
 
@@ -38,6 +43,10 @@
 
   home-manager.users.openclaw = { pkgs, lib, ... }: {
     home.stateVersion = "25.11";
+    home.packages = with pkgs; [
+      hass-cli
+    ];
+    
     programs.home-manager.enable = true;
 
     programs.openclaw = {
