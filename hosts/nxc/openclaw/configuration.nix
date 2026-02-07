@@ -13,8 +13,8 @@
 
   networking.hostName = "openclaw";
 
-  # Firewall disabled - Proxmox manages LXC container networking
-  networking.firewall.enable = false;
+  networking.firewall.allowedTCPPorts = [ 8384 22000 ];
+  networking.firewall.allowedUDPPorts = [ 22000 21027 ];
 
   # Create openclaw user
   users.users.openclaw = {
