@@ -112,9 +112,9 @@
     # Firewall
     firewall = {
       enable = true;
-      # Syncthing ports
-      allowedTCPPorts = [ 22000 ];
-      allowedUDPPorts = [ 22000 21027 ];
+      # Add any specific ports you need
+      # allowedTCPPorts = [ ];
+      # allowedUDPPorts = [ ];
     };
   };
 

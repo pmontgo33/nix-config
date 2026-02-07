@@ -13,6 +13,13 @@
 
   networking.hostName = "openclaw";
 
+  networking.firewall = {
+    enable = true;
+    # Syncthing ports
+    allowedTCPPorts = [ 8384 22000 ];  # 8384 = Web UI, 22000 = sync
+    allowedUDPPorts = [ 22000 21027 ]; # 22000 = QUIC sync, 21027 = discovery
+  };
+
   # Create openclaw user
   users.users.openclaw = {
     isNormalUser = true;
@@ -117,6 +124,7 @@
     services.syncthing = {
       enable = true;
       settings.gui = {
+        address = "0.0.0.0:8384";  # Listen on all interfaces for remote access
         user = "patrick";
         password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
       };
