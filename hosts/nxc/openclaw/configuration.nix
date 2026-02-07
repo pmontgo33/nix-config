@@ -113,6 +113,14 @@
         WantedBy = [ "default.target" ];
       };
     };
+
+    services.syncthing = {
+      enable = true;
+      settings.gui = {
+        user = "patrick";
+        password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
+      };
+    };
   };
 
 

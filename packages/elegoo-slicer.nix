@@ -19,12 +19,6 @@ in
 appimageTools.wrapType1 rec {
   inherit pname version src;
 
-  # Minimal sandboxing - share network and key system directories
-  extraBwrapArgs = [
-    "--share-net"
-    "--filesystem=host"
-  ];
-
   extraPkgs = pkgs: with pkgs; [
     webkitgtk_4_1
     # Network libraries for printer connectivity
@@ -33,7 +27,7 @@ appimageTools.wrapType1 rec {
     nss
     nspr
     avahi
-    nss-mdns
+    # nss-mdns
     # Additional system libraries
     systemd
     dbus

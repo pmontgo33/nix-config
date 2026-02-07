@@ -81,4 +81,5 @@
   boot.supportedFilesystems = [ "nfs" ];
   # Ensure network-online.target is enabled
   systemd.targets.network-online.enable = true;
+
 }

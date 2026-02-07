@@ -43,6 +43,14 @@ in
     onCalendar = "daily"; # Options: daily, weekly, monthly, or a systemd timer format like "12:00"
   };
 
+  services.syncthing = {
+    enable = true;
+    settings.gui = {
+      user = "patrick";
+      password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
+    };
+  };
+
   # Plasma 6 configuration
   programs.plasma = {
     enable = true;
