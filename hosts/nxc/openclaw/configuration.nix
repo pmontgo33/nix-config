@@ -13,12 +13,8 @@
 
   networking.hostName = "openclaw";
 
-  networking.firewall = {
-    enable = true;
-    # Syncthing ports
-    allowedTCPPorts = [ 8384 22000 ];  # 8384 = Web UI, 22000 = sync
-    allowedUDPPorts = [ 22000 21027 ]; # 22000 = QUIC sync, 21027 = discovery
-  };
+  # Firewall disabled - Proxmox manages LXC container networking
+  networking.firewall.enable = false;
 
   # Create openclaw user
   users.users.openclaw = {
