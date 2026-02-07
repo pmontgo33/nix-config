@@ -26,6 +26,7 @@
     description = "Openclaw service user";
     home = "/home/openclaw";
     createHome = true;
+    linger = true;  # Enable user services to run without login
   };
 
   services.openssh.enable = true;
