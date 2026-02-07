@@ -27,6 +27,17 @@
 
   services.openssh.enable = true;
 
+  services.syncthing = {
+    enable = true;
+    user = "openclaw";
+    dataDir = "/home/openclaw";
+    guiAddress = "0.0.0.0:8384";
+    settings.gui = {
+      user = "patrick";
+      password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
+    };
+  };
+
   sops.secrets = {
     openclaw-telegram-token = {
       owner = "openclaw";
@@ -118,14 +129,6 @@
       };
     };
 
-    services.syncthing = {
-      enable = true;
-      settings.gui = {
-        address = "0.0.0.0:8384";  # Listen on all interfaces for remote access
-        user = "patrick";
-        password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
-      };
-    };
   };
 
 
