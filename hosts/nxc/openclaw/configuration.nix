@@ -60,6 +60,7 @@
     home.stateVersion = "25.11";
     home.packages = with pkgs; [
       home-assistant-cli
+      rclone
     ];
 
     programs.home-manager.enable = true;

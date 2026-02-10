@@ -99,6 +99,7 @@
       overwritehost = "drive.montycasa.com";
       trusted_proxies = [ "147.182.139.226" "100.84.116.17" "45.33.94.83" "100.106.205.39" ];
       overwrite.cli.url = "https://drive.montycasa.com";
+      filesystem_check_changes = 1;
       # trusted_domains = ["192.168.86.136"];
     };
     config = {
