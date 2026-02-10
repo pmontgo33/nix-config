@@ -100,6 +100,10 @@
       # Enable consumption directory polling
       PAPERLESS_CONSUMER_POLLING = 60;
 
+      # Use scratch directory on same filesystem as media/consume to avoid
+      # PrivateTmp isolation issues with temp files
+      PAPERLESS_SCRATCH_DIR = "/mnt/general/paperless-ngx/scratch";
+
       # AI configuration - points to paperless-ai container
       # Uncomment once paperless-ai is configured
       # PAPERLESS_AI_ENABLED = true;
@@ -148,6 +152,7 @@
   systemd.tmpfiles.rules = [
     "d /var/lib/paperless-ai 0755 paperless paperless -"
     "d /mnt/general 0750 paperless paperless -"
+    "d /mnt/general/paperless-ngx/scratch 0750 paperless paperless -"
   ];
 
   # Ensure paperless-ai container starts after paperless service
