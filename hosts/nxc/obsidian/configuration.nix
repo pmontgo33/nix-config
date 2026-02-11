@@ -1,5 +1,16 @@
 { config, pkgs, modulesPath, inputs, outputs, ... }:
 
+let
+  obsidianAutostart = pkgs.writeText "obsidian.desktop" ''
+    [Desktop Entry]
+    Type=Application
+    Name=Obsidian
+    Exec=/usr/bin/obsidian
+    Hidden=false
+    NoDisplay=false
+    X-GNOME-Autostart-enabled=true
+  '';
+in
 {
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
@@ -10,6 +21,7 @@
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
+  extra-services.mount_general.enable = true;
 
   services.openssh.enable = true;
 
@@ -20,22 +32,24 @@
   };
 
   systemd.tmpfiles.rules = [
-    "d /var/lib/obsidian/vaults 0755 root root -"
     "d /var/lib/obsidian/config 0755 root root -"
+    "d /var/lib/obsidian/config/.config/autostart 0755 root root -"
+    "C+ /var/lib/obsidian/config/.config/autostart/obsidian.desktop 0644 root root - ${obsidianAutostart}"
   ];
 
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {
-      obsidian-remote = {
-        image = "ghcr.io/sytone/obsidian-remote:latest";
+      obsidian = {
+        image = "lscr.io/linuxserver/obsidian:latest";
         autoStart = true;
         ports = [
-          "8080:8080"
+          "3000:3000"
+          "3001:3001"
         ];
         volumes = [
-          "/var/lib/obsidian/vaults:/vaults"
           "/var/lib/obsidian/config:/config"
+          "/mnt/general:/mnt/general"
         ];
         environment = {
           PUID = "1000";
@@ -44,12 +58,13 @@
         };
         extraOptions = [
           "--pull=newer"
+          "--shm-size=1g"
         ];
       };
     };
   };
 
-  networking.firewall.allowedTCPPorts = [ 8080 ];
+  networking.firewall.allowedTCPPorts = [ 3000 3001 ];
 
   system.stateVersion = "25.11";
 }
