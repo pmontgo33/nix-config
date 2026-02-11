@@ -11,6 +11,7 @@
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
+  extra-services.mount_general.enable = true;
 
   # sops secrets configuration
   sops.secrets."nextcloud-admin-password" = {
@@ -47,6 +48,7 @@
   # Create necessary directories
   systemd.tmpfiles.rules = [
     "d /mnt/drive 0750 nextcloud nextcloud -"
+    "d /mnt/general 0750 nextcloud nextcloud -"
   ];
 
   # optional, but ensures rpc-statsd is running for on demand mounting
