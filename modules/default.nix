@@ -7,6 +7,7 @@
     ./mount_home_media.nix
     ./mount_media.nix
     ./mount_general.nix
+    ./mount_notes.nix
     ./pbs-home-dirs.nix
     ./caddy-proxy.nix
     ./host-checkin.nix

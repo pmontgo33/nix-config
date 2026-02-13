@@ -52,6 +52,8 @@
     };
   };
 
+  extra-services.mount_notes.enable = true;
+
   systemd.tmpfiles.rules = [
     "d /var/lib/openclaw 0755 root root -"
   ];
@@ -59,8 +61,8 @@
   home-manager.users.openclaw = { pkgs, lib, ... }: {
     home.stateVersion = "25.11";
     home.packages = with pkgs; [
-      home-assistant-cli
-      rclone
+      # home-assistant-cli
+      # rclone
     ];
 
     programs.home-manager.enable = true;

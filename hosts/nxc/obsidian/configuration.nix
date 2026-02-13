@@ -21,7 +21,8 @@ in
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
-  extra-services.mount_general.enable = true;
+  # extra-services.mount_general.enable = true;
+  extra-services.mount_notes.enable = true;
 
   services.openssh.enable = true;
 
@@ -49,7 +50,8 @@ in
         ];
         volumes = [
           "/var/lib/obsidian/config:/config"
-          "/mnt/general:/mnt/general"
+          # "/mnt/general:/mnt/general"
+          "/mnt/Notes:/mnt/Notes"
         ];
         environment = {
           PUID = "1000";
@@ -59,6 +61,8 @@ in
         extraOptions = [
           "--pull=newer"
           "--shm-size=1g"
+          "--dns=1.1.1.1"
+          "--dns=8.8.8.8"
         ];
       };
     };
