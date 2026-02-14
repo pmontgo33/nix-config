@@ -1,5 +1,13 @@
 { config, pkgs, modulesPath, inputs, outputs, ... }:
 
+# Commands to run VNC Server:
+# systemctl start obsidian-vnc
+# # Connect via VNC to :5900, log into Obsidian Sync, open your vault
+# # # On another nix system run "nix-shell -p tigervnc --run "vncviewer obsidian:5900""
+
+# systemctl stop obsidian-vnc
+
+
 {
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
@@ -10,7 +18,6 @@
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
-  extra-services.mount_notes.enable = true;
 
   services.openssh.enable = true;
 
@@ -89,6 +96,19 @@
       ExecStart = "${pkgs.x11vnc}/bin/x11vnc -display :99 -rfbport 5900 -forever -shared";
       Restart = "on-failure";
       RestartSec = "10s";
+    };
+  };
+
+  services.syncthing = {
+    enable = true;
+    user = "root";
+    dataDir = "/root";
+    guiAddress = "0.0.0.0:8384";
+    overrideDevices = false;  # Don't reset devices on rebuild
+    overrideFolders = false;  # Don't reset folders on rebuild
+    settings.gui = {
+      user = "patrick";
+      password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
     };
   };
 

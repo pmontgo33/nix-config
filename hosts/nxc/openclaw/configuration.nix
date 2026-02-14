@@ -23,17 +23,19 @@
     home = "/home/openclaw";
     createHome = true;
     linger = true;  # Enable user services to run without login
+    shell = pkgs.fish;
   };
+  programs.fish.enable = true;
 
   services.openssh.enable = true;
 
   services.syncthing = {
     enable = true;
     user = "openclaw";
-    dataDir = "/home/openclaw";
+    dataDir = "/var/lib/syncthing";
     guiAddress = "0.0.0.0:8384";
-    overrideDevices = false;  # Don't reset devices on rebuild
-    overrideFolders = false;  # Don't reset folders on rebuild
+    # overrideDevices = false;  # Don't reset devices on rebuild
+    # overrideFolders = false;  # Don't reset folders on rebuild
     settings.gui = {
       user = "patrick";
       password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
@@ -58,6 +60,7 @@
 
   systemd.tmpfiles.rules = [
     "d /var/lib/openclaw 0755 root root -"
+    "d /var/lib/syncthing 0755 openclaw openclaw -"
   ];
 
   home-manager.users.openclaw = { pkgs, lib, ... }: {
