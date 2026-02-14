@@ -38,6 +38,9 @@ in
     "C+ /var/lib/obsidian/config/.config/autostart/obsidian.desktop 0644 root root - ${obsidianAutostart}"
   ];
 
+  # boot.kernel.sysctl."fs.inotify.max_user_watches" = 524288;
+  # boot.kernel.sysctl."fs.inotify.max_user_instances" = 1024;
+
   virtualisation.oci-containers = {
     backend = "podman";
     containers = {

@@ -32,6 +32,8 @@
     user = "openclaw";
     dataDir = "/home/openclaw";
     guiAddress = "0.0.0.0:8384";
+    overrideDevices = false;  # Don't reset devices on rebuild
+    overrideFolders = false;  # Don't reset folders on rebuild
     settings.gui = {
       user = "patrick";
       password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
@@ -107,6 +109,9 @@
               "*" = { requireMention = true; };
             };
           };
+
+          # Enable telegram plugin
+          plugins.entries.telegram.enabled = true;
         };
 
         # Plugins can be added here after initial setup
