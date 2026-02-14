@@ -60,7 +60,6 @@
 
   systemd.tmpfiles.rules = [
     "d /var/lib/openclaw 0755 root root -"
-    "d /var/lib/syncthing 0755 openclaw openclaw -"
   ];
 
   home-manager.users.openclaw = { pkgs, lib, ... }: {
