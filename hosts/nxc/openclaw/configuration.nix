@@ -56,8 +56,6 @@
     };
   };
 
-  extra-services.mount_notes.enable = true;
-
   systemd.tmpfiles.rules = [
     "d /var/lib/openclaw 0755 root root -"
   ];
