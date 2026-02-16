@@ -67,7 +67,7 @@
     ];
   };
 
-  # networking.firewall.allowedTCPPorts = [ 2283 ];
+  networking.firewall.allowedTCPPorts = [ 2283 ];
 
   system.stateVersion = "25.11";
 }
