@@ -59,6 +59,9 @@
 
   systemd.tmpfiles.rules = [
     "d /var/lib/openclaw 0755 root root -"
+    "d /var/lib/syncthing 0755 openclaw users -"
+    "d /var/lib/syncthing/.config 0755 openclaw users -"
+    "d /var/lib/syncthing/.config/syncthing 0755 openclaw users -"
   ];
 
   home-manager.users.openclaw = { pkgs, lib, ... }: {
@@ -77,7 +80,7 @@
 
     programs.openclaw = {
       enable = true;
-      documents = ./documents;
+      # documents = ./documents;
 
       bundledPlugins = {
         summarize.enable = true;   # Summarize web pages, PDFs, videos
