@@ -32,6 +32,7 @@
   services.syncthing = {
     enable = true;
     user = "openclaw";
+    group = "users";
     dataDir = "/var/lib/syncthing";
     guiAddress = "0.0.0.0:8384";
     # overrideDevices = false;  # Don't reset devices on rebuild
