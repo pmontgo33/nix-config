@@ -362,7 +362,7 @@
     nixosConfigurations.immich = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
-        ./hosts/dev/immich
+        ./hosts/nxc/immich
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
