@@ -126,13 +126,10 @@
     wants = [ "network-online.target" ];
   };
 
-  # Minimal home-manager config - nix-openclaw module disabled (using container instead)
+  # Minimal home-manager config (using Podman container for OpenClaw)
   home-manager.users.openclaw = { pkgs, lib, ... }: {
     home.stateVersion = "25.11";
     programs.home-manager.enable = true;
-
-    # Disable nix-openclaw module - using Podman container instead
-    programs.openclaw.enable = false;
   };
 
   system.stateVersion = "25.11";

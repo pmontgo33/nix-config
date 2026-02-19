@@ -676,9 +676,6 @@
         ./hosts/nxc/openclaw
         sops-nix.nixosModules.sops
 
-        # Add nix-openclaw overlay to provide pkgs.openclaw
-        { nixpkgs.overlays = [ nix-openclaw.overlays.default ]; }
-
         home-manager.nixosModules.home-manager
         {
           home-manager.useGlobalPkgs = true;
@@ -688,7 +685,6 @@
 
           home-manager.sharedModules = [
             sops-nix.homeManagerModules.sops
-            nix-openclaw.homeManagerModules.openclaw
           ];
         }
       ];
