@@ -112,5 +112,7 @@
     };
   };
 
+  networking.firewall.allowedTCPPorts = [ 8080 ];
+
   system.stateVersion = "25.11";
 }

@@ -13,16 +13,16 @@
 
   networking.hostName = "openclaw";
 
-  networking.firewall.allowedTCPPorts = [ 8384 22000 ];
+  networking.firewall.allowedTCPPorts = [ 8384 22000 18789 ];
   networking.firewall.allowedUDPPorts = [ 22000 21027 ];
 
-  # Create openclaw user
+  # Create openclaw user (uid 1000 matches container's node user)
   users.users.openclaw = {
     isNormalUser = true;
     description = "Openclaw service user";
     home = "/home/openclaw";
     createHome = true;
-    linger = true;  # Enable user services to run without login
+    uid = 1000;  # Match container's node user
     shell = pkgs.fish;
   };
   programs.fish.enable = true;
@@ -35,8 +35,6 @@
     group = "users";
     dataDir = "/var/lib/syncthing";
     guiAddress = "0.0.0.0:8384";
-    # overrideDevices = false;  # Don't reset devices on rebuild
-    # overrideFolders = false;  # Don't reset folders on rebuild
     settings.gui = {
       user = "patrick";
       password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
@@ -49,7 +47,6 @@
     };
     openclaw-env = {
       owner = "openclaw";
-      
       # ANTHROPIC_API_KEY
       # OPENCODE_API_KEY
       # HASS_SERVER
@@ -57,92 +54,86 @@
     };
   };
 
+  # Enable Podman for running OpenClaw container
+  virtualisation.podman = {
+    enable = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
   systemd.tmpfiles.rules = [
-    "d /var/lib/openclaw 0755 root root -"
     "d /var/lib/syncthing 0755 openclaw users -"
     "d /var/lib/syncthing/.config 0755 openclaw users -"
     "d /var/lib/syncthing/.config/syncthing 0755 openclaw users -"
   ];
 
-  home-manager.users.openclaw = { pkgs, lib, ... }: {
-    home.stateVersion = "25.11";
-    home.packages = with pkgs; [
-      # home-assistant-cli
-      # rclone
-    ];
+  # Copy secrets to container-accessible location before container starts
+  systemd.services.openclaw-secrets-setup = {
+    description = "Setup OpenClaw secrets for container";
+    wantedBy = [ "podman-openclaw.service" ];
+    before = [ "podman-openclaw.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      # Copy .env file
+      ${pkgs.coreutils}/bin/cp ${config.sops.secrets.openclaw-env.path} /home/openclaw/.openclaw/.env
+      ${pkgs.coreutils}/bin/chmod 600 /home/openclaw/.openclaw/.env
+      ${pkgs.coreutils}/bin/chown openclaw:users /home/openclaw/.openclaw/.env
 
-    programs.home-manager.enable = true;
-
-    # Clean up old backup files before activation to prevent conflicts
-    home.activation.cleanupOldBackups = lib.hm.dag.entryBefore ["checkLinkTargets"] ''
-      $DRY_RUN_CMD rm -f ~/.openclaw/*.backup
+      # Copy telegram token
+      ${pkgs.coreutils}/bin/mkdir -p /home/openclaw/.openclaw/secrets
+      ${pkgs.coreutils}/bin/cp ${config.sops.secrets.openclaw-telegram-token.path} /home/openclaw/.openclaw/secrets/telegram-token
+      ${pkgs.coreutils}/bin/chmod 600 /home/openclaw/.openclaw/secrets/telegram-token
+      ${pkgs.coreutils}/bin/chown -R openclaw:users /home/openclaw/.openclaw/secrets
     '';
-
-    programs.openclaw = {
-      enable = true;
-      # documents = ./documents;
-
-      bundledPlugins = {
-        summarize.enable = true;   # Summarize web pages, PDFs, videos
-        peekaboo.enable = true;    # Take screenshots
-        oracle.enable = false;     # Web search
-        sag.enable = false;        # Text-to-speech
-        camsnap.enable = false;    # Camera snapshots
-        # gogcli.enable = false;     # Google Calendar
-        # goplaces.enable = true;    # Google Places API
-      };
-
-      instances.default = {
-        enable = true;
-        systemd.enable = true;
-
-        config = {
-          gateway = {
-            mode = "local";
-            auth = {
-              token = "local-dev-token";  # For local mode, can be any value
-            };
-          };
-
-          # Telegram channel configuration
-          channels.telegram = {
-            enabled = true;
-            tokenFile = config.sops.secrets.openclaw-telegram-token.path;
-            allowFrom = [ 748642877 ];
-            groups = {
-              "*" = { requireMention = true; };
-            };
-          };
-
-          # Enable telegram plugin
-          plugins.entries.telegram.enabled = true;
-        };
-
-        # Plugins can be added here after initial setup
-        # To add plugins, you'll need to add them as flake inputs first
-        plugins = [ ];
-      };
-    };
-
-    # Copy .env file from SOPS secret
-    systemd.user.services.openclaw-gateway = {
-      Unit = {
-        After = [ "network.target" ];
-      };
-      Service = {
-        ExecStartPre = pkgs.writeShellScript "setup-openclaw-env" ''
-          ${pkgs.coreutils}/bin/mkdir -p /home/openclaw/.openclaw
-          ${pkgs.coreutils}/bin/cp ${config.sops.secrets.openclaw-env.path} /home/openclaw/.openclaw/.env
-          ${pkgs.coreutils}/bin/chmod 600 /home/openclaw/.openclaw/.env
-        '';
-      };
-      Install = {
-        WantedBy = [ "default.target" ];
-      };
-    };
-
   };
 
+  # OpenClaw as OCI Container
+  virtualisation.oci-containers = {
+    backend = "podman";
+    containers.openclaw = {
+      image = "ghcr.io/openclaw/openclaw:latest";
+
+      # Map container port to host
+      ports = [ "18789:18789" ];
+
+      # Mount the existing .openclaw directory
+      # Container runs as node (uid 1000), same as openclaw user
+      volumes = [
+        "/home/openclaw/.openclaw:/home/node/.openclaw:z"
+      ];
+
+      environment = {
+        TZ = "America/New_York";
+        # Gateway binds to all interfaces for container access
+        OPENCLAW_GATEWAY_BIND = "0.0.0.0";
+      };
+
+      # Auto-pull newer images
+      extraOptions = [
+        "--pull=newer"
+        # Run as the node user (uid 1000)
+        "--user=1000:100"
+      ];
+    };
+  };
+
+  # Ensure container restarts after secrets are updated
+  systemd.services.podman-openclaw = {
+    requires = [ "openclaw-secrets-setup.service" ];
+    after = [ "openclaw-secrets-setup.service" "network-online.target" ];
+    wants = [ "network-online.target" ];
+  };
+
+  # Minimal home-manager config - nix-openclaw module disabled (using container instead)
+  home-manager.users.openclaw = { pkgs, lib, ... }: {
+    home.stateVersion = "25.11";
+    programs.home-manager.enable = true;
+
+    # Disable nix-openclaw module - using Podman container instead
+    programs.openclaw.enable = false;
+  };
 
   system.stateVersion = "25.11";
 }
