@@ -98,14 +98,15 @@
       # Map container port to host
       ports = [ "18789:18789" ];
 
-      # Mount the existing .openclaw directory
-      # Container runs as node (uid 1000), same as openclaw user
+      # Mount at /home/openclaw to preserve existing paths in session data
+      # Container runs as uid 1000, same as openclaw user on host
       volumes = [
-        "/home/openclaw/.openclaw:/home/node/.openclaw:z"
+        "/home/openclaw:/home/openclaw:z"
       ];
 
       environment = {
         TZ = "America/New_York";
+        HOME = "/home/openclaw";
         # Gateway binds to all interfaces for container access
         OPENCLAW_GATEWAY_BIND = "0.0.0.0";
       };
