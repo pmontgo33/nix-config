@@ -61,6 +61,10 @@
   };
 
   systemd.tmpfiles.rules = [
+    # OpenClaw directories (created before container starts)
+    "d /home/openclaw/.openclaw 0755 openclaw users -"
+    "d /home/openclaw/.openclaw/secrets 0700 openclaw users -"
+    # Syncthing directories
     "d /var/lib/syncthing 0755 openclaw users -"
     "d /var/lib/syncthing/.config 0755 openclaw users -"
     "d /var/lib/syncthing/.config/syncthing 0755 openclaw users -"
