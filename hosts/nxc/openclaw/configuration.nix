@@ -64,6 +64,7 @@
       extraOptions = [
         "--pull=newer"
         "--user=1000:100"
+        "--network=host"
       ];
     };
   };
