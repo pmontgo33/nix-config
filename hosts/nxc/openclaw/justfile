@@ -80,7 +80,7 @@ clawhub-update:
 
 # List installed skills
 clawhub-list:
-    @if [ -d /var/lib/openclaw/workspace/skills ]; then ls -la /var/lib/openclaw/workspace/skills/; else echo "No skills installed yet"; fi
+    podman exec -it openclaw npx clawhub list
 
 # Login to ClawHub
 clawhub-login:
