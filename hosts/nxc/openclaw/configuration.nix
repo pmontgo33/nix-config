@@ -38,8 +38,16 @@
   };
 
   sops.secrets = {
-    openclaw-telegram-token = {};
-    openclaw-env = {};
+    openclaw-telegram-token = {
+      owner = "1000";
+      group = "100";
+      mode = "0400";
+    };
+    openclaw-env = {
+      owner = "1000";
+      group = "100";
+      mode = "0400";
+    };
   };
 
   # Enable Podman
