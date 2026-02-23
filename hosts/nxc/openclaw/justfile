@@ -80,7 +80,7 @@ clawhub-update:
 
 # List installed skills
 clawhub-list:
-    ls -la /var/lib/openclaw/workspace/skills/
+    @if [ -d /var/lib/openclaw/workspace/skills ]; then ls -la /var/lib/openclaw/workspace/skills/; else echo "No skills installed yet"; fi
 
 # Login to ClawHub
 clawhub-login:
