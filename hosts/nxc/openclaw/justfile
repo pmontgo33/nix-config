@@ -1,0 +1,139 @@
+# OpenClaw management commands
+
+# Default: show available commands
+default:
+    @just --list
+
+# === Container Management ===
+
+# Start the OpenClaw container
+start:
+    systemctl start podman-openclaw
+
+# Stop the OpenClaw container
+stop:
+    systemctl stop podman-openclaw
+
+# Restart the OpenClaw container
+restart:
+    systemctl restart podman-openclaw
+
+# Show container status
+status:
+    podman ps -a --filter name=openclaw
+    @echo ""
+    systemctl status podman-openclaw --no-pager
+
+# === Logs ===
+
+# Follow container logs
+logs:
+    podman logs -f openclaw
+
+# Show last N lines of logs (default: 50)
+logs-tail n="50":
+    podman logs --tail {{n}} openclaw
+
+# === Shell & CLI ===
+
+# Open a shell inside the container
+shell:
+    podman exec -it openclaw sh
+
+# Run openclaw CLI command
+cli *args:
+    podman exec -it openclaw node /app/openclaw.mjs {{args}}
+
+# Run onboarding
+onboard:
+    podman exec -it openclaw node /app/openclaw.mjs onboard
+
+# Show OpenClaw version
+version:
+    podman exec openclaw node /app/openclaw.mjs --version
+
+# Run OpenClaw doctor
+doctor:
+    podman exec -it openclaw node /app/openclaw.mjs doctor
+
+# Fix OpenClaw config issues
+doctor-fix:
+    podman exec -it openclaw node /app/openclaw.mjs doctor --fix
+
+# === ClawHub ===
+
+# Login to ClawHub
+clawhub-login:
+    podman exec -it openclaw node /app/openclaw.mjs clawhub login
+
+# Show ClawHub status
+clawhub-status:
+    podman exec -it openclaw node /app/openclaw.mjs clawhub status
+
+# List ClawHub skills
+clawhub-skills:
+    podman exec -it openclaw node /app/openclaw.mjs clawhub skills
+
+# Install a ClawHub skill
+clawhub-install skill:
+    podman exec -it openclaw node /app/openclaw.mjs clawhub install {{skill}}
+
+# Uninstall a ClawHub skill
+clawhub-uninstall skill:
+    podman exec -it openclaw node /app/openclaw.mjs clawhub uninstall {{skill}}
+
+# Sync ClawHub skills
+clawhub-sync:
+    podman exec -it openclaw node /app/openclaw.mjs clawhub sync
+
+# === Cron ===
+
+# List cron jobs
+cron-list:
+    podman exec openclaw node /app/openclaw.mjs cron list
+
+# Show cron job details
+cron-show job:
+    podman exec openclaw node /app/openclaw.mjs cron show {{job}}
+
+# === Config ===
+
+# Show current config
+config:
+    cat /var/lib/openclaw/openclaw.json | jq
+
+# Edit config
+config-edit:
+    $EDITOR /var/lib/openclaw/openclaw.json
+
+# === Data ===
+
+# Show data directory contents
+data:
+    ls -la /var/lib/openclaw/
+
+# Show workspace contents
+workspace:
+    ls -la /var/lib/openclaw/workspace/
+
+# === Backup ===
+
+# Create a backup of OpenClaw data
+backup name="openclaw-backup":
+    tar -czvf /tmp/{{name}}-$(date +%Y%m%d-%H%M%S).tar.gz -C /var/lib/openclaw .
+    @echo "Backup created at /tmp/{{name}}-$(date +%Y%m%d-%H%M%S).tar.gz"
+
+# === Maintenance ===
+
+# Clear stale session locks
+clear-locks:
+    rm -f /var/lib/openclaw/agents/*/sessions/*.lock
+    @echo "Session locks cleared"
+
+# Pull latest container image
+pull:
+    podman pull ghcr.io/openclaw/openclaw:latest
+
+# Update container (pull + restart)
+update: pull restart
+    @echo "OpenClaw updated"

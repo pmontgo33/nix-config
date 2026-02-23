@@ -9,7 +9,13 @@
   networking.firewall.allowedTCPPorts = [ 8384 22000 18789 ];
   networking.firewall.allowedUDPPorts = [ 22000 21027 ];
 
-  environment.systemPackages = with pkgs; [ jq ];
+  environment.systemPackages = with pkgs; [ jq just ];
+
+  # OpenClaw justfile for common commands
+  environment.etc."openclaw/justfile".source = ./justfile;
+
+  # 'oc' command as shortcut to run justfile commands
+  environment.shellAliases.oc = "just -f /etc/openclaw/justfile";
 
   services.openssh.enable = true;
 
