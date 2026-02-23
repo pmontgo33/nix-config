@@ -64,6 +64,28 @@ doctor:
 doctor-fix:
     podman exec -it openclaw node /app/openclaw.mjs doctor --fix
 
+# === ClawHub ===
+
+# Search ClawHub for skills
+clawhub-search query:
+    podman exec -it openclaw npx clawhub search "{{query}}"
+
+# Install a ClawHub skill
+clawhub-install skill:
+    podman exec -it openclaw npx clawhub install {{skill}}
+
+# Update all ClawHub skills
+clawhub-update:
+    podman exec -it openclaw npx clawhub update --all
+
+# List installed skills
+clawhub-list:
+    ls -la /var/lib/openclaw/workspace/skills/
+
+# Login to ClawHub
+clawhub-login:
+    podman exec -it openclaw npx clawhub login
+
 # === Channels ===
 
 # List configured channels
