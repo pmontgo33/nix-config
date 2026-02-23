@@ -14,13 +14,12 @@
   # OpenClaw justfile for common commands
   environment.etc."openclaw/justfile".source = ./justfile;
 
-  # 'oc' command as shortcut to run justfile commands
-  environment.shellAliases.oc = "just -f /etc/openclaw/justfile";
-
-  # Enable fish with the alias
+  # Enable fish with 'oc' alias
   programs.fish = {
     enable = true;
-    shellAliases.oc = "just -f /etc/openclaw/justfile";
+    shellAliases = {
+      oc = "just -f /etc/openclaw/justfile";
+    };
   };
 
   services.openssh.enable = true;
