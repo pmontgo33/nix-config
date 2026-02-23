@@ -37,15 +37,12 @@
       efi.canTouchEfiVariables = true;
     };
 
-    # Hybrid kernel approach: Latest with LTS fallback
-    # Primary: Latest stable kernel for newest features and optimizations
-    kernelPackages = pkgs.linuxPackages_latest;
+    # Using LTS kernel for NVIDIA driver compatibility
+    # Latest kernel (6.19+) has compatibility issues with NVIDIA proprietary drivers
+    kernelPackages = pkgs.linuxPackages_6_12;
 
-    # Keep more generations in bootloader to include LTS fallback
+    # Keep more generations in bootloader for fallback
     loader.systemd-boot.configurationLimit = 10;
-
-    # Alternative: Uncomment to switch to LTS as primary (if latest causes issues)
-    # kernelPackages = pkgs.linuxPackages_6_6;
 
     kernelParams = [
       "quiet"
