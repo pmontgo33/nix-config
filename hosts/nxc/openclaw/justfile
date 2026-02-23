@@ -4,6 +4,10 @@
 default:
     @just --list
 
+# Completion helper (used by shell completion)
+completion:
+    @just --list --list-prefix '' --list-heading '' | awk '{print $1}'
+
 # === Container Management ===
 
 # Start the OpenClaw container
