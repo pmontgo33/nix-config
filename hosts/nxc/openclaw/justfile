@@ -40,9 +40,9 @@ logs-tail n="50":
 
 # === Shell & CLI ===
 
-# Open a shell inside the container
+# Open a bash shell inside the container
 shell:
-    podman exec -it openclaw sh
+    podman exec -it openclaw bash
 
 # Run openclaw CLI command
 cli *args:
@@ -64,31 +64,25 @@ doctor:
 doctor-fix:
     podman exec -it openclaw node /app/openclaw.mjs doctor --fix
 
-# === ClawHub ===
+# === Channels ===
 
-# Login to ClawHub
-clawhub-login:
-    podman exec -it openclaw node /app/openclaw.mjs clawhub login
+# List configured channels
+channels:
+    podman exec openclaw node /app/openclaw.mjs channels list
 
-# Show ClawHub status
-clawhub-status:
-    podman exec -it openclaw node /app/openclaw.mjs clawhub status
+# Show channel status
+channels-status:
+    podman exec openclaw node /app/openclaw.mjs channels status
 
-# List ClawHub skills
-clawhub-skills:
-    podman exec -it openclaw node /app/openclaw.mjs clawhub skills
+# === Models ===
 
-# Install a ClawHub skill
-clawhub-install skill:
-    podman exec -it openclaw node /app/openclaw.mjs clawhub install {{skill}}
+# List available models
+models:
+    podman exec openclaw node /app/openclaw.mjs models list
 
-# Uninstall a ClawHub skill
-clawhub-uninstall skill:
-    podman exec -it openclaw node /app/openclaw.mjs clawhub uninstall {{skill}}
-
-# Sync ClawHub skills
-clawhub-sync:
-    podman exec -it openclaw node /app/openclaw.mjs clawhub sync
+# Scan for models
+models-scan:
+    podman exec -it openclaw node /app/openclaw.mjs models scan
 
 # === Cron ===
 
