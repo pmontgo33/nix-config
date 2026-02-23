@@ -17,6 +17,12 @@
   # 'oc' command as shortcut to run justfile commands
   environment.shellAliases.oc = "just -f /etc/openclaw/justfile";
 
+  # Enable fish with the alias
+  programs.fish = {
+    enable = true;
+    shellAliases.oc = "just -f /etc/openclaw/justfile";
+  };
+
   services.openssh.enable = true;
 
   # Syncthing (runs as root)
