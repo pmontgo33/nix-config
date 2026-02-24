@@ -155,6 +155,13 @@
     "d /mnt/general/paperless-ngx/scratch 0750 paperless paperless -"
   ];
 
+  # Allow paperless services to write to the scratch directory on NFS
+  # (ProtectSystem=strict makes everything read-only except ReadWritePaths)
+  systemd.services.paperless-scheduler.serviceConfig.ReadWritePaths = [ "/mnt/general/paperless-ngx/scratch" ];
+  systemd.services.paperless-task-queue.serviceConfig.ReadWritePaths = [ "/mnt/general/paperless-ngx/scratch" ];
+  systemd.services.paperless-consumer.serviceConfig.ReadWritePaths = [ "/mnt/general/paperless-ngx/scratch" ];
+  systemd.services.paperless-web.serviceConfig.ReadWritePaths = [ "/mnt/general/paperless-ngx/scratch" ];
+
   # Ensure paperless-ai container starts after paperless service
   systemd.services.podman-paperless-ai = {
     requires = [ "paperless-consumer.service" ];
