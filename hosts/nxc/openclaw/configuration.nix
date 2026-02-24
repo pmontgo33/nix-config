@@ -24,11 +24,19 @@
 
   services.openssh.enable = true;
 
-  # Syncthing (runs as root)
+  # System user matching container's uid 1000
+  users.users.openclaw = {
+    uid = 1000;
+    group = "users";
+    isSystemUser = true;
+    home = "/var/lib/openclaw";
+  };
+
+  # Syncthing (runs as uid 1000 to match container file ownership)
   services.syncthing = {
     enable = true;
-    user = "root";
-    group = "root";
+    user = "openclaw";
+    group = "users";
     dataDir = "/var/lib/syncthing";
     guiAddress = "0.0.0.0:8384";
     settings.gui = {
@@ -51,6 +59,7 @@
   # Create data directory (uid 1000 = container's node user)
   systemd.tmpfiles.rules = [
     "d /var/lib/openclaw 0755 1000 100 -"
+    "d /var/lib/syncthing 0700 1000 100 -"
   ];
 
   # OpenClaw container
