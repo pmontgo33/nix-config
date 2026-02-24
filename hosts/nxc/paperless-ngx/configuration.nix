@@ -104,6 +104,9 @@
       # PrivateTmp isolation issues with temp files
       PAPERLESS_SCRATCH_DIR = "/mnt/general/paperless-ngx/scratch";
 
+      # Store files in dated folders (added date) with created-date-prefixed title filenames
+      PAPERLESS_FILENAME_FORMAT = "{{ added_year }}-{{ added_month }}-{{ added_day }}/{{ created_year }}-{{ created_month }}-{{ created_day }}_{{ title }}";
+
       # AI configuration - points to paperless-ai container
       # Uncomment once paperless-ai is configured
       # PAPERLESS_AI_ENABLED = true;
