@@ -61,7 +61,7 @@
       ports = [ "18789:18789" ];
 
       volumes = [
-        "/var/lib/openclaw:/home/node/.openclaw:z"
+        "/var/lib/openclaw:/home/node/.openclaw"
         # Mount SOPS secrets directly
         "${config.sops.secrets.openclaw-env.path}:/home/node/.openclaw/.env:ro"
         "${config.sops.secrets.openclaw-telegram-token.path}:/home/node/.openclaw/secrets/telegram-token:ro"
