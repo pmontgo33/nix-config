@@ -180,7 +180,15 @@ cameras:
       retain:
         days: 0.125
     detect:
-      enabled: false
+      enabled: true
+    objects:
+      track:
+        - person
+    review:
+      alerts:
+        labels: []
+      detections:
+        labels: []
 
   girls_room:
     ffmpeg:
@@ -199,7 +207,15 @@ cameras:
       retain:
         days: 0.125
     detect:
-      enabled: false
+      enabled: true
+    objects:
+      track:
+        - person
+    review:
+      alerts:
+        labels: []
+      detections:
+        labels: []
 
   nursery:
     ffmpeg:
@@ -218,4 +234,12 @@ cameras:
       retain:
         days: 0.25
     detect:
-      enabled: false
+      enabled: true
+    objects:
+      track:
+        - person
+    review:
+      alerts:
+        labels: []
+      detections:
+        labels: []
