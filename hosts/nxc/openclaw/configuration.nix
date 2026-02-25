@@ -50,6 +50,7 @@
   sops.secrets = {
     openclaw-telegram-token.mode = "0444";
     openclaw-env.mode = "0444";
+    forgejo-mcp-env.mode = "0444";
   };
 
   # Enable Podman
@@ -76,6 +77,7 @@
         # Mount SOPS secrets directly
         "${config.sops.secrets.openclaw-env.path}:/home/node/.openclaw/.env:ro"
         "${config.sops.secrets.openclaw-telegram-token.path}:/home/node/.openclaw/secrets/telegram-token:ro"
+        "${config.sops.secrets.forgejo-mcp-env.path}:/home/node/.openclaw/secrets/forgejo-mcp-env:ro"
       ];
 
       environment = {
