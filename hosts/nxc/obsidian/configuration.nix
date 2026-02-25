@@ -99,10 +99,13 @@
     };
   };
 
+  systemd.tmpfiles.rules = [
+    "d /var/lib/obsidian-vault 0755 syncthing syncthing -"
+  ];
+
   services.syncthing = {
     enable = true;
-    user = "root";
-    dataDir = "/root";
+    dataDir = "/var/lib/obsidian-vault";
     guiAddress = "0.0.0.0:8384";
     overrideDevices = false;  # Don't reset devices on rebuild
     overrideFolders = false;  # Don't reset folders on rebuild
@@ -112,7 +115,24 @@
     };
   };
 
-  networking.firewall.allowedTCPPorts = [ 8080 ];
+  # Serve .ics calendar files from the Obsidian vault
+  services.nginx = {
+    enable = true;
+    virtualHosts."ics" = {
+      listen = [{ addr = "0.0.0.0"; port = 8081; }];
+      locations."~ \\.ics$" = {
+        root = "/var/lib/obsidian-vault/MontyVault";
+      };
+      locations."/" = {
+        return = "403";
+      };
+    };
+  };
+
+  networking.firewall.allowedTCPPorts = [
+    8080  # TaskNotes MCP server (Obsidian plugin)
+    8081  # nginx - .ics calendar files
+  ];
 
   system.stateVersion = "25.11";
 }

@@ -39,6 +39,8 @@
     group = "users";
     dataDir = "/var/lib/syncthing";
     guiAddress = "0.0.0.0:8384";
+    overrideDevices = false;
+    overrideFolders = false;
     settings.gui = {
       user = "patrick";
       password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
@@ -66,7 +68,7 @@
   virtualisation.oci-containers = {
     backend = "podman";
     containers.openclaw = {
-      image = "ghcr.io/openclaw/openclaw:latest";
+      image = "ghcr.io/openclaw/openclaw:2026.2.23";
       ports = [ "18789:18789" ];
 
       volumes = [

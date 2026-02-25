@@ -31,6 +31,7 @@ in
     pkgs-unstable.nodejs_22 #required for claude-code
     pkgs-unstable.opencode
     pkgs-unstable.freecad
+    pkgs-unstable.telegram-desktop
   ];
 
   services.flatpak.enable = true;
