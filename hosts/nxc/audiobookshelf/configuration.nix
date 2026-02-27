@@ -11,10 +11,7 @@
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
-  extra-services.mount_media = {
-    enable = true;
-    readOnly = true;
-  };
+  extra-services.mount_media.enable = true;
 
   sops = {
     secrets = {
@@ -36,6 +33,7 @@
   systemd.tmpfiles.rules = [
     "d /var/lib/audiobookshelf/config 0755 root root -"
     "d /var/lib/audiobookshelf/metadata 0755 root root -"
+    "d /mnt/media 0755 root root -"
   ];
 
   virtualisation.oci-containers = {
@@ -47,7 +45,7 @@
         volumes = [
           "/var/lib/audiobookshelf/config:/config"
           "/var/lib/audiobookshelf/metadata:/metadata"
-          "/mnt/media/audiobooks:/audiobooks"
+          "/mnt/media/audiobooks:/mnt/media/audiobooks"
         ];
         environment = {
           TZ = "America/New_York";
