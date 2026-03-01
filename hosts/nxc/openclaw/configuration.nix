@@ -11,6 +11,12 @@
 
   environment.systemPackages = with pkgs; [ jq just ];
 
+  extra-services.tailscale = {
+    enable = true;
+    lxc = true;
+  };
+  extra-services.host-checkin.enable = true;
+
   # OpenClaw justfile for common commands
   environment.etc."openclaw/justfile".source = ./justfile;
 
