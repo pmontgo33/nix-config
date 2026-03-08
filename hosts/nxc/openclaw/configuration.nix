@@ -16,6 +16,7 @@
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
+  extra-services.obsidian.enable = true;
 
   # OpenClaw justfile for common commands
   environment.etc."openclaw/justfile".source = ./justfile;
@@ -75,7 +76,7 @@
   virtualisation.oci-containers = {
     backend = "podman";
     containers.openclaw = {
-      image = "ghcr.io/openclaw/openclaw:2026.2.23";
+      image = "ghcr.io/openclaw/openclaw:2026.2.26";
       ports = [ "18789:18789" ];
 
       volumes = [

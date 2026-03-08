@@ -157,3 +157,7 @@ pull:
 # Update container (pull + restart)
 update: pull restart
     @echo "OpenClaw updated"
+
+# Fix fish autocomplete error
+fish:
+  true
