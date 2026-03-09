@@ -19,7 +19,6 @@
 
   services.ollama = {
     enable = true;
-    package = pkgs.ollama-vulkan;
     host = "0.0.0.0";
     openFirewall = true;
   };
@@ -29,10 +28,42 @@
     extraPackages = with pkgs; [
       intel-media-driver
       intel-compute-runtime
+      mesa.drivers
+      vulkan-loader
+      # intel-level-zero-gpu
     ];
   };
 
-  networking.firewall.allowedTCPPorts = [ 11434 ];
+  environment.sessionVariables = {
+    VK_ICD_FILENAMES = "${pkgs.mesa.drivers}/share/vulkan/icd.d/intel_icd.x86_64.json";
+  };
 
-  system.stateVersion = "25.05";
+  systemd.services.ollama.environment = {
+    VK_ICD_FILENAMES = "${pkgs.mesa.drivers}/share/vulkan/icd.d/intel_icd.x86_64.json";
+  };
+
+  users.users.ollama = {
+    isNormalUser = true;
+    group = "ollama";
+    extraGroups = [ "video" "render" ];
+  };
+  users.groups.ollama = {};
+  users.groups.renderaccess = {
+    gid = 104;
+    members = [ "ollama" ];
+  };
+
+  # Open WebUI (native)
+  services.open-webui = {
+    enable = true;
+    port = 3000;
+    host = "0.0.0.0";
+    environment = {
+      OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+    };
+  };
+
+  networking.firewall.allowedTCPPorts = [ 11434 3000 ];
+
+  system.stateVersion = "25.11";
 }
