@@ -43,7 +43,7 @@
   virtualisation.oci-containers = {
     backend = "podman";
     containers.frigate = {
-      image = "ghcr.io/blakeblackshear/frigate:stable";
+      image = "ghcr.io/blakeblackshear/frigate:0.17.0";
 
       # Use host network mode for easier access to go2rtc
       extraOptions = [

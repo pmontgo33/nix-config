@@ -40,7 +40,7 @@
     backend = "podman";
     containers = {
       grist = {
-        image = "gristlabs/grist:latest";
+        image = "gristlabs/grist:v1.7.11";
         autoStart = true;
         ports = [
           "8484:8484"
