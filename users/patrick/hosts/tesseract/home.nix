@@ -30,6 +30,7 @@ in
     pkgs-unstable.claude-code
     pkgs-unstable.nodejs_22 #required for claude-code
     pkgs-unstable.opencode
+    pkgs-unstable.opencode-desktop
     pkgs-unstable.freecad
     pkgs-unstable.telegram-desktop
   ];

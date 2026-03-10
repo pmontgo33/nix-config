@@ -820,7 +820,7 @@
           {
             "Paperless-ngx" = {
               href = "https://paperless.montycasa.net";
-              siteMonitor = "https://paperless-ngx.montycasa.net";
+              siteMonitor = "https://paperless.montycasa.net";
               icon = "sh-paperless-ngx.svg";
             };
           }

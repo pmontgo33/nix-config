@@ -122,18 +122,17 @@
     containers.paperless-ai = {
       image = "clusterzx/paperless-ai:latest";
 
-      ports = [
-        "3000:3000"  # Paperless-ai Web UI (setup and management)
-        "8000:8000"  # Paperless-ai RAG API port
-      ];
+      # Ports 3000 (web UI) and 8000 (RAG API) are exposed directly via --network=host
 
       volumes = [
         "/mnt/general/paperless-ngx/media:/data/media:ro"  # Read-only access to paperless documents on NFS
         "/var/lib/paperless-ai:/data/models"               # Storage for AI models
       ];
 
+      extraOptions = [ "--network=host" ];
+
       environment = {
-        # Paperless-ngx connection
+        # Paperless-ngx connection (using localhost since we're on host network)
         PAPERLESS_URL = "http://localhost:28981";
 
         # OpenAI API configuration (if using OpenAI)

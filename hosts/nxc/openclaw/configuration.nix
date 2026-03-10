@@ -85,7 +85,11 @@
       image = "ghcr.io/openclaw/openclaw:2026.2.26";
       ports = [ "18789:18789" ];
 
+      entrypoint = "/init.sh";
+      cmd = [ "node" "openclaw.mjs" "gateway" "--allow-unconfigured" ];
+
       volumes = [
+        "${./init.sh}:/init.sh:ro"
         "/var/lib/openclaw:/home/node/.openclaw"
         # Mount SOPS secrets directly
         "${config.sops.secrets.openclaw-env.path}:/home/node/.openclaw/.env:ro"
