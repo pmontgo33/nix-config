@@ -109,8 +109,8 @@
 
       # AI configuration - points to paperless-ai container
       # Uncomment once paperless-ai is configured
-      # PAPERLESS_AI_ENABLED = true;
-      # PAPERLESS_AI_URL = "http://localhost:8000";
+      PAPERLESS_AI_ENABLED = true;
+      PAPERLESS_AI_URL = "http://localhost:8000";
     };
   };
 
@@ -139,8 +139,8 @@
         # OPENAI_API_KEY will be loaded from environment file
 
         # Or use local models (ollama, etc.)
-        # MODEL_BACKEND = "ollama";
-        # OLLAMA_URL = "http://host.docker.internal:11434";
+        MODEL_BACKEND = "ollama";
+        OLLAMA_URL = "http://192.168.86.113:11434";
       };
 
       # Use sops secret for API token
