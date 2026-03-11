@@ -40,6 +40,11 @@ in
         DISABLE_REGISTRATION = true;
       };
 
+      actions = {
+        ENABLED = true;
+        DEFAULT_ACTIONS_URL = "github";
+      };
+
       # Add other settings from old app.ini here
     };
   };

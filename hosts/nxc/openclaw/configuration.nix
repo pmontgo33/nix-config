@@ -95,6 +95,9 @@
         "${config.sops.secrets.openclaw-env.path}:/home/node/.openclaw/.env:ro"
         "${config.sops.secrets.openclaw-telegram-token.path}:/home/node/.openclaw/secrets/telegram-token:ro"
         "${config.sops.secrets.forgejo-mcp-env.path}:/home/node/.openclaw/secrets/forgejo-mcp-env:ro"
+        # Bind-mount rsync from NixOS host
+        "/nix/store:/nix/store:ro"
+        "${pkgs.rsync}/bin/rsync:/usr/local/bin/rsync:ro"
       ];
 
       environment = {
