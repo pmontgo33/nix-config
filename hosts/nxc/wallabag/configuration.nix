@@ -48,7 +48,7 @@
 
     # Wallabag application
     containers.wallabag = {
-      image = "wallabag/wallabag:latest";
+      image = "wallabag/wallabag:2.6.14";
 
       ports = [
         "8080:80"
