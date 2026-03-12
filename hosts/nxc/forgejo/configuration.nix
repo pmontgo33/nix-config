@@ -9,9 +9,14 @@ in
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
   ];
 
+  virtualisation.podman = {
+    enable = true;
+    dockerCompat = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
   environment.systemPackages = with pkgs; [
-    # git
-    # gitAndTools.git-lfs
+    forgejo-runner
   ];
 
   services.openssh.enable = true;
@@ -47,6 +52,22 @@ in
 
       # Add other settings from old app.ini here
     };
+  };
+
+  services.gitea-actions-runner.instances.default = {
+    enable = true;
+    name = "forgejo-runner";
+    url = "http://192.168.86.120:3000";
+    tokenFile = config.sops.secrets.forgejo-runner-token.path;
+    labels = [
+      "ubuntu-latest:docker://node:18-bullseye"
+      "nixos:host"
+    ];
+  };
+
+  sops.secrets."forgejo-runner-token" = {
+    mode = "0400";
+    restartUnits = [ "gitea-runner-default.service" ];
   };
 
   # forgejo-mcp: MCP server for AI tools to interact with Forgejo
