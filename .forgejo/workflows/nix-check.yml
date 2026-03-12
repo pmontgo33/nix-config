@@ -1,0 +1,12 @@
+name: Nix Flake Check
+
+on:
+  pull_request:
+
+jobs:
+  flake-check:
+    runs-on: nixos:host
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          nix flake check --show-trace
