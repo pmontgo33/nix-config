@@ -40,7 +40,7 @@
     backend = "podman";
     containers = {
       audiobookshelf = {
-        image = "ghcr.io/advplyr/audiobookshelf:v2.32.1";
+        image = "ghcr.io/advplyr/audiobookshelf:2.32.1";
         ports = [ "13378:80" ];
         volumes = [
           "/var/lib/audiobookshelf/config:/config"
