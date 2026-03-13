@@ -63,6 +63,17 @@ in
       "ubuntu-latest:docker://node:18-bullseye"
       "nixos:host"
     ];
+    hostPackages = with pkgs; [
+      bash
+      coreutils
+      curl
+      gawk
+      gitMinimal
+      gnused
+      nix
+      nodejs
+      wget
+    ];
   };
 
   sops.secrets."forgejo-runner-token" = {
