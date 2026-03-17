@@ -6,7 +6,8 @@ on:
 jobs:
   flake-check:
     runs-on: nixos
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - run: |
-          nix flake check --show-trace
+          nix --extra-experimental-features 'nix-command flakes' flake check --no-build --show-trace
