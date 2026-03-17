@@ -98,6 +98,7 @@
         # Bind-mount rsync from NixOS host
         "/nix/store:/nix/store:ro"
         "${pkgs.rsync}/bin/rsync:/usr/local/bin/rsync:ro"
+        "${pkgs.nix}/bin/nix:/usr/local/bin/nix:ro"
       ];
 
       environment = {
