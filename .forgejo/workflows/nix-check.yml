@@ -10,4 +10,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          nix --extra-experimental-features 'nix-command flakes' flake check --no-build --show-trace
+          set -euo pipefail
+
+          hosts="$(sed -n 's/^[[:space:]]*nixosConfigurations\.\([a-zA-Z0-9_-]\+\)[[:space:]]*=.*/\1/p' flake.nix)"
+
+          echo "Checking nixosConfigurations one-by-one..."
+          for host in $hosts; do
+            echo " - $host"
+            nix --extra-experimental-features 'nix-command flakes' \
+              eval ".#nixosConfigurations.${host}.config.system.build.toplevel.drvPath" \
+              --show-trace > /dev/null
+          done
