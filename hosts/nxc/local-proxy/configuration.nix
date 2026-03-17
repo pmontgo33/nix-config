@@ -156,6 +156,11 @@
         protocol = "http"; 
         upstream = "192.168.86.99:20910"; 
       };
+
+      "openclaw.montycasa.net" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.136:18789"; 
+      };
     };
 
     # layer4SniServices = {
