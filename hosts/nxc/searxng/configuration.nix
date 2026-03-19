@@ -1,5 +1,8 @@
 { config, pkgs, modulesPath, inputs, outputs, ... }:
 
+let
+  searxng = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.searxng;
+in
 {
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
@@ -18,19 +21,19 @@
   # Native NixOS SearXNG service (no OCI container)
   services.searx = {
     enable = true;
-    package = pkgs.searxng;
+    package = searxng;
     redisCreateLocally = true;
 
     settings = {
       server = {
         bind_address = "0.0.0.0";
         port = 8080;
-        base_url = "http://searxng.montycasa.com/";
+        base_url = "http://search.montycasa.net/";
       };
 
-      search = {
-        safe_search = 1;
-      };
+      # search = {
+      #   safe_search = 1;
+      # };
     };
   };
 

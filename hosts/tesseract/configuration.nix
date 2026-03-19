@@ -79,8 +79,8 @@
       options i915 enable_fbc=1
 
       # Bluetooth fixes for resume from suspend/hibernate
-      # Aggressive power management disable to prevent HCI errors
-      options btusb enable_autosuspend=0 reset_resume=1
+      # Keep autosuspend disabled here; current kernels ignore btusb.reset_resume.
+      options btusb enable_autosuspend=0
       options bluetooth disable_ertm=1
 
       # Intel WiFi (iwlwifi) fixes for resume from suspend/hibernate
@@ -275,9 +275,12 @@
 
     # udev rules for better power management
     udev.extraRules = ''
-      # Disable Bluetooth autosuspend to prevent resume issues
-      # TEST condition ensures power/control exists before setting it
-      ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="8087", ATTRS{idProduct}=="0aaa", TEST=="power/control", ATTR{power/control}="on"
+      # Disable autosuspend for the internal Bluetooth adapter and fingerprint reader.
+      # TEST ensures the attribute exists before we try to write it.
+      ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0aaa", TEST=="power/control", ATTR{power/control}="on"
+      ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0aaa", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
+      ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="06cb", ATTR{idProduct}=="00bd", TEST=="power/control", ATTR{power/control}="on"
+      ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="06cb", ATTR{idProduct}=="00bd", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
       ACTION=="add", SUBSYSTEM=="usb", DRIVER=="btusb", TEST=="power/control", ATTR{power/control}="on"
       ACTION=="add", SUBSYSTEM=="bluetooth", TEST=="power/control", ATTR{power/control}="on"
     '';
@@ -330,18 +333,62 @@
     "d /home/.snapshots 0755 root root -"
   ];
 
-  # Fix Bluetooth and fingerprint reader after resume from sleep/hibernate
+  # Prepare Bluetooth and the Synaptics fingerprint reader for suspend/hibernate.
+  # Starting fprintd from a system-sleep hook causes it to race the active sleep
+  # transaction, so we stop it before sleep and let normal D-Bus activation bring
+  # it back after resume.
   environment.etc."systemd/system-sleep/fix-bluetooth-fprintd".source = pkgs.writeShellScript "fix-bluetooth-fprintd" ''
-    #!/bin/sh
-    # Fix Bluetooth and fingerprint reader on resume
+    set -eu
+
+    sleep_bin="${pkgs.coreutils}/bin/sleep"
+    systemctl_bin="${pkgs.systemd}/bin/systemctl"
+
+    find_usb_device() {
+      wanted_vendor="$1"
+      wanted_product="$2"
+
+      for dev in /sys/bus/usb/devices/*; do
+        [ -f "$dev/idVendor" ] || continue
+
+        read -r vendor < "$dev/idVendor" || continue
+        read -r product < "$dev/idProduct" || continue
+
+        [ "$vendor" = "$wanted_vendor" ] || continue
+        [ "$product" = "$wanted_product" ] || continue
+
+        printf '%s\n' "''${dev##*/}"
+        return 0
+      done
+
+      return 1
+    }
+
+    set_usb_power_policy() {
+      dev="$1"
+      dev_path="/sys/bus/usb/devices/$dev"
+
+      [ -d "$dev_path" ] || return 0
+      [ -w "$dev_path/power/control" ] && printf 'on\n' > "$dev_path/power/control" || true
+      [ -w "$dev_path/power/autosuspend" ] && printf '%s\n' '-1' > "$dev_path/power/autosuspend" || true
+    }
+
     case $1 in
+      pre)
+        "$systemctl_bin" stop fprintd.service || true
+        "$systemctl_bin" stop bluetooth.service || true
+        ;;
       post)
         # Wait a bit for devices to settle
-        sleep 2
-        # Restart Bluetooth to fix HCI errors
-        systemctl restart bluetooth.service
-        # Restart fingerprint reader
-        systemctl restart fprintd.service
+        "$sleep_bin" 2
+
+        bluetooth_usb_device="$(find_usb_device 8087 0aaa || true)"
+        fingerprint_usb_device="$(find_usb_device 06cb 00bd || true)"
+
+        [ -n "$bluetooth_usb_device" ] && set_usb_power_policy "$bluetooth_usb_device"
+        [ -n "$fingerprint_usb_device" ] && set_usb_power_policy "$fingerprint_usb_device"
+
+        "$systemctl_bin" reset-failed bluetooth.service fprintd.service || true
+        "$systemctl_bin" start bluetooth.service || true
         ;;
     esac
   '';
