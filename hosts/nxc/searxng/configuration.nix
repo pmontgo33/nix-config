@@ -39,9 +39,9 @@ in
         secret_key = "$SEARX_SECRET_KEY";
       };
 
-      # search = {
-      #   safe_search = 1;
-      # };
+      search = {
+        formats = [ "html" "json" ];
+      };
     };
   };
 
