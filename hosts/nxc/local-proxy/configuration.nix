@@ -161,6 +161,11 @@
         protocol = "http"; 
         upstream = "192.168.86.136:18789"; 
       };
+
+      "search.montycasa.net" = { 
+        protocol = "http"; 
+        upstream = "192.168.86.137:8080"; 
+      };
     };
 
     # layer4SniServices = {

@@ -10,7 +10,7 @@ let
       "github.com/caddy-dns/cloudflare@v0.2.2"
       "github.com/mholt/caddy-l4@v0.0.0-20251201210923-0c96591f5650"
     ];
-    hash = "sha256-CYdeRTy9OppOTYSYnavNLseGzXI1EoqBmb0wm16cX3g=";
+    hash = "sha256-T1M5pq8pZJ1xXZ9R7eTZyKDXqmyJq/EIv5sXmKhWIAg=";
   };
 
   cfTls = ''

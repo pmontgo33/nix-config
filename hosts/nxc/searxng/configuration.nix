@@ -18,17 +18,25 @@ in
 
   services.openssh.enable = true;
 
+  sops.secrets."searxng-env" = {
+    mode = "0400";
+    owner = "searx";
+    group = "searx";
+  };
+
   # Native NixOS SearXNG service (no OCI container)
   services.searx = {
     enable = true;
     package = searxng;
     redisCreateLocally = true;
+    environmentFile = config.sops.secrets."searxng-env".path;
 
     settings = {
       server = {
         bind_address = "0.0.0.0";
         port = 8080;
         base_url = "http://search.montycasa.net/";
+        secret_key = "$SEARX_SECRET_KEY";
       };
 
       # search = {
