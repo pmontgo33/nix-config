@@ -1,6 +1,10 @@
 { lib
 , fetchurl
 , appimageTools
+, writeText
+, dejavu_fonts
+, runCommand
+, fontconfig
 }:
 
 let
@@ -15,6 +19,18 @@ let
   appimageContents = appimageTools.extractType1 {
     inherit pname version src;
   };
+
+  # Self-contained fontconfig that does NOT include /etc/fonts/conf.d or use
+  # the user's ~/.cache/fontconfig. This avoids a SIGSEGV in Pango's
+  # ensure_faces triggered by the NixOS host fontconfig inside the bwrap sandbox.
+  fontsConf = writeText "elegoo-slicer-fonts.conf" ''
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+    <fontconfig>
+      <dir>${dejavu_fonts}/share/fonts</dir>
+      <cachedir>/tmp/elegoo-slicer-fontconfig-cache</cachedir>
+    </fontconfig>
+  '';
 in
 appimageTools.wrapType1 rec {
   inherit pname version src;
@@ -34,6 +50,13 @@ appimageTools.wrapType1 rec {
     glib
     glibc
   ];
+
+  # Point fontconfig at our self-contained config instead of the host NixOS one,
+  # which triggers SIGSEGV in Pango's ensure_faces when opening GTK file dialogs
+  extraPreBwrapCmds = ''
+    export FONTCONFIG_FILE=${fontsConf}
+    export FONTCONFIG_SYSROOT=""
+  '';
 
   extraInstallCommands = ''
     install -Dm444 ${appimageContents}/ElegooSlicer.desktop $out/share/applications/elegoo-slicer.desktop
