@@ -100,6 +100,10 @@
       # Enable consumption directory polling
       PAPERLESS_CONSUMER_POLLING = 60;
 
+      # Wait 30 seconds after detecting a file before processing
+      # Helps with large files on NFS that take time to fully write
+      PAPERLESS_CONSUMER_INOTIFY_DELAY = 30;
+
       # Use scratch directory on same filesystem as media/consume to avoid
       # PrivateTmp isolation issues with temp files
       PAPERLESS_SCRATCH_DIR = "/mnt/general/paperless-ngx/scratch";
