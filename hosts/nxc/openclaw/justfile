@@ -86,6 +86,24 @@ clawhub-list:
 clawhub-login:
     podman exec -it openclaw npx clawhub login
 
+# === Skills ===
+
+# List installed skills
+skills:
+    podman exec openclaw node /app/openclaw.mjs skills list
+
+# Search skills
+skills-search query:
+    podman exec openclaw node /app/openclaw.mjs skills search "{{query}}"
+
+# Show skill details
+skills-info name:
+    podman exec openclaw node /app/openclaw.mjs skills info {{name}}
+
+# Check skills status
+skills-check:
+    podman exec openclaw node /app/openclaw.mjs skills check
+
 # === Channels ===
 
 # List configured channels
@@ -96,15 +114,45 @@ channels:
 channels-status:
     podman exec openclaw node /app/openclaw.mjs channels status
 
+# Show channel logs
+channels-logs:
+    podman exec openclaw node /app/openclaw.mjs channels logs
+
+# Add a channel (interactive)
+channels-add channel:
+    podman exec -it openclaw node /app/openclaw.mjs channels add --channel {{channel}}
+
+# === Nodes ===
+
+# List connected nodes
+nodes:
+    podman exec openclaw node /app/openclaw.mjs nodes status
+
 # === Models ===
 
 # List available models
 models:
     podman exec openclaw node /app/openclaw.mjs models list
 
+# Show model status (auth, expiry)
+models-status:
+    podman exec openclaw node /app/openclaw.mjs models status
+
 # Scan for models
 models-scan:
     podman exec -it openclaw node /app/openclaw.mjs models scan
+
+# === Health & Status ===
+
+# Check gateway health
+health:
+    podman exec openclaw node /app/openclaw.mjs health
+
+# === Sessions ===
+
+# List sessions
+sessions:
+    podman exec openclaw node /app/openclaw.mjs sessions
 
 # === Cron ===
 
@@ -116,6 +164,10 @@ cron-list:
 cron-show job:
     podman exec openclaw node /app/openclaw.mjs cron show {{job}}
 
+# Show cron status
+cron-status:
+    podman exec openclaw node /app/openclaw.mjs cron status
+
 # === Config ===
 
 # Show current config
@@ -126,6 +178,14 @@ config:
 config-edit:
     $EDITOR /var/lib/openclaw/openclaw.json
 
+# Validate config
+config-validate:
+    podman exec openclaw node /app/openclaw.mjs config validate
+
+# Get a config value
+config-get path:
+    podman exec openclaw node /app/openclaw.mjs config get {{path}}
+
 # === Data ===
 
 # Show data directory contents
@@ -135,6 +195,36 @@ data:
 # Show workspace contents
 workspace:
     ls -la /var/lib/openclaw/workspace/
+
+# === Pairing ===
+
+# List pending pairing requests
+pairing:
+    podman exec openclaw node /app/openclaw.mjs pairing list
+
+# Approve a pairing request
+pairing-approve channel code:
+    podman exec openclaw node /app/openclaw.mjs pairing approve {{channel}} {{code}}
+
+# === Browser ===
+
+# Start browser
+browser-start:
+    podman exec openclaw node /app/openclaw.mjs browser start
+
+# Stop browser
+browser-stop:
+    podman exec openclaw node /app/openclaw.mjs browser stop
+
+# Show browser tabs
+browser-tabs:
+    podman exec openclaw node /app/openclaw.mjs browser tabs
+
+# === Gateway ===
+
+# Probe gateway
+gateway-probe:
+    podman exec openclaw node /app/openclaw.mjs gateway probe
 
 # === Backup ===
 
@@ -158,6 +248,22 @@ pull:
 update: pull restart
     @echo "OpenClaw updated"
 
+# Run openclaw update (in-container update)
+update-cli:
+    podman exec openclaw node /app/openclaw.mjs update
+
 # Fix fish autocomplete error
 fish:
   true
+
+# === TUI ===
+
+# Open terminal UI
+tui:
+    podman exec -it openclaw node /app/openclaw.mjs tui
+
+# === Agents ===
+
+# List agents
+agents:
+    podman exec openclaw node /app/openclaw.mjs agents list
