@@ -82,7 +82,7 @@
   virtualisation.oci-containers = {
     backend = "podman";
     containers.openclaw = {
-      image = "ghcr.io/openclaw/openclaw:2026.3.13-1";
+      image = "ghcr.io/openclaw/openclaw:2026.3.23";
       ports = [ "18789:18789" ];
 
       entrypoint = "/init.sh";
@@ -98,7 +98,6 @@
         # Bind-mount rsync from NixOS host
         "/nix/store:/nix/store:ro"
         "${pkgs.rsync}/bin/rsync:/usr/local/bin/rsync:ro"
-        "${pkgs.nix}/bin/nix:/usr/local/bin/nix:ro"
       ];
 
       environment = {
