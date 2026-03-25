@@ -1,5 +1,11 @@
 { config, pkgs, modulesPath, inputs, outputs, ... }:
 
+let
+  pkgs-unstable = import inputs.nixpkgs-unstable {
+    system = pkgs.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+in
 {
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
@@ -15,6 +21,7 @@
     python311
     python311Packages.requests
     python311Packages.pip
+    pkgs-unstable.claude-code
   ];
 
   extra-services.tailscale = {
