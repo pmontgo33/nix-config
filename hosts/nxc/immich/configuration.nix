@@ -30,7 +30,7 @@
   # # Create necessary directories
   systemd.tmpfiles.rules = [
     "d /mnt/home_media 0755 root root -"
-    "Z /mnt/home_media/immich 0750 immich immich -"
+    "z /mnt/home_media/immich 0750 immich immich -"
   ];
 
   # Immich service configuration
@@ -91,7 +91,7 @@
         "b737f3d1-ffff-4731-8644-3a30c8d8a9d2" #Fourth
         "67da8aa8-17be-40f6-a7e8-6135aa188572" #Dog
       ];
-      # memories =  true;
+      # memories = true;
       layout = "splitview";
       show_image_date = true;
       image_date_format = "M/D/YYYY";
