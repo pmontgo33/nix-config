@@ -129,22 +129,23 @@
       # Ports 3000 (web UI) and 8000 (RAG API) are exposed directly via --network=host
 
       volumes = [
-        "/mnt/general/paperless-ngx/media:/data/media:ro"  # Read-only access to paperless documents on NFS
-        "/var/lib/paperless-ai:/data/models"               # Storage for AI models
+        "/mnt/general/paperless-ngx/media:/app/data/media:ro"  # Read-only access to paperless documents on NFS
+        "/var/lib/paperless-ai:/app/data"                     # Persistent storage for app data, models, and database
       ];
 
       extraOptions = [ "--network=host" ];
 
       environment = {
-        # Paperless-ngx connection (using localhost since we're on host network)
-        PAPERLESS_URL = "http://localhost:28981";
+        # Paperless-ngx connection — app expects PAPERLESS_API_URL with /api suffix
+        PAPERLESS_API_URL = "http://localhost:28981/api";
 
-        # OpenAI API configuration (if using OpenAI)
-        # OPENAI_API_KEY will be loaded from environment file
+        # Paperless username for the API token owner
+        PAPERLESS_USERNAME = "admin";
 
-        # Or use local models (ollama, etc.)
-        MODEL_BACKEND = "ollama";
-        OLLAMA_URL = "http://192.168.86.113:11434";
+        # AI provider configuration
+        AI_PROVIDER = "ollama";
+        OLLAMA_API_URL = "http://192.168.86.113:11434";
+        OLLAMA_MODEL = "mistral:latest";
       };
 
       # Use sops secret for API token
@@ -161,6 +162,17 @@
     "d /mnt/general/paperless-ngx/scratch 0750 paperless paperless -"
   ];
 
+  # Paperless services require the NFS mount before starting.
+  # Without this they race against the mount on boot and fail with NAMESPACE errors.
+  systemd.services.paperless-scheduler.requires = [ "mnt-general.mount" ];
+  systemd.services.paperless-scheduler.after = [ "mnt-general.mount" ];
+  systemd.services.paperless-task-queue.requires = [ "mnt-general.mount" ];
+  systemd.services.paperless-task-queue.after = [ "mnt-general.mount" ];
+  systemd.services.paperless-consumer.requires = [ "mnt-general.mount" ];
+  systemd.services.paperless-consumer.after = [ "mnt-general.mount" ];
+  systemd.services.paperless-web.requires = [ "mnt-general.mount" ];
+  systemd.services.paperless-web.after = [ "mnt-general.mount" ];
+
   # Allow paperless services to write to the scratch directory on NFS
   # (ProtectSystem=strict makes everything read-only except ReadWritePaths)
   systemd.services.paperless-scheduler.serviceConfig.ReadWritePaths = [ "/mnt/general/paperless-ngx/scratch" ];
@@ -168,10 +180,27 @@
   systemd.services.paperless-consumer.serviceConfig.ReadWritePaths = [ "/mnt/general/paperless-ngx/scratch" ];
   systemd.services.paperless-web.serviceConfig.ReadWritePaths = [ "/mnt/general/paperless-ngx/scratch" ];
 
+  # Write the .env file that paperless-ai reads for configuration.
+  # The app's isConfigured() check reads this file directly rather than process env.
+  systemd.services.paperless-ai-write-env = {
+    description = "Write paperless-ai .env configuration file";
+    wantedBy = [ "podman-paperless-ai.service" ];
+    before = [ "podman-paperless-ai.service" ];
+    after = [ "sops-install-secrets.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      TOKEN=$(grep PAPERLESS_API_TOKEN ${config.sops.secrets.paperless-ai-env.path} | cut -d= -f2)
+      printf 'PAPERLESS_API_URL=http://localhost:28981/api\nPAPERLESS_API_TOKEN=%s\nPAPERLESS_USERNAME=admin\nAI_PROVIDER=ollama\nOLLAMA_API_URL=http://192.168.86.113:11434\nOLLAMA_MODEL=mistral:latest\n' "$TOKEN" > /var/lib/paperless-ai/.env
+    '';
+  };
+
   # Ensure paperless-ai container starts after paperless service
   systemd.services.podman-paperless-ai = {
-    requires = [ "paperless-consumer.service" ];
-    after = [ "paperless-consumer.service" ];
+    requires = [ "paperless-consumer.service" "paperless-ai-write-env.service" ];
+    after = [ "paperless-consumer.service" "paperless-ai-write-env.service" ];
   };
 
   # Open firewall ports
