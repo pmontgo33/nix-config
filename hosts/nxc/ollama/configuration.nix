@@ -19,6 +19,7 @@
 
   services.ollama = {
     enable = true;
+    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.ollama;
     host = "0.0.0.0";
     openFirewall = true;
   };
