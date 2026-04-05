@@ -89,7 +89,7 @@ in
   virtualisation.oci-containers = {
     backend = "podman";
     containers.openclaw = {
-      image = "ghcr.io/openclaw/openclaw:2026.3.24";
+      image = "ghcr.io/openclaw/openclaw:2026.4.1";
       ports = [ "18789:18789" ];
 
       entrypoint = "/init.sh";
