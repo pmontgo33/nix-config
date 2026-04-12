@@ -143,7 +143,7 @@ in
           "minimax-portal/MiniMax-M2.5-highspeed".alias = "minimax-m2.5-highspeed";
           "minimax-portal/MiniMax-M2.5-Lightning".alias = "minimax-m2.5-lightning";
         };
-        workspace = "/home/node/.openclaw/workspace";
+        workspace = "/var/lib/openclaw/workspace";
         contextPruning = {
           mode = "cache-ttl";
           ttl = "4h";
