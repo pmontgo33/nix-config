@@ -19,7 +19,7 @@
 
   services.ollama = {
     enable = true;
-    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.ollama;
+    package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.ollama-vulkan;
     host = "0.0.0.0";
     openFirewall = true;
   };
@@ -41,6 +41,7 @@
 
   systemd.services.ollama.environment = {
     VK_ICD_FILENAMES = "${pkgs.mesa.drivers}/share/vulkan/icd.d/intel_icd.x86_64.json";
+    OLLAMA_NEW_ENGINE = "1";
   };
 
   users.users.ollama = {

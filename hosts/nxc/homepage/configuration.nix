@@ -457,10 +457,10 @@
             };
           }
           {
-            "Homelab 2.5GbE Mini Switch" = {
-              href = "http://192.168.86.3/";
-              siteMonitor = "http://192.168.86.3";
-              description = "2x10GbE SPF+ / 4x2.5GbE";
+            "Homelab 2.5GbE Switch" = {
+              href = "http://192.168.86.6/";
+              siteMonitor = "http://192.168.86.6";
+              description = "1x10GbE SPF+ / 8x2.5GbE";
               icon = "mdi-router-network";
             };
           }
@@ -469,6 +469,14 @@
               href = "http://192.168.86.4/";
               siteMonitor = "http://192.168.86.4";
               description = "1x10GbE SPF+ / 8x2.5GbE PoE";
+              icon = "mdi-router-network";
+            };
+          }
+          {
+            "Homelab 2.5GbE Mini Switch" = {
+              href = "http://192.168.86.3/";
+              siteMonitor = "http://192.168.86.3";
+              description = "2x10GbE SPF+ / 4x2.5GbE";
               icon = "mdi-router-network";
             };
           }
