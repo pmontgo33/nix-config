@@ -1,5 +1,12 @@
 # OpenClaw management commands (nix-openclaw native)
 
+# Use bash so we can source the env file (fish can't source KEY=value files)
+set shell := ["bash", "-c"]
+
+# Source secrets and set config path for CLI commands
+export OPENCLAW_CONFIG_PATH := "/etc/openclaw/openclaw.json"
+ocenv := "set -a; source /run/secrets/openclaw-env; set +a;"
+
 # Default: show available commands
 default:
     @just --list
@@ -36,137 +43,133 @@ logs-tail n="50":
 
 # Run openclaw CLI command
 cli *args:
-    openclaw {{args}}
+    {{ocenv}} openclaw {{args}}
 
 # Show OpenClaw version
 version:
-    openclaw --version
+    {{ocenv}} openclaw --version
 
 # Run OpenClaw doctor
 doctor:
-    openclaw doctor
+    {{ocenv}} openclaw doctor
 
 # Run onboarding
 onboard:
-    openclaw onboard
+    {{ocenv}} openclaw onboard
 
 # === ClawHub ===
 
 # Search ClawHub for skills
 clawhub-search query:
-    openclaw skills clawhub search "{{query}}"
+    {{ocenv}} openclaw skills clawhub search "{{query}}"
 
 # Install a ClawHub skill
 clawhub-install skill:
-    openclaw skills clawhub install {{skill}}
+    {{ocenv}} openclaw skills clawhub install {{skill}}
 
 # Update all ClawHub skills
 clawhub-update:
-    openclaw skills clawhub update --all
+    {{ocenv}} openclaw skills clawhub update --all
 
 # List installed skills
 clawhub-list:
-    openclaw skills clawhub list
+    {{ocenv}} openclaw skills clawhub list
 
 # Login to ClawHub
 clawhub-login:
-    openclaw skills clawhub login
+    {{ocenv}} openclaw skills clawhub login
 
 # === Skills ===
 
 # List installed skills
 skills:
-    openclaw skills list
+    {{ocenv}} openclaw skills list
 
 # Search skills
 skills-search query:
-    openclaw skills search "{{query}}"
+    {{ocenv}} openclaw skills search "{{query}}"
 
 # Show skill details
 skills-info name:
-    openclaw skills info {{name}}
+    {{ocenv}} openclaw skills info {{name}}
 
 # Check skills status
 skills-check:
-    openclaw skills check
+    {{ocenv}} openclaw skills check
 
 # === Channels ===
 
 # List configured channels
 channels:
-    openclaw channels list
+    {{ocenv}} openclaw channels list
 
 # Show channel status
 channels-status:
-    openclaw channels status
+    {{ocenv}} openclaw channels status
 
 # Show channel logs
 channels-logs:
-    openclaw channels logs
+    {{ocenv}} openclaw channels logs
 
 # Add a channel (interactive)
 channels-add channel:
-    openclaw channels add --channel {{channel}}
+    {{ocenv}} openclaw channels add --channel {{channel}}
 
 # === Nodes ===
 
 # List connected nodes
 nodes:
-    openclaw nodes status
+    {{ocenv}} openclaw nodes status
 
 # === Models ===
 
 # List available models
 models:
-    openclaw models list
+    {{ocenv}} openclaw models list
 
 # Show model status (auth, expiry)
 models-status:
-    openclaw models status
+    {{ocenv}} openclaw models status
 
 # Scan for models
 models-scan:
-    openclaw models scan
-
-# Scan for models
-models-scan:
-    openclaw models scan
+    {{ocenv}} openclaw models scan
 
 # === Health & Status ===
 
 # Check gateway health
 health:
-    openclaw health
+    {{ocenv}} openclaw health
 
 # === Sessions ===
 
 # List sessions
 sessions:
-    openclaw sessions list
+    {{ocenv}} openclaw sessions
 
 # === Pairing ===
 
 # List pending pairing requests
 pairing:
-    openclaw pairing list
+    {{ocenv}} openclaw pairing list
 
 # Approve a pairing request
 pairing-approve channel code:
-    openclaw pairing approve {{channel}} {{code}}
+    {{ocenv}} openclaw pairing approve {{channel}} {{code}}
 
 # === Cron ===
 
 # List cron jobs
 cron-list:
-    openclaw cron list
+    {{ocenv}} openclaw cron list
 
 # Show cron job details
 cron-show job:
-    openclaw cron show {{job}}
+    {{ocenv}} openclaw cron show {{job}}
 
 # Show cron status
 cron-status:
-    openclaw cron status
+    {{ocenv}} openclaw cron status
 
 # === Config ===
 
@@ -180,11 +183,11 @@ config-edit:
 
 # Validate config
 config-validate:
-    openclaw config validate
+    {{ocenv}} openclaw config validate
 
 # Get a config value
 config-get path:
-    openclaw config get {{path}}
+    {{ocenv}} openclaw config get {{path}}
 
 # === Data ===
 
@@ -194,37 +197,27 @@ data:
 
 # Show workspace contents
 workspace:
-    ls -la /home/node/.openclaw/workspace/
-
-# === Pairing ===
-
-# List pending pairing requests
-pairing:
-    openclaw pairing list
-
-# Approve a pairing request
-pairing-approve channel code:
-    openclaw pairing approve {{channel}} {{code}}
+    ls -la /var/lib/openclaw/workspace/
 
 # === Browser ===
 
 # Start browser
 browser-start:
-    openclaw browser start
+    {{ocenv}} openclaw browser start
 
 # Stop browser
 browser-stop:
-    openclaw browser stop
+    {{ocenv}} openclaw browser stop
 
 # Show browser tabs
 browser-tabs:
-    openclaw browser tabs
+    {{ocenv}} openclaw browser tabs
 
 # === Gateway ===
 
 # Probe gateway
 gateway-probe:
-    openclaw gateway probe
+    {{ocenv}} openclaw gateway probe
 
 # === Backup ===
 
@@ -246,19 +239,19 @@ update:
 
 # Run openclaw in-app update
 update-cli:
-    openclaw update
+    {{ocenv}} openclaw update
 
 # === TUI ===
 
 # Open terminal UI
 tui:
-    openclaw tui
+    {{ocenv}} openclaw tui
 
 # === Agents ===
 
 # List agents
 agents:
-    openclaw agents list
+    {{ocenv}} openclaw agents list
 
 
 

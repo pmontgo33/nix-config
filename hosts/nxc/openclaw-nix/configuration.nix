@@ -16,13 +16,14 @@ in
   networking.firewall.allowedTCPPorts = [ 8384 22000 18789 ];
   networking.firewall.allowedUDPPorts = [ 22000 21027 ];
 
-  environment.systemPackages = with pkgs; [ 
-    jq 
-    just 
+  environment.systemPackages = with pkgs; [
+    jq
+    just
     python311
     python311Packages.requests
     python311Packages.pip
     pkgs-unstable.claude-code
+    openclaw  # CLI on PATH for justfile commands
   ];
 
   extra-services.tailscale = {
