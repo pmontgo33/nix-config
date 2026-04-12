@@ -1,0 +1,231 @@
+# OpenClaw management commands (nix-openclaw native)
+
+# Default: show available commands
+default:
+    @just --list
+
+# === Service Management ===
+
+# Start OpenClaw gateway
+start:
+    systemctl start openclaw-gateway
+
+# Stop OpenClaw gateway
+stop:
+    systemctl stop openclaw-gateway
+
+# Restart OpenClaw gateway
+restart:
+    systemctl restart openclaw-gateway
+
+# Show service status
+status:
+    systemctl status openclaw-gateway --no-pager
+
+# === Logs ===
+
+# Follow gateway logs
+logs:
+    journalctl -u openclaw-gateway -f
+
+# Show last N lines of logs (default: 50)
+logs-tail n="50":
+    journalctl -u openclaw-gateway --no-pager -n {{n}}
+
+# === CLI ===
+
+# Run openclaw CLI command
+cli *args:
+    openclaw {{args}}
+
+# Show OpenClaw version
+version:
+    openclaw --version
+
+# Run OpenClaw doctor
+doctor:
+    openclaw doctor
+
+# === ClawHub ===
+
+# Search ClawHub for skills
+clawhub-search query:
+    openclaw skills clawhub search "{{query}}"
+
+# Install a ClawHub skill
+clawhub-install skill:
+    openclaw skills clawhub install {{skill}}
+
+# Update all ClawHub skills
+clawhub-update:
+    openclaw skills clawhub update --all
+
+# List installed skills
+clawhub-list:
+    openclaw skills clawhub list
+
+# Login to ClawHub
+clawhub-login:
+    openclaw skills clawhub login
+
+# === Skills ===
+
+# List installed skills
+skills:
+    openclaw skills list
+
+# Search skills
+skills-search query:
+    openclaw skills search "{{query}}"
+
+# Show skill details
+skills-info name:
+    openclaw skills info {{name}}
+
+# Check skills status
+skills-check:
+    openclaw skills check
+
+# === Channels ===
+
+# List configured channels
+channels:
+    openclaw channels list
+
+# Show channel status
+channels-status:
+    openclaw channels status
+
+# === Models ===
+
+# List available models
+models:
+    openclaw models list
+
+# Show model status (auth, expiry)
+models-status:
+    openclaw models status
+
+# Scan for models
+models-scan:
+    openclaw models scan
+
+# === Health & Status ===
+
+# Check gateway health
+health:
+    openclaw health
+
+# === Sessions ===
+
+# List sessions
+sessions:
+    openclaw sessions list
+
+# === Cron ===
+
+# List cron jobs
+cron-list:
+    openclaw cron list
+
+# Show cron job details
+cron-show job:
+    openclaw cron show {{job}}
+
+# Show cron status
+cron-status:
+    openclaw cron status
+
+# === Config ===
+
+# Show current config
+config:
+    cat /etc/openclaw/openclaw.json | jq
+
+# Edit config
+config-edit:
+    $EDITOR /etc/openclaw/openclaw.json
+
+# Validate config
+config-validate:
+    openclaw config validate
+
+# Get a config value
+config-get path:
+    openclaw config get {{path}}
+
+# === Data ===
+
+# Show state directory contents
+data:
+    ls -la /var/lib/openclaw/
+
+# Show workspace contents
+workspace:
+    ls -la /home/node/.openclaw/workspace/
+
+# === Pairing ===
+
+# List pending pairing requests
+pairing:
+    openclaw pairing list
+
+# Approve a pairing request
+pairing-approve channel code:
+    openclaw pairing approve {{channel}} {{code}}
+
+# === Browser ===
+
+# Start browser
+browser-start:
+    openclaw browser start
+
+# Stop browser
+browser-stop:
+    openclaw browser stop
+
+# Show browser tabs
+browser-tabs:
+    openclaw browser tabs
+
+# === Gateway ===
+
+# Probe gateway
+gateway-probe:
+    openclaw gateway probe
+
+# === Backup ===
+
+# Create a backup of OpenClaw data
+backup name="openclaw-backup":
+    tar -czvf /tmp/{{name}}-$(date +%Y%m%d-%H%M%S).tar.gz -C /var/lib/openclaw .
+    @echo "Backup created at /tmp/{{name}}-$(date +%Y%m%d-%H%M%S).tar.gz"
+
+# === Maintenance ===
+
+# Clear stale session locks
+clear-locks:
+    rm -f /var/lib/openclaw/agents/*/sessions/*.lock
+    @echo "Session locks cleared"
+
+# Update openclaw (nixos-rebuild)
+update:
+    @echo "Run 'nixos-rebuild switch --flake .' to update OpenClaw"
+
+# === TUI ===
+
+# Open terminal UI
+tui:
+    openclaw tui
+
+# === Agents ===
+
+# List agents
+agents:
+    openclaw agents list
+
+# === Fish shell ===
+
+# Fix fish autocomplete error
+fish:
+  true
