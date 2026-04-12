@@ -731,6 +731,7 @@
     nixosConfigurations.openclaw-nix = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
+        { nixpkgs.overlays = [ nix-openclaw.overlays.default ]; }
         ./hosts/nxc/openclaw-nix
         sops-nix.nixosModules.sops
 

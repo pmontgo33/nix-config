@@ -46,6 +46,10 @@ version:
 doctor:
     openclaw doctor
 
+# Run onboarding
+onboard:
+    openclaw onboard
+
 # === ClawHub ===
 
 # Search ClawHub for skills
@@ -96,6 +100,20 @@ channels:
 channels-status:
     openclaw channels status
 
+# Show channel logs
+channels-logs:
+    openclaw channels logs
+
+# Add a channel (interactive)
+channels-add channel:
+    openclaw channels add --channel {{channel}}
+
+# === Nodes ===
+
+# List connected nodes
+nodes:
+    openclaw nodes status
+
 # === Models ===
 
 # List available models
@@ -105,6 +123,10 @@ models:
 # Show model status (auth, expiry)
 models-status:
     openclaw models status
+
+# Scan for models
+models-scan:
+    openclaw models scan
 
 # Scan for models
 models-scan:
@@ -121,6 +143,16 @@ health:
 # List sessions
 sessions:
     openclaw sessions list
+
+# === Pairing ===
+
+# List pending pairing requests
+pairing:
+    openclaw pairing list
+
+# Approve a pairing request
+pairing-approve channel code:
+    openclaw pairing approve {{channel}} {{code}}
 
 # === Cron ===
 
@@ -212,6 +244,10 @@ clear-locks:
 update:
     @echo "Run 'nixos-rebuild switch --flake .' to update OpenClaw"
 
+# Run openclaw in-app update
+update-cli:
+    openclaw update
+
 # === TUI ===
 
 # Open terminal UI
@@ -223,6 +259,8 @@ tui:
 # List agents
 agents:
     openclaw agents list
+
+
 
 # === Fish shell ===
 

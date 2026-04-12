@@ -46,16 +46,9 @@ in
   services.openssh.enable = true;
 
   sops.secrets = {
-    openclaw-telegram-token.mode = "0444";
     openclaw-env.mode = "0444";
     forgejo-mcp-env.mode = "0444";
   };
-
-  # Create data directory (uid 1000 = openclaw user)
-  systemd.tmpfiles.rules = [
-    "d /var/lib/openclaw 0755 1000 100 -"
-    "d /var/lib/syncthing 0700 1000 100 -"
-  ];
 
   # OpenClaw gateway service (replaces Podman container)
   services.openclaw-gateway = {
@@ -70,12 +63,12 @@ in
     environment = {
       TZ = "America/New_York";
       OPENCLAW_GATEWAY_BIND = "0.0.0.0";
+      OPENCLAW_NIX_MODE = "0";  # disable strict Nix-mode schema validation (config managed manually)
     };
 
     # Pass SOPS secrets as environment files
     environmentFiles = [
       config.sops.secrets.openclaw-env.path
-      config.sops.secrets.openclaw-telegram-token.path
       config.sops.secrets.forgejo-mcp-env.path
     ];
 
