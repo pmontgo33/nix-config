@@ -727,7 +727,6 @@
         }
       ];
     };
-  };
   ## openclaw-nix ##
     nixosConfigurations.openclaw-nix = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
