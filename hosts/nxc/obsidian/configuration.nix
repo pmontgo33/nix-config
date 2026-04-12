@@ -10,7 +10,7 @@
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
-  extra-services.obsidian.enable = true;
+  extra-services.obsidian-vnc.enable = true;
 
   services.openssh.enable = true;
 

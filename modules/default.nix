@@ -11,7 +11,8 @@
     ./pbs-home-dirs.nix
     ./caddy-proxy.nix
     ./host-checkin.nix
-    ./obsidian.nix
+    ./obsidian-vnc.nix
+    ./obsidian-headless.nix
     ./proxmox-storage-monitor.nix
     ./simplex-relay.nix
   ];

@@ -5,6 +5,7 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
+  ob = pkgs.callPackage ../../../packages/obsidian-headless.nix {};
 in
 {
   imports = [
@@ -31,7 +32,10 @@ in
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
-  extra-services.obsidian.enable = true;
+  extra-services.obsidian-headless = {
+    enable = true;
+    vaultPath = "/var/lib/obsidian-headless/MontyVault";
+  };
 
   # OpenClaw justfile for common commands
   environment.etc."openclaw/justfile".source = ./justfile;
@@ -43,6 +47,9 @@ in
       oc = "just -f /etc/openclaw/justfile";
     };
   };
+
+  # Grant openclaw service user read access to the Obsidian vault
+  users.users.openclaw.extraGroups = [ "obsidian-headless" ];
 
   services.openssh.enable = true;
 
@@ -317,6 +324,27 @@ in
 
     restart = "always";
     restartSec = 10;
+  };
+
+  # Continuous sync of OpenClaw workspace to Obsidian Sync vault
+  systemd.services.obsidian-workspace-sync = {
+    description = "Obsidian Sync for OpenClaw workspace";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" "openclaw-gateway.service" ];
+    serviceConfig = {
+      Type = "simple";
+      User = "openclaw";
+      Group = "users";
+      WorkingDirectory = "/var/lib/openclaw/workspace";
+      Environment = "HOME=/var/lib/openclaw";
+      EnvironmentFile = config.sops.secrets.obsidian-env.path;
+      ExecStartPre = "${ob}/bin/ob login --email $OBSIDIAN_EMAIL --password $OBSIDIAN_PASSWORD";
+      ExecStart = "${ob}/bin/ob sync --path /var/lib/openclaw/workspace --continuous";
+      UMask = "0002";
+      Restart = "on-failure";
+      RestartSec = "30s";
+    };
   };
 
   system.stateVersion = "25.11";

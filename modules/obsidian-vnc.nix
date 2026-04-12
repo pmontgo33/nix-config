@@ -6,9 +6,9 @@
 
 {config, lib, pkgs, ...}:
 with lib; let
-  cfg = config.extra-services.obsidian;
+  cfg = config.extra-services.obsidian-vnc;
 in {
-  options.extra-services.obsidian = {
+  options.extra-services.obsidian-vnc = {
     enable = mkEnableOption "headless Obsidian with VNC for setup";
   };
 
