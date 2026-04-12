@@ -45,21 +45,6 @@ in
 
   services.openssh.enable = true;
 
-  # Syncthing (runs as uid 1000)
-  services.syncthing = {
-    enable = true;
-    user = "openclaw";
-    group = "users";
-    dataDir = "/var/lib/syncthing";
-    guiAddress = "0.0.0.0:8384";
-    overrideDevices = false;
-    overrideFolders = false;
-    settings.gui = {
-      user = "patrick";
-      password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
-    };
-  };
-
   sops.secrets = {
     openclaw-telegram-token.mode = "0444";
     openclaw-env.mode = "0444";
