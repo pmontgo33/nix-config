@@ -1,0 +1,129 @@
+{ config, pkgs, modulesPath, inputs, outputs, ... }:
+
+let
+  pkgs-unstable = import inputs.nixpkgs-unstable {
+    system = pkgs.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+in
+{
+  imports = [
+    (modulesPath + "/virtualisation/proxmox-lxc.nix")
+  ];
+
+  networking.hostName = "openclaw";
+  networking.firewall.allowedTCPPorts = [ 8384 22000 18789 ];
+  networking.firewall.allowedUDPPorts = [ 22000 21027 ];
+
+  environment.systemPackages = with pkgs; [ 
+    jq 
+    just 
+    python311
+    python311Packages.requests
+    python311Packages.pip
+    pkgs-unstable.claude-code
+  ];
+
+  extra-services.tailscale = {
+    enable = true;
+    lxc = true;
+  };
+  extra-services.host-checkin.enable = true;
+  extra-services.obsidian.enable = true;
+
+  # OpenClaw justfile for common commands
+  environment.etc."openclaw/justfile".source = ./justfile;
+
+  # Enable fish with 'oc' alias
+  programs.fish = {
+    enable = true;
+    shellAliases = {
+      oc = "just -f /etc/openclaw/justfile";
+    };
+  };
+
+  services.openssh.enable = true;
+
+  # System user matching container's uid 1000
+  users.users.openclaw = {
+    uid = 1000;
+    group = "users";
+    isSystemUser = true;
+    home = "/var/lib/openclaw";
+  };
+
+  # Syncthing (runs as uid 1000 to match container file ownership)
+  services.syncthing = {
+    enable = true;
+    user = "openclaw";
+    group = "users";
+    dataDir = "/var/lib/syncthing";
+    guiAddress = "0.0.0.0:8384";
+    overrideDevices = false;
+    overrideFolders = false;
+    settings.gui = {
+      user = "patrick";
+      password = "$2b$05$HyI3HBR7.6RpSjKnXJVXgOVfq/Kvmc6sDOpnYJ8EbY5U199kmLKZG";
+    };
+  };
+
+  sops.secrets = {
+    openclaw-telegram-token.mode = "0444";
+    openclaw-env.mode = "0444";
+    forgejo-mcp-env.mode = "0444";
+  };
+
+  # Enable Podman
+  virtualisation.podman = {
+    enable = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+
+  # Create data directory (uid 1000 = container's node user)
+  systemd.tmpfiles.rules = [
+    "d /var/lib/openclaw 0755 1000 100 -"
+    "d /var/lib/syncthing 0700 1000 100 -"
+  ];
+
+  # OpenClaw container
+  virtualisation.oci-containers = {
+    backend = "podman";
+    containers.openclaw = {
+      image = "ghcr.io/openclaw/openclaw:2026.4.1";
+      ports = [ "18789:18789" ];
+
+      entrypoint = "/init.sh";
+      cmd = [ "node" "openclaw.mjs" "gateway" "--allow-unconfigured" ];
+
+      volumes = [
+        "${./init.sh}:/init.sh:ro"
+        "/var/lib/openclaw:/home/node/.openclaw"
+        # Mount SOPS secrets directly
+        "${config.sops.secrets.openclaw-env.path}:/home/node/.openclaw/.env:ro"
+        "${config.sops.secrets.openclaw-telegram-token.path}:/home/node/.openclaw/secrets/telegram-token:ro"
+        "${config.sops.secrets.forgejo-mcp-env.path}:/home/node/.openclaw/secrets/forgejo-mcp-env:ro"
+        # Bind-mount rsync from NixOS host
+        "/nix/store:/nix/store:ro"
+        "${pkgs.rsync}/bin/rsync:/usr/local/bin/rsync:ro"
+      ];
+
+      environment = {
+        TZ = "America/New_York";
+        OPENCLAW_GATEWAY_BIND = "0.0.0.0";
+      };
+
+      extraOptions = [
+        "--pull=newer"
+        "--user=1000:100"
+        "--network=host"
+      ];
+    };
+  };
+
+  systemd.services.podman-openclaw = {
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+  };
+
+  system.stateVersion = "25.11";
+}

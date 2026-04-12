@@ -711,6 +711,7 @@
     nixosConfigurations.openclaw = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
+        { nixpkgs.overlays = [ nix-openclaw.overlays.default ]; }
         ./hosts/nxc/openclaw
         sops-nix.nixosModules.sops
 
@@ -727,12 +728,12 @@
         }
       ];
     };
-  ## openclaw-nix ##
-    nixosConfigurations.openclaw-nix = nixpkgs.lib.nixosSystem {
+
+    ## openclaw-podman ##
+    nixosConfigurations.openclaw-podman = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
-        { nixpkgs.overlays = [ nix-openclaw.overlays.default ]; }
-        ./hosts/nxc/openclaw-nix
+        ./hosts/nxc/openclaw-podman
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
