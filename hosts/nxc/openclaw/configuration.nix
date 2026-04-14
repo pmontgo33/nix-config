@@ -347,5 +347,30 @@ in
     };
   };
 
+  # Inject API keys from sops into openclaw auth-profiles.json at activation time.
+  # openclaw reads keys from this file rather than environment variables.
+  system.activationScripts.openclaw-auth-profiles = {
+    deps = [ "setupSecrets" ];
+    text = ''
+      inject_openai_key() {
+        local AUTH_FILE="$1"
+        local OWNER="$2"
+        if [ -f "$AUTH_FILE" ]; then
+          OPENAI_KEY=$(grep '^OPENAI_API_KEY=' ${config.sops.secrets.openclaw-env.path} | cut -d= -f2-)
+          if [ -n "$OPENAI_KEY" ]; then
+            ${pkgs.jq}/bin/jq --arg key "$OPENAI_KEY" \
+              '.profiles["openai:default"] = {"type": "api_key", "provider": "openai", "key": $key}' \
+              "$AUTH_FILE" > "$AUTH_FILE.tmp" && mv "$AUTH_FILE.tmp" "$AUTH_FILE"
+            chown "$OWNER" "$AUTH_FILE"
+          fi
+        fi
+      }
+      # Service user (openclaw) auth store
+      inject_openai_key /var/lib/openclaw/agents/main/agent/auth-profiles.json openclaw:users
+      # Root CLI auth store (for running openclaw commands as root)
+      inject_openai_key /root/.openclaw/agents/main/agent/auth-profiles.json root:root
+    '';
+  };
+
   system.stateVersion = "25.11";
 }
