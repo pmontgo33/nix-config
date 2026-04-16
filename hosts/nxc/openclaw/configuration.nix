@@ -6,6 +6,22 @@ let
     config.allowUnfree = true;
   };
   ob = pkgs.callPackage ../../../packages/obsidian-headless.nix {};
+  noCheck = pkg: pkg.overrideAttrs (_: { doCheck = false; });
+  python3 = pkgs.python311.override {
+    packageOverrides = self: super: {
+      # These packages have flaky/environment-sensitive tests that fail in LXC
+      inline-snapshot = noCheck super.inline-snapshot;
+      django = noCheck super.django;
+      psycopg = noCheck super.psycopg;
+      factory-boy = noCheck super.factory-boy;
+      narwhals = noCheck super.narwhals;
+      sqlframe = noCheck super.sqlframe;
+      ibis-framework = noCheck super.ibis-framework;
+      jupyterlab-server = noCheck super.jupyterlab-server;
+      jupyterlab = noCheck super.jupyterlab;
+      pytest-randomly = noCheck super.pytest-randomly;
+    };
+  };
 in
 {
   imports = [
@@ -20,12 +36,12 @@ in
   environment.systemPackages = with pkgs; [
     jq
     just
-    python311
-    python311Packages.requests
-    python311Packages.pip
-    python311Packages.pdfplumber
-    python311Packages.pandas
-    python311Packages.openpyxl
+    python3
+    python3.pkgs.requests
+    python3.pkgs.pip
+    python3.pkgs.pdfplumber
+    python3.pkgs.pandas
+    python3.pkgs.openpyxl
     pkgs-unstable.claude-code
     openclaw  # CLI on PATH for justfile commands
   ];
