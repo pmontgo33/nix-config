@@ -23,6 +23,9 @@ in
     python311
     python311Packages.requests
     python311Packages.pip
+    python311Packages.pdfplumber
+    python311Packages.pandas
+    python311Packages.openpyxl
     pkgs-unstable.claude-code
     openclaw  # CLI on PATH for justfile commands
   ];
