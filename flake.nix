@@ -711,7 +711,23 @@
     nixosConfigurations.openclaw = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
-        { nixpkgs.overlays = [ nix-openclaw.overlays.default ]; }
+        {
+          nixpkgs.overlays = [
+            nix-openclaw.overlays.default
+            # Disable Python package test suites — many fail in LXC due to
+            # timing constraints and network limitations
+            (final: prev: {
+              python311 = prev.python311.override {
+                packageOverrides = _self: super:
+                  builtins.mapAttrs (_name: val:
+                    if builtins.isAttrs val && val ? overrideAttrs
+                    then val.overrideAttrs (_: { doCheck = false; })
+                    else val
+                  ) super;
+              };
+            })
+          ];
+        }
         ./hosts/nxc/openclaw
         sops-nix.nixosModules.sops
 

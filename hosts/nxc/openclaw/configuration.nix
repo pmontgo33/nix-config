@@ -6,14 +6,6 @@ let
     config.allowUnfree = true;
   };
   ob = pkgs.callPackage ../../../packages/obsidian-headless.nix {};
-  python3 = pkgs.python311.override {
-    packageOverrides = self: super:
-      builtins.mapAttrs (name: val:
-        if builtins.isAttrs val && val ? overrideAttrs
-        then val.overrideAttrs (_: { doCheck = false; })
-        else val
-      ) super;
-  };
 in
 {
   imports = [
@@ -28,12 +20,12 @@ in
   environment.systemPackages = with pkgs; [
     jq
     just
-    python3
-    python3.pkgs.requests
-    python3.pkgs.pip
-    python3.pkgs.pdfplumber
-    python3.pkgs.pandas
-    python3.pkgs.openpyxl
+    python311
+    python311Packages.requests
+    python311Packages.pip
+    python311Packages.pdfplumber
+    python311Packages.pandas
+    python311Packages.openpyxl
     pkgs-unstable.claude-code
     openclaw  # CLI on PATH for justfile commands
   ];
