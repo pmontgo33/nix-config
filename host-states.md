@@ -2,7 +2,7 @@
 
 This file tracks the current state of all NixOS hosts in the infrastructure, including their NixOS version, last verification date, last rebuild date, and OCI container status. This helps identify which hosts need updates or maintenance.
 
-Last updated: 2026-04-16
+Last updated: 2026-04-18
 
 ## Host Status Table
 
