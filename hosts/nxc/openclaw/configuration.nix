@@ -6,21 +6,13 @@ let
     config.allowUnfree = true;
   };
   ob = pkgs.callPackage ../../../packages/obsidian-headless.nix {};
-  noCheck = pkg: pkg.overrideAttrs (_: { doCheck = false; });
   python3 = pkgs.python311.override {
-    packageOverrides = self: super: {
-      # These packages have flaky/environment-sensitive tests that fail in LXC
-      inline-snapshot = noCheck super.inline-snapshot;
-      django = noCheck super.django;
-      psycopg = noCheck super.psycopg;
-      factory-boy = noCheck super.factory-boy;
-      narwhals = noCheck super.narwhals;
-      sqlframe = noCheck super.sqlframe;
-      ibis-framework = noCheck super.ibis-framework;
-      jupyterlab-server = noCheck super.jupyterlab-server;
-      jupyterlab = noCheck super.jupyterlab;
-      pytest-randomly = noCheck super.pytest-randomly;
-    };
+    packageOverrides = self: super:
+      builtins.mapAttrs (name: val:
+        if builtins.isAttrs val && val ? overrideAttrs
+        then val.overrideAttrs (_: { doCheck = false; })
+        else val
+      ) super;
   };
 in
 {
