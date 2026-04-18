@@ -298,7 +298,7 @@ in
       };
 
       plugins = {
-        slots.memory = "memory-lancedb";
+        slots.memory = "memory-core";
         entries = {
           telegram.enabled = true;
           discord.enabled = true;
