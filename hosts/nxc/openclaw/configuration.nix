@@ -316,7 +316,14 @@ in
               autoRecall = true;
             };
           };
-          "memory-core".enabled = false;
+          "memory-core" = {
+            enabled = true;
+            config.dreaming = {
+              enabled = true;
+              frequency = "0 3 * * *";
+              timezone = "America/New_York";
+            };
+          };
           searxng = {
             enabled = true;
             config.webSearch.baseUrl = "http://192.168.86.137:8080";
