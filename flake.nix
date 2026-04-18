@@ -721,7 +721,10 @@
                 packageOverrides = _self: super:
                   builtins.mapAttrs (_name: val:
                     if builtins.isAttrs val && val ? overrideAttrs
-                    then val.overrideAttrs (_: { doCheck = false; })
+                    then val.overrideAttrs (_: {
+                      doCheck = false;
+                      doInstallCheck = false;
+                    })
                     else val
                   ) super;
               };
