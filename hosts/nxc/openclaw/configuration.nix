@@ -24,6 +24,8 @@ in
     python311Packages.requests
     python311Packages.pip
     python311Packages.pdfplumber
+    python311Packages.pdfminer-six
+    python311Packages.pillow
     python311Packages.pandas
     python311Packages.openpyxl
     pkgs-unstable.claude-code
