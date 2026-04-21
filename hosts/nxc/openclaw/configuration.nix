@@ -20,14 +20,15 @@ in
   environment.systemPackages = with pkgs; [
     jq
     just
-    python311
-    python311Packages.requests
-    python311Packages.pip
-    python311Packages.pdfplumber
-    python311Packages.pdfminer-six
-    python311Packages.pillow
-    python311Packages.pandas
-    python311Packages.openpyxl
+    (python311.withPackages (ps: with ps; [
+      requests
+      pip
+      pdfplumber
+      pdfminer-six
+      pillow
+      pandas
+      openpyxl
+    ]))
     pkgs-unstable.claude-code
     openclaw  # CLI on PATH for justfile commands
   ];
