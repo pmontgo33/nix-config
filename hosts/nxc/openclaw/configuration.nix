@@ -21,7 +21,7 @@ in
     jq
     just
     tesseract
-    poppler_utils
+    poppler-utils
     (python311.withPackages (ps: with ps; [
       requests
       pip
