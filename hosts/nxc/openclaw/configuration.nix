@@ -20,6 +20,8 @@ in
   environment.systemPackages = with pkgs; [
     jq
     just
+    tesseract
+    poppler
     (python311.withPackages (ps: with ps; [
       requests
       pip
