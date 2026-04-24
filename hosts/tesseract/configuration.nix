@@ -541,6 +541,11 @@
     (pkgs.callPackage ../../packages/elegoo-slicer.nix {})
   ];
 
+  fonts.packages = with pkgs; [
+    source-han-sans
+    noto-fonts
+  ];
+
   environment.variables = {
     # Use Intel GPU by default
     # For NVIDIA, use: nvidia-offload <command>
