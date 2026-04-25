@@ -244,6 +244,17 @@ in
             to = "748642877";
             wakeMode = "now";
           }
+          {
+            id = "agentmail";
+            match = { path = "agentmail"; };
+            action = "agent";
+            name = "AgentMail";
+            messageTemplate = "📬 Email from {{ payload.sender_name }} ({{ payload.sender_email }}) — {{ payload.subject }}";
+            deliver = true;
+            channel = "telegram";
+            to = "748642877";
+            wakeMode = "now";
+          }
         ];
       };
 
