@@ -94,7 +94,7 @@
       };
       
       endurain = {
-        image = "ghcr.io/joaovitoriasilva/endurain:v0.17.6";
+        image = "ghcr.io/endurain-project/endurain:v0.17.6";
         autoStart = true;
         dependsOn = [ "endurain-db" ];
         ports = [
