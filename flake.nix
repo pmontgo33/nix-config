@@ -86,6 +86,26 @@
       ];
     };
 
+    ## rescue ##
+    nixosConfigurations.rescue = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; };
+      modules = [
+        "${nixpkgs}/nixos/modules/installer/cd-dvd/installation-cd-minimal.nix"
+
+        ./hosts/rescue
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
     ## nixbook installer ##
     nixosConfigurations.nixbook-installer = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };

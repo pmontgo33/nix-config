@@ -109,6 +109,7 @@
         ];
         extraOptions = [
           "--network=endurain-net"
+          "--dns=1.1.1.1"
         ];
       };
     };
