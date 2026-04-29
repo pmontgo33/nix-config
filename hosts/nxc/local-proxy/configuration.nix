@@ -87,9 +87,9 @@
         upstream = "192.168.86.1:3000"; 
       };
       
-      "git.montycasa.net" = { 
-        protocol = "http"; 
-        upstream = "192.168.86.120:3000"; 
+      "git.montycasa.net" = {
+        protocol = "http";
+        upstream = "192.168.86.120:3000";
       };
 
       "qbittorrent.montycasa.net" = { 
@@ -168,12 +168,7 @@
       };
     };
 
-    # layer4SniServices = {
-    #   "git.montycasa.net" = { 
-    #     protocol = "tcp"; 
-    #     upstream = "192.168.86.120:22"; 
-    #   };
-    # };
+    sshUpstream = "192.168.86.120:22";
   };
 
   networking.firewall = {

@@ -10,7 +10,7 @@ let
       "github.com/caddy-dns/cloudflare@v0.2.2"
       "github.com/mholt/caddy-l4@v0.0.0-20251201210923-0c96591f5650"
     ];
-    hash = "sha256-T1M5pq8pZJ1xXZ9R7eTZyKDXqmyJq/EIv5sXmKhWIAg=";
+    hash = "sha256-R9sJAoldUK6BaNYD5t/auGbotZyjC2AII9HW0nBaqG4=";
   };
 
   cfTls = ''
@@ -47,8 +47,8 @@ let
   # Filter HTTP/HTTPS services for virtualHosts
   httpServices = filterAttrs (n: v: v.protocol == "http" || v.protocol == "https") cfg.services;
 
-  # Check if we have SNI services
-  hasSniServices = cfg.layer4SniServices != {};
+  # Check if we need layer4
+  hasSniServices = cfg.layer4SniServices != {} || cfg.sshUpstream != null;
 in
 {
   options.extra-services.caddy-proxy = {
@@ -114,6 +114,12 @@ in
       '';
     };
 
+    sshUpstream = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "If set, proxy all SSH connections on port 443 to this upstream (e.g. 192.168.86.120:22)";
+    };
+
     extraGlobalConfig = mkOption {
       type = types.lines;
       default = "";
@@ -134,6 +140,12 @@ in
 
           layer4 {
             :443 {
+              ${optionalString (cfg.sshUpstream != null) ''
+              @ssh ssh
+              route @ssh {
+                proxy ${cfg.sshUpstream}
+              }
+              ''}
               ${concatStringsSep "\n          " (mapAttrsToList mkLayer4SniConfig cfg.layer4SniServices)}
 
               # Pass all non-matching traffic to Caddy's HTTPS server

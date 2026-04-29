@@ -38,7 +38,7 @@ in
         DOMAIN = "git.montycasa.net";
         ROOT_URL = "https://git.montycasa.net/";
         HTTP_PORT = 3000;
-        SSH_PORT = 22;
+        SSH_PORT = 443;
       };
 
       service = {
