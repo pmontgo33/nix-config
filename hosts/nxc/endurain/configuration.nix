@@ -51,8 +51,15 @@
       RemainAfterExit = true;
     };
     script = ''
-      ${pkgs.podman}/bin/podman network inspect endurain-net >/dev/null 2>&1 || \
-      ${pkgs.podman}/bin/podman network create endurain-net
+      if ! ${pkgs.podman}/bin/podman network inspect endurain-net >/dev/null 2>&1; then
+        ${pkgs.podman}/bin/podman network create --dns 1.1.1.1 endurain-net
+      else
+        # Recreate if dns_servers is missing (aardvark-dns needs explicit upstream to avoid Tailscale resolver)
+        if ! ${pkgs.podman}/bin/podman network inspect endurain-net --format '{{.}}' | grep -q '1.1.1.1'; then
+          ${pkgs.podman}/bin/podman network rm endurain-net
+          ${pkgs.podman}/bin/podman network create --dns 1.1.1.1 endurain-net
+        fi
+      fi
     '';
     before = [
       "podman-endurain-db.service"
