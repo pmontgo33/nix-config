@@ -35,6 +35,11 @@ in {
       example = [ "--advertise-routes=192.168.1.0/24" "--netfilter-mode=off" ];
       description = "Additional flags to pass to tailscale up";
     };
+    ephemeral = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Use the ephemeral auth key instead of the standard auth key";
+    };
   };
   
   imports = [
@@ -45,16 +50,20 @@ in {
     sops = {
       secrets = {
         "tailscale_auth_key" = {};
-      };
+      } // (optionalAttrs cfg.ephemeral {
+        "tailscale_ephemeral_key" = {};
+      });
     };
-    
+
     services.tailscale = {
       enable = true;
       package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.tailscale;
       openFirewall = true;
       # Only use userspace networking if LXC mode is enabled
       interfaceName = mkIf cfg.userspace-networking "userspace-networking";
-      authKeyFile = config.sops.secrets.tailscale_auth_key.path;
+      authKeyFile = if cfg.ephemeral
+        then config.sops.secrets.tailscale_ephemeral_key.path
+        else config.sops.secrets.tailscale_auth_key.path;
       useRoutingFeatures = "client";
       permitCertUid = "caddy";
       extraUpFlags = [
@@ -74,10 +83,10 @@ in {
     # Make tailscaled-autoconnect non-blocking to prevent boot delays on desktop systems
     # For LXC containers (servers), we want it to auto-start
     # For desktops, we disable auto-start to save ~50 seconds on boot
-    systemd.services.tailscaled-autoconnect = mkIf (!cfg.lxc) {
-      wantedBy = mkForce [ ];  # Remove from boot dependencies (desktop only)
-      after = [ "multi-user.target" ];  # Run after boot is complete
-    };
+    # systemd.services.tailscaled-autoconnect = mkIf (!cfg.lxc) {
+    #   wantedBy = mkForce [ ];  # Remove from boot dependencies (desktop only)
+    #   after = [ "multi-user.target" ];  # Run after boot is complete
+    # };
 
     # # Service to update Tailscale when tags or flags change
     # systemd.services.tailscale-update-config = let

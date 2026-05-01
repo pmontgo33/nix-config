@@ -19,5 +19,5 @@ jobs:
             echo " - $host"
             nix --extra-experimental-features 'nix-command flakes' \
               eval ".#nixosConfigurations.${host}.config.system.build.toplevel.drvPath" \
-              --show-trace > /dev/null
+              --impure --show-trace > /dev/null
           done

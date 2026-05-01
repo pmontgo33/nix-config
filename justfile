@@ -38,6 +38,21 @@ git-cpush message branch="master":
 git-rpull remote:
   ssh root@{{remote}} "cd /etc/nixos && git pull https://github.com/pmontgo33/nixos-config.git"
 
+rescue-build:
+  nix build .#nixosConfigurations.rescue.config.system.build.isoImage --impure
+
+rescue-flash device:
+  sudo dd if=$(ls result/iso/*.iso) of={{device}} bs=4M status=progress conv=fsync
+
+rescue-build-flash device: rescue-build
+  just rescue-flash {{device}}
+
+rescue-flash-remote host device:
+  cat result/iso/*.iso | ssh root@{{host}} "dd of={{device}} bs=4M status=progress conv=fsync"
+
+rescue-build-flash-remote host device: rescue-build
+  just rescue-flash-remote {{host}} {{device}}
+
 ap host tags="all" vars="":
   ansible-playbook ansible/playbooks/host_{{host}}.yml --tags "{{tags}}" -e "{{vars}}"
 

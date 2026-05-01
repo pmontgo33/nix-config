@@ -7,7 +7,7 @@
       ../../secrets
   ];
 
-  extra-services.auto-upgrade.enable = true;
+  extra-services.auto-upgrade.enable = lib.mkDefault true;
 
   environment.systemPackages = with pkgs; [
     wget
@@ -31,7 +31,8 @@
 
   # Add public keys for management machines
   users.users.root = {
-    hashedPassword = "$6$fu.ra7ConU15mC8P$kMM7PcKtpo3ruRpqncC47lbRKYK3/f2z4shsK8pewbxohu6OjpxdJP/NYLLvEg4NjN29BSt3zPq6UwSxK1Zn90";
+    hashedPassword = lib.mkForce "$6$fu.ra7ConU15mC8P$kMM7PcKtpo3ruRpqncC47lbRKYK3/f2z4shsK8pewbxohu6OjpxdJP/NYLLvEg4NjN29BSt3zPq6UwSxK1Zn90";
+    initialHashedPassword = lib.mkForce null;
     openssh.authorizedKeys.keys = [
         # Management public keys
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEr9aBBJ73I/tXOT00krxHglmAqZ0A8xt7Hk5s2zMwCo patrick@hp-nixos"
