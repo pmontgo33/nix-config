@@ -31,6 +31,8 @@
     gptfdisk
     parted
     smartmontools
+    testdisk
+    ddrescue
     # system tools
     htop
     lsof

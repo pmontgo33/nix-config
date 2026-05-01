@@ -53,6 +53,9 @@ rescue-flash-remote host device:
 rescue-build-flash-remote host device: rescue-build
   just rescue-flash-remote {{host}} {{device}}
 
+rescue-test:
+  nix shell nixpkgs#qemu --command sudo qemu-system-x86_64 -m 4G -enable-kvm -cpu host -drive file=/dev/sda,format=raw,if=virtio
+
 ap host tags="all" vars="":
   ansible-playbook ansible/playbooks/host_{{host}}.yml --tags "{{tags}}" -e "{{vars}}"
 
