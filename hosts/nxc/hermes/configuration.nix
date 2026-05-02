@@ -17,7 +17,7 @@
 
   services.openssh.enable = true;
 
-  sops.secrets."hermes-env".mode = "0444";
+  sops.secrets."openclaw-env".mode = "0444";
 
   services.hermes-agent = {
     enable = true;
@@ -25,7 +25,7 @@
     group = "users";
     createUser = true;
     stateDir = "/var/lib/hermes";
-    environmentFiles = [ config.sops.secrets.hermes-env.path ];
+    environmentFiles = [ config.sops.secrets.openclaw-env.path ];
     environment = {
       TZ = "America/New_York";
     };
