@@ -33,9 +33,13 @@
     nix-openclaw = {
       url = "github:openclaw/nix-openclaw";
     };
+
+    nix-hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
+    };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-openclaw, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-openclaw, nix-hermes-agent, ... }: {
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
@@ -773,6 +777,28 @@
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/openclaw-podman
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+
+          home-manager.sharedModules = [
+            sops-nix.homeManagerModules.sops
+          ];
+        }
+      ];
+    };
+
+    ## hermes ##
+    nixosConfigurations.hermes = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; };
+      modules = [
+        { nixpkgs.overlays = [ nix-hermes-agent.overlays.default ]; }
+        ./hosts/nxc/hermes
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager

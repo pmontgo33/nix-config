@@ -17,12 +17,6 @@ nrs-wtf host="$HOSTNAME":
 nfc:
   sudo nix flake check
 
-agenix file:
-  cd secrets && nix run github:ryantm/agenix -- -e {{file}}
-
-agenix-rekey:
-  cd secrets && nix run github:ryantm/agenix -- -r
-
 secrets:
   -nix-shell -p sops --run "SOPS_AGE_KEY_FILE='/home/patrick/.config/sops/age/keys.txt' sops secrets/secrets.yaml"
 

@@ -36,6 +36,7 @@
     # system tools
     htop
     lsof
+    cowsay
   ];
 
   system.stateVersion = "25.11";
