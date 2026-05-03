@@ -1,5 +1,12 @@
 { config, pkgs, modulesPath, inputs, ... }:
 
+let
+  pkgs-unstable = import inputs.nixpkgs-unstable {
+    system = pkgs.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+in
+
 {
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
@@ -109,6 +116,10 @@
   systemd.services.hermes-agent.environment = {
     TELEGRAM_ALLOWED_USERS = "748642877";
   };
+
+  environment.systemPackages = with pkgs; [
+    pkgs-unstable.claude-code
+  ];
 
   system.stateVersion = "25.11";
 }
