@@ -1,5 +1,12 @@
 { config, pkgs, modulesPath, inputs, ... }:
 
+let
+  pkgs-unstable = import inputs.nixpkgs-unstable {
+    system = pkgs.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+in
+
 {
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
@@ -32,6 +39,10 @@
     # Agent config populated in Part 2 migration
     settings = {};
   };
+
+  environment.systemPackages = with pkgs; [
+    pkgs-unstable.claude-code
+  ];
 
   system.stateVersion = "25.11";
 }
