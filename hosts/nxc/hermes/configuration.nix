@@ -140,6 +140,8 @@ in
     TELEGRAM_ALLOWED_USERS = "748642877";
   };
 
+  users.users.hermes.linger = true;
+
   # Profile directories for named subagents (Rocket, Friday)
   systemd.services.hermes-profiles = {
     wantedBy = [ "multi-user.target" ];
