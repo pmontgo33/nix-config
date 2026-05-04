@@ -85,11 +85,6 @@ in
       # Fallback chain mirrors openclaw: openrouter kimi-k2.5, then claude-haiku.
       model = "minimax-portal/MiniMax-M2.7";
 
-      fallback_providers = [
-        { provider = "openrouter"; model = "moonshot/kimi-k2"; }
-        { provider = "anthropic"; model = "claude-haiku-4-5-20251001"; }
-      ];
-
       # MiniMax via their Anthropic-compatible portal
       custom_providers = [
         {
@@ -103,7 +98,35 @@ in
             { id = "MiniMax-M2.5-Lightning"; context_length = 200000; }
           ];
         }
+        {
+          name = "google";
+          base_url = "https://generativelanguage.googleapis.com/v1beta";
+          api_key_env = "GEMINI_API_KEY";
+          models = [
+            { id = "gemini-flash-latest"; context_length = 1000000; }
+            { id = "gemini-3-flash-preview"; context_length = 1000000; }
+          ];
+        }
       ];
+
+      fallback_providers = [
+        { provider = "google"; model = "gemini-flash-latest"; }
+        { provider = "openrouter"; model = "moonshot/kimi-k2"; }
+        { provider = "anthropic"; model = "claude-haiku-4-5-20251001"; }
+      ];
+
+      auxiliary = {
+        provider = "minimax-portal";
+        model = "MiniMax-M2.7";
+      };
+
+      homeassistant = {
+        enabled = true;
+        url = "http://192.168.86.100:8123";
+        watch_entities = [ "binary_sensor.away_mode" ];
+        watch_all = false;
+        cooldown_seconds = 10;
+      };
 
       toolsets = [ "hermes-cli" "files" "web" "computer" ];
 
