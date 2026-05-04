@@ -154,6 +154,9 @@ in
         reactions = false;
       };
     };
+
+    # SOUL.md — injected as a workspace document at activation time
+    documents."SOUL.md" = builtins.readFile ./documents/SOUL.md;
   };
 
   # Inject allowlist into the systemd environment so hermes's os.getenv()
