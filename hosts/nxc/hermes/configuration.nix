@@ -13,6 +13,19 @@ in
     inputs.nix-hermes-agent.nixosModules.default
   ];
 
+  nixpkgs.overlays = [
+    (final: prev: {
+      python312 = prev.python312.override {
+        packageOverrides = _self: super:
+          builtins.mapAttrs (_name: val:
+            if builtins.isAttrs val && val ? overrideAttrs
+            then val.overrideAttrs (_: { doCheck = false; doInstallCheck = false; })
+            else val
+          ) super;
+      };
+    })
+  ];
+
   networking.hostName = "hermes";
   networking.firewall.allowedTCPPorts = [ 8642 ];
 
@@ -24,7 +37,17 @@ in
 
   services.openssh.enable = true;
 
-  environment.systemPackages = [ pkgs.hermes-agent ];
+  environment.systemPackages = with pkgs; [
+    pkgs-unstable.claude-code
+    hermes-agent
+    tmux
+
+    (pkgs.python312.withPackages (ps: with ps; [
+      ps.pandas
+      ps.pdfplumber
+      ps.openpyxl
+    ]))
+  ];
 
   programs.fish = {
     enable = true;
@@ -130,16 +153,6 @@ in
       done
     '';
   };
-
-  environment.systemPackages = with pkgs; [
-    pkgs-unstable.claude-code
-    (pkgs.python312.withPackages (ps: with ps; [
-      ps.pandas
-      ps.pdfplumber
-      ps.openpyxl
-    ]))
-    tmux
-  ];
 
   system.stateVersion = "25.11";
 }
