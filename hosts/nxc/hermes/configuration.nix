@@ -137,9 +137,9 @@ in
 
       compression = {
         enabled = true;
-        threshold = 0.50;
+        threshold = 0.85;
         target_ratio = 0.20;
-        protect_last_n = 20;
+        protect_last_n = 120;
       };
 
       memory = {
