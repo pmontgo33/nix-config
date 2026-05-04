@@ -133,6 +133,11 @@ in
 
   environment.systemPackages = with pkgs; [
     pkgs-unstable.claude-code
+    (pkgs.python312.withPackages (ps: with ps; [
+      ps.pandas
+      ps.pdfplumber
+      ps.openpyxl
+    ]))
     tmux
   ];
 
