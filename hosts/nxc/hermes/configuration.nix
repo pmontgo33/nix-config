@@ -117,8 +117,23 @@ in
     TELEGRAM_ALLOWED_USERS = "748642877";
   };
 
+  # Profile directories for named subagents (Rocket, Friday)
+  systemd.services.hermes-profiles = {
+    wantedBy = [ "multi-user.target" ];
+    script = ''
+      for profile in rocket friday; do
+        for subdir in cron sessions logs logs/curator memories; do
+          mkdir -p "/var/lib/hermes/.hermes/profiles/$profile/$subdir"
+          chown -R hermes:users "/var/lib/hermes/.hermes/profiles/$profile"
+          chmod 2775 "/var/lib/hermes/.hermes/profiles/$profile/$subdir"
+        done
+      done
+    '';
+  };
+
   environment.systemPackages = with pkgs; [
     pkgs-unstable.claude-code
+    tmux
   ];
 
   system.stateVersion = "25.11";
