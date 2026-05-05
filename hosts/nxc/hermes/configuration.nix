@@ -5,7 +5,7 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
-  agentmail = pkgs.python312.buildPythonPackage rec {
+  agentmail = pkgs.python312Packages.buildPythonPackage rec {
     pname = "agentmail";
     version = "0.5.0";
     src = pkgs.fetchurl {
@@ -14,7 +14,7 @@ let
     };
     format = "wheel";
     propagatedBuildInputs = with pkgs.python312Packages; [
-      httpx pydantic pydantic-core typing_extensions websockets
+      httpx pydantic websockets
     ];
     doCheck = false;
   };
