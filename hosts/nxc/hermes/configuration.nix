@@ -5,6 +5,19 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
+  agentmail = pkgs.python312.buildPythonPackage rec {
+    pname = "agentmail";
+    version = "0.5.0";
+    src = pkgs.fetchurl {
+      url = "https://files.pythonhosted.org/packages/d9/f0/4c7dbbd1db1b820eb1206636b6be146655cff497a6d7739669432d8f0553/agentmail-0.5.0-py3-none-any.whl";
+      hash = "sha256-ALyfhuTG/i9aMibBZg3boq3LgGPIBUD+Pp5WT+KFsjM=";
+    };
+    format = "wheel";
+    propagatedBuildInputs = with pkgs.python312Packages; [
+      httpx pydantic pydantic-core typing_extensions websockets
+    ];
+    doCheck = false;
+  };
 in
 
 {
@@ -47,6 +60,7 @@ in
       ps.pandas
       ps.pdfplumber
       ps.openpyxl
+      agentmail
     ]))
   ];
 
