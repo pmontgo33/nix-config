@@ -47,7 +47,6 @@ in
       ps.pandas
       ps.pdfplumber
       ps.openpyxl
-      ps.agentmail
     ]))
   ];
 
