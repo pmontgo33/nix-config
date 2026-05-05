@@ -90,7 +90,7 @@ in
       custom_providers = [
         {
           name = "minimax-portal";
-          base_url = "https://api.minimax.io/anthropic";
+          base_url = "https://api.minimax.io";
           api_key_env = "MINIMAX_API_KEY";
           api_mode = "chat_completions";
           models = [
