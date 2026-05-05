@@ -92,6 +92,7 @@ in
           name = "minimax-portal";
           base_url = "https://api.minimax.io/anthropic";
           api_key_env = "MINIMAX_API_KEY";
+          api_mode = "chat_completions";
           models = [
             { id = "MiniMax-M2.7"; context_length = 200000; }
             { id = "MiniMax-M2.5"; context_length = 200000; }
