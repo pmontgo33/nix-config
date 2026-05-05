@@ -81,25 +81,9 @@ in
     };
 
     settings = {
-      # Primary model: MiniMax M2.7 via minimax-portal (Anthropic-compatible API).
-      # Hermes uses OpenAI-compatible providers via custom_providers.
-      # Fallback chain mirrors openclaw: openrouter kimi-k2.5, then claude-haiku.
-      model = "minimax-portal/MiniMax-M2.7";
+      model = "minimax/MiniMax-M2.7";
 
-      # MiniMax via their Anthropic-compatible portal
       custom_providers = [
-        {
-          name = "minimax-portal";
-          base_url = "https://api.minimax.io";
-          api_key_env = "MINIMAX_API_KEY";
-          api_mode = "chat_completions";
-          models = [
-            { id = "MiniMax-M2.7"; context_length = 200000; }
-            { id = "MiniMax-M2.5"; context_length = 200000; }
-            { id = "MiniMax-M2.5-highspeed"; context_length = 200000; }
-            { id = "MiniMax-M2.5-Lightning"; context_length = 200000; }
-          ];
-        }
         {
           name = "google";
           base_url = "https://generativelanguage.googleapis.com/v1beta";
@@ -118,7 +102,7 @@ in
       ];
 
       auxiliary = {
-        provider = "minimax-portal";
+        provider = "minimax";
         model = "MiniMax-M2.7";
       };
 
@@ -155,6 +139,10 @@ in
       telegram = {
         reactions = false;
       };
+
+      terminal = {
+        cwd = "/var/lib/hermes/workspace";
+      };
     };
 
     # SOUL.md — injected as a workspace document at activation time
@@ -166,6 +154,7 @@ in
   # allowlist check uses os.getenv, not hermes's own .env loader).
   systemd.services.hermes-agent.environment = {
     TELEGRAM_ALLOWED_USERS = "748642877";
+    HERMES_MANAGED = "true";
   };
 
   users.users.hermes.linger = true;
