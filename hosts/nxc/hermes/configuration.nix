@@ -41,6 +41,7 @@ in
     pkgs-unstable.claude-code
     hermes-agent
     tmux
+    pkgs.jq
 
     (pkgs.python312.withPackages (ps: with ps; [
       ps.pandas
