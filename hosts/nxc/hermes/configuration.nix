@@ -40,7 +40,7 @@ in
   ];
 
   networking.hostName = "hermes";
-  networking.firewall.allowedTCPPorts = [ 8642 9119 ];
+  networking.firewall.allowedTCPPorts = [ 8642 8644 9119 ];
 
   extra-services.tailscale = {
     enable = true;
@@ -153,6 +153,17 @@ in
       # Allow-list mirrors openclaw (user 748642877 = Monty).
       telegram = {
         reactions = false;
+      };
+
+      platforms = {
+        webhook = {
+          enabled = true;
+          extra = {
+            host = "0.0.0.0";
+            port = 8644;
+            secret = "skYQYIzpOKXwVH8R726AdxhZbZPNctlKimtpmMQvj7HFCoh9";
+          };
+        };
       };
 
       terminal = {
