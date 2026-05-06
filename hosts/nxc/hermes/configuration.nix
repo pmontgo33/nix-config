@@ -40,7 +40,7 @@ in
   ];
 
   networking.hostName = "hermes";
-  networking.firewall.allowedTCPPorts = [ 8642 ];
+  networking.firewall.allowedTCPPorts = [ 8642 9119 ];
 
   extra-services.tailscale = {
     enable = true;
@@ -80,6 +80,7 @@ in
 
   services.hermes-agent = {
     enable = true;
+    extraPythonPackages = with pkgs.python312Packages; [ fastapi uvicorn ptyprocess ];
     user = "hermes";
     group = "users";
     createUser = true;
@@ -185,6 +186,20 @@ in
         done
       done
     '';
+  };
+
+  systemd.services.hermes-dashboard = {
+    wantedBy = [ "multi-user.target" ];
+    after = [ "hermes-agent.service" ];
+    environment = {
+      HERMES_HOME = "/var/lib/hermes/.hermes";
+    };
+    serviceConfig = {
+      User = "hermes";
+      Group = "users";
+      ExecStart = "${pkgs.hermes-agent}/bin/hermes dashboard --host 0.0.0.0 --port 9119 --no-open --insecure";
+      Restart = "on-failure";
+    };
   };
 
   system.stateVersion = "25.11";
