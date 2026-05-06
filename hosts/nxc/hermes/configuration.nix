@@ -102,6 +102,20 @@ in
             { id = "gemini-3-flash-preview"; context_length = 1000000; }
           ];
         }
+        {
+          name = "opencode-go";
+          base_url = "https://api.opencode.ai/v1";
+          api_key_env = "OPENCODE_GO_API_KEY";
+          models = [
+            { id = "minimax-m2.7"; context_length = 1000000; }
+            { id = "kimi-k2.5"; context_length = 1000000; }
+            { id = "kimi-k2.6"; context_length = 1000000; }
+            { id = "glm-5"; context_length = 1000000; }
+            { id = "glm-5.1"; context_length = 1000000; }
+            { id = "deepseek-v4-flash"; context_length = 1000000; }
+            { id = "deepseek-v4-pro"; context_length = 1000000; }
+          ];
+        }
       ];
 
       fallback_providers = [
@@ -217,6 +231,18 @@ in
           chmod 2775 "/var/lib/hermes/.hermes/profiles/$profile/$subdir"
         done
       done
+    '';
+  };
+
+  systemd.services.rocket-githook = {
+    wantedBy = [ "multi-user.target" ];
+    after = [ "hermes-agent.service" ];
+    script = ''
+      HOOK_DIR="/var/lib/hermes/.hermes/git/nix-config/.git/hooks"
+      mkdir -p "$HOOK_DIR"
+      cp ${./githooks/pre-push} "$HOOK_DIR/pre-push"
+      chmod +x "$HOOK_DIR/pre-push"
+      chown hermes:users "$HOOK_DIR/pre-push"
     '';
   };
 

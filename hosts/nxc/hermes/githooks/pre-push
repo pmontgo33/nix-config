@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Rocket pre-push githook: block pushes that don't build
+set -euo pipefail
+
+echo "🔨 Rocket pre-push: testing Nix build..."
+
+REMOTE="$1"
+URL="$2"
+
+# Only run on fork pushes (PR branches)
+if [[ "$URL" != *"openclaw"* ]]; then
+  echo "  ↳ Skipping build test (not pushing to fork)"
+  exit 0
+fi
+
+echo "  ↳ Running nix build..."
+if nix --extra-experimental-features 'nix-command flakes' build \
+  .#nixosConfigurations.hermes.config.system.build.toplevel \
+  --no-link 2>&1; then
+  echo "✅ Build passed. Push allowed."
+  exit 0
+else
+  echo "❌ Build FAILED. Push blocked."
+  echo "   Fix the Nix expression and try again."
+  exit 1
+fi
