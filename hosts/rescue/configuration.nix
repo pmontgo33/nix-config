@@ -14,7 +14,7 @@
   boot.kernelParams = [ "copytoram" ];
 
   environment.etc."sops/age/keys.txt" = {
-    source = /etc/sops/age/keys.txt;
+    source = "/etc/sops/age/keys.txt";
     mode = "0400";
   };
 

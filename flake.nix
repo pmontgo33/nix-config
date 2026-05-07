@@ -750,27 +750,6 @@
       ];
     };
 
-    ## openclaw-podman ##
-    nixosConfigurations.openclaw-podman = nixpkgs.lib.nixosSystem {
-      specialArgs = { inherit inputs; };
-      modules = [
-        ./hosts/nxc/openclaw-podman
-        sops-nix.nixosModules.sops
-
-        home-manager.nixosModules.home-manager
-        {
-          home-manager.useGlobalPkgs = true;
-          home-manager.useUserPackages = true;
-          home-manager.backupFileExtension = "backup";
-          home-manager.extraSpecialArgs = { inherit inputs; };
-
-          home-manager.sharedModules = [
-            sops-nix.homeManagerModules.sops
-          ];
-        }
-      ];
-    };
-
     ## hermes ##
     nixosConfigurations.hermes = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
