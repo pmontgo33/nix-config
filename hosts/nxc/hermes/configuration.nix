@@ -71,6 +71,7 @@ in
   # MiniMax, etc.). Telegram token must be a NEW bot separate from openclaw's to
   # avoid double-responses; add TELEGRAM_BOT_TOKEN to this secret for hermes's bot.
   sops.secrets."openclaw-env".mode = "0444";
+  sops.secrets."hermes-webhook".mode = "0444";
 
   services.hermes-agent = {
     enable = true;
@@ -169,7 +170,7 @@ in
           extra = {
             host = "0.0.0.0";
             port = 8644;
-            secret = "skYQYIzpOKXwVH8R726AdxhZbZPNctlKimtpmMQvj7HFCoh9";
+            secret = config.sops.secrets."hermes-webhook".path;
           };
         };
       };
