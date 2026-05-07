@@ -171,6 +171,11 @@ in
             host = "0.0.0.0";
             port = 8644;
             secret = config.sops.secrets."hermes-webhook".path;
+            routes = {
+              "ha-alert" = {
+                secret = config.sops.secrets."hermes-webhook".path;
+              };
+            };
           };
         };
       };
