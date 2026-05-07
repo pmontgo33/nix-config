@@ -88,6 +88,7 @@ in
       API_SERVER_PORT = "8642";
       SEARXNG_BASE_URL = "http://192.168.86.137:8080";
       TELEGRAM_ALLOWED_USERS = "748642877";
+      TELEGRAM_HOME_CHANNEL = "748642877";
     };
 
     settings = {
