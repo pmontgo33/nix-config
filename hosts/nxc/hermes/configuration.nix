@@ -75,7 +75,7 @@ in
 
   services.hermes-agent = {
     enable = true;
-    extraPythonPackages = with pkgs.python312Packages; [ fastapi uvicorn ptyprocess pandas pdfplumber openpyxl agentmail ];
+    extraPythonPackages = with pkgs.python312Packages; [ fastapi uvicorn ptyprocess pandas pdfplumber openpyxl agentmail reportlab ];
     user = "hermes";
     group = "users";
     createUser = true;
