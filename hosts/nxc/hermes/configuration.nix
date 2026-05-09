@@ -75,7 +75,7 @@ in
 
   services.hermes-agent = {
     enable = true;
-    extraPythonPackages = with pkgs.python312Packages; [ fastapi uvicorn ptyprocess pandas pdfplumber openpyxl agentmail ];
+    extraPythonPackages = with pkgs.python312Packages; [ fastapi uvicorn ptyprocess pandas pdfplumber openpyxl agentmail reportlab ];
     user = "hermes";
     group = "users";
     createUser = true;
@@ -88,6 +88,7 @@ in
       API_SERVER_PORT = "8642";
       SEARXNG_BASE_URL = "http://192.168.86.137:8080";
       TELEGRAM_ALLOWED_USERS = "748642877";
+      TELEGRAM_HOME_CHANNEL = "748642877";
     };
 
     settings = {
