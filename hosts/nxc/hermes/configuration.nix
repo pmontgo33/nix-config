@@ -113,20 +113,6 @@ in
             { id = "gemini-3-flash-preview"; context_length = 1000000; }
           ];
         }
-        {
-          name = "opencode-go";
-          base_url = "https://api.opencode.ai/v1";
-          api_key_env = "OPENCODE_GO_API_KEY";
-          models = [
-            { id = "minimax-m2.7"; context_length = 1000000; }
-            { id = "kimi-k2.5"; context_length = 1000000; }
-            { id = "kimi-k2.6"; context_length = 1000000; }
-            { id = "glm-5"; context_length = 1000000; }
-            { id = "glm-5.1"; context_length = 1000000; }
-            { id = "deepseek-v4-flash"; context_length = 1000000; }
-            { id = "deepseek-v4-pro"; context_length = 1000000; }
-          ];
-        }
       ];
 
       fallback_providers = [
@@ -195,7 +181,7 @@ in
         cwd = "/var/lib/hermes/workspace";
       };
 
-      # OpenCode opencode-go models — referenced as "opencode-go/<model>"
+      # OpenCode Go built-in provider models — referenced as "opencode-go/<model>"
       agents = {
         defaults = {
           model = {
