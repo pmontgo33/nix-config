@@ -92,7 +92,7 @@ in
     };
 
     settings = {
-      model = "minimax/MiniMax-M2.7";
+      model = "opencode-go/deepseek-v4-flash";
 
       custom_providers = [
         {
@@ -121,6 +121,7 @@ in
       ];
 
       fallback_providers = [
+        { provider = "minimax"; model = "MiniMax-M2.7"; }
         { provider = "google"; model = "gemini-flash-latest"; }
         { provider = "openrouter"; model = "moonshot/kimi-k2"; }
         { provider = "anthropic"; model = "claude-haiku-4-5-20251001"; }
