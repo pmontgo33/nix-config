@@ -55,7 +55,16 @@ in
     hermes-agent
     tmux
     pkgs.jq
-
+    (pkgs.python312.withPackages (ps: with ps; [
+      ps.pandas
+      ps.pdfplumber
+      ps.openpyxl
+      ps.reportlab
+      ps.fastapi
+      ps.uvicorn
+      ps.ptyprocess
+      agentmail
+    ]))
   ];
 
   programs.fish = {
@@ -75,7 +84,7 @@ in
 
   services.hermes-agent = {
     enable = true;
-    extraPythonPackages = with pkgs.python312Packages; [ fastapi uvicorn ptyprocess pandas pdfplumber openpyxl agentmail reportlab ];
+    extraPythonPackages = with pkgs.python312Packages; [ ];
     user = "hermes";
     group = "users";
     createUser = true;
