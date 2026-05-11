@@ -102,6 +102,7 @@ in
 
     settings = {
       model = "opencode-go/deepseek-v4-flash";
+      provider = "opencode-go";
 
       custom_providers = [
         {
@@ -124,14 +125,6 @@ in
       auxiliary = {
         provider = "minimax";
         model = "MiniMax-M2.7";
-      };
-
-      homeassistant = {
-        enabled = true;
-        url = "http://192.168.86.100:8123";
-        watch_entities = [ "binary_sensor.away_mode" ];
-        watch_all = false;
-        cooldown_seconds = 10;
       };
 
       toolsets = [ "hermes-cli" "files" "web" "computer" ];
@@ -161,6 +154,16 @@ in
       };
 
       platforms = {
+        homeassistant = {
+          enabled = true;
+          extra = {
+            url = "http://192.168.86.100:8123";
+            watch_entities = [ "binary_sensor.away_mode" ];
+            watch_all = false;
+            cooldown_seconds = 10;
+          };
+        };
+
         webhook = {
           enabled = true;
           extra = {
@@ -180,32 +183,6 @@ in
         cwd = "/var/lib/hermes/workspace";
       };
 
-      # OpenCode Go built-in provider models — referenced as "opencode-go/<model>"
-      agents = {
-        defaults = {
-          model = {
-            primary = "minimax/MiniMax-M2.7";
-            fallbacks = [
-              "opencode-go/minimax-m2.7"
-              "opencode-go/kimi-k2.5"
-              "opencode-go/kimi-k2.6"
-              "opencode-go/glm-5"
-              "opencode-go/glm-5.1"
-              "opencode-go/deepseek-v4-flash"
-              "opencode-go/deepseek-v4-pro"
-            ];
-          };
-          models = {
-            "opencode-go/minimax-m2.7".alias = "m2.7-go";
-            "opencode-go/kimi-k2.5".alias = "Kimi K2.5 (Go)";
-            "opencode-go/kimi-k2.6".alias = "K2.6 (Go)";
-            "opencode-go/glm-5".alias = "GLM-5 (Go)";
-            "opencode-go/glm-5.1".alias = "GLM-5.1 (Go)";
-            "opencode-go/deepseek-v4-flash".alias = "DeepSeek V4 Flash (Go)";
-            "opencode-go/deepseek-v4-pro".alias = "DeepSeek V4 Pro (Go)";
-          };
-        };
-      };
     };
 
     # SOUL.md — injected as a workspace document at activation time
