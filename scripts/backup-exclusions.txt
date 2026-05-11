@@ -17,3 +17,5 @@
 *.tmp
 *.temp
 node_modules
+*/.local/share/baloo
+*/.local/share/akonadi

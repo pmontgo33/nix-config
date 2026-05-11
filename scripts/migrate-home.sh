@@ -4,6 +4,17 @@
 #
 # This script syncs a user's home directory from a source machine to the current machine,
 # excluding common cache/temporary files and large directories.
+#
+# IMPORTANT: Run this on the NEW machine, before first GUI login.
+# Steps:
+#   1. Boot the new machine; switch to TTY with Ctrl+Alt+F2
+#   2. Connect to network: nmcli device wifi connect "SSID" password "PASSWORD"
+#   3. Clone the repo: git clone <repo-url> ~/nix-config
+#   4. Run: ~/nix-config/scripts/migrate-home.sh <user> <source-host> /home/<user>/
+#   5. Return to display manager with Ctrl+Alt+F1 and log in graphically
+#
+# Running before GUI login ensures Firefox and KDE have not yet created lock files
+# or state databases that would conflict with the migrated files.
 
 set -euo pipefail
 
@@ -32,7 +43,7 @@ rsync -avhP --delete \
 
 echo ""
 echo "Migration complete. Fixing permissions..."
-ssh "root@${SOURCE_HOST}" "chown -R ${SOURCE_USER}:${SOURCE_USER} ${DEST_PATH}"
-ssh "root@${SOURCE_HOST}" "rm -f ${DEST_PATH}/.mozilla/firefox/*/lock ${DEST_PATH}/.mozilla/firefox/.parentlock"
+chown -R "${SOURCE_USER}:${SOURCE_USER}" "${DEST_PATH}"
+rm -f "${DEST_PATH}/.mozilla/firefox/"*/lock "${DEST_PATH}/.mozilla/firefox/.parentlock"
 
 echo "Done!"
