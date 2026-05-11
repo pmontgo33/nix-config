@@ -221,6 +221,7 @@ in
   };
 
   users.users.hermes.linger = true;
+  users.users.root.linger = true;
 
   # Profile directories for named subagents (Rocket, Friday)
   systemd.services.hermes-profiles = {
