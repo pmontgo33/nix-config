@@ -118,8 +118,7 @@ in
       fallback_providers = [
         { provider = "minimax"; model = "MiniMax-M2.7"; }
         { provider = "google"; model = "gemini-flash-latest"; }
-        { provider = "openrouter"; model = "moonshot/kimi-k2"; }
-        { provider = "anthropic"; model = "claude-haiku-4-5-20251001"; }
+        { provider = "opencode-go"; model = "minimax-m2.7"; }
       ];
 
       auxiliary = {
