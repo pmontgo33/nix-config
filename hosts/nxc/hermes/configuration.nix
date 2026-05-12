@@ -183,6 +183,11 @@ in
         cwd = "/var/lib/hermes/workspace";
       };
 
+      checkpoints = {
+        enabled = true;
+        auto_prune = true;
+      };
+
     };
 
     # SOUL.md — injected as a workspace document at activation time
