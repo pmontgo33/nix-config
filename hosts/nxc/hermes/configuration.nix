@@ -63,6 +63,7 @@ in
       ps.fastapi
       ps.uvicorn
       ps.ptyprocess
+      ps.mcp
       agentmail
     ]))
   ];
