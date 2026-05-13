@@ -63,7 +63,7 @@ in
       ps.fastapi
       ps.uvicorn
       ps.ptyprocess
-      ps.mcp
+      pkgs-unstable.python312Packages.mcp
       agentmail
     ]))
   ];
