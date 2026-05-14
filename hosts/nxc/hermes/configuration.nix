@@ -209,6 +209,7 @@ in
   systemd.services.hermes-agent.environment = {
     TELEGRAM_ALLOWED_USERS = "748642877";
     HERMES_MANAGED = "true";
+    ANTHROPIC_TOKEN = "sk-ant-oat-hermes";
   };
 
   users.users.hermes.linger = true;
