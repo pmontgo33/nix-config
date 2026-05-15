@@ -47,7 +47,10 @@ in
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
-  extra-services.obsidian-headless.enable = true;
+  extra-services.obsidian-headless = {
+    enable = true;
+    vaultPath = "/var/lib/hermes/vault";
+  };
 
   services.openssh.enable = true;
 
