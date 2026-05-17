@@ -67,6 +67,7 @@ in
       ps.fastapi
       ps.uvicorn
       ps.ptyprocess
+      ps.python-telegram-bot
       pkgs-unstable.python312Packages.mcp
       agentmail
     ]))
