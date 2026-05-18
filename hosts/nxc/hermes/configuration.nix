@@ -70,7 +70,7 @@ in
       ps.python-telegram-bot
       pkgs-unstable.python312Packages.mcp
       agentmail
-    ]))
+    ]);
 
   programs.fish = {
     enable = true;
