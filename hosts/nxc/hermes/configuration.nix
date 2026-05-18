@@ -71,7 +71,6 @@ in
       pkgs-unstable.python312Packages.mcp
       agentmail
     ]))
-  ];
 
   programs.fish = {
     enable = true;
@@ -90,7 +89,9 @@ in
 
   services.hermes-agent = {
     enable = true;
-    extraPythonPackages = with pkgs.python312Packages; [ ];
+    extraPythonPackages = with pkgs.python312Packages; [
+      python-telegram-bot
+    ];
 
     mcpServers.forgejo = {
       url = "http://192.168.86.120:8080/sse";
@@ -158,6 +159,15 @@ in
       memory = {
         memory_enabled = true;
         user_profile_enabled = true;
+      };
+
+      # Real-time token streaming over Telegram (editMessageText / sendMessageDraft)
+      streaming = {
+        enabled = true;
+        transport = "auto";
+        edit_interval = 0.8;
+        buffer_threshold = 24;
+        fresh_final_after_seconds = 60;
       };
 
       # Telegram — requires a NEW bot token separate from openclaw's.
