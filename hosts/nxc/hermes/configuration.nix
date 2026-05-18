@@ -112,8 +112,10 @@ in
     };
 
     settings = {
-      model = "opencode-go/deepseek-v4-flash";
-      provider = "opencode-go";
+      model = {
+        default = "deepseek-v4-flash";
+        provider = "opencode-go";
+      };
 
       custom_providers = [
         {
