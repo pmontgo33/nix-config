@@ -157,6 +157,15 @@ in
         user_profile_enabled = true;
       };
 
+      # Real-time token streaming over Telegram (editMessageText / sendMessageDraft)
+      streaming = {
+        enabled = true;
+        transport = "auto";
+        edit_interval = 0.8;
+        buffer_threshold = 24;
+        fresh_final_after_seconds = 60;
+      };
+
       # Telegram — requires a NEW bot token separate from openclaw's.
       # Set TELEGRAM_BOT_TOKEN in openclaw-env to hermes's bot token.
       # Allow-list mirrors openclaw (user 748642877 = Monty).
