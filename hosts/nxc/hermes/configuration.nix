@@ -70,7 +70,6 @@ in
       pkgs-unstable.python312Packages.mcp
       agentmail
     ]))
-  ];
 
   programs.fish = {
     enable = true;
@@ -89,7 +88,9 @@ in
 
   services.hermes-agent = {
     enable = true;
-    extraPythonPackages = with pkgs.python312Packages; [ ];
+    extraPythonPackages = with pkgs.python312Packages; [
+      python-telegram-bot
+    ];
 
     mcpServers.forgejo = {
       url = "http://192.168.86.120:8080/sse";
