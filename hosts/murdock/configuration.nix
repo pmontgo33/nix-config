@@ -49,7 +49,7 @@
       # IMPORTANT: Recalculate after install with:
       # sudo btrfs inspect-internal map-swapfile -r /swap/swapfile
       # Then update this value and rebuild.
-      # "resume_offset=PLACEHOLDER"
+      "resume_offset=533760"
       "nvme_core.default_ps_max_latency_us=5000"
     ];
 
