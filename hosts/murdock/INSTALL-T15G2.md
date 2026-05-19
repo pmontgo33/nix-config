@@ -274,7 +274,8 @@ No partition changes needed — the swapfile lives inside btrfs.
 
 ## Post-Installation Checklist
 
-- [ ] System boots and prompts for LUKS password (or auto-unlocks with TPM)
+- [ ] TPM2 enrolled for LUKS auto-unlock (`sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+7 /dev/nvme0n1p2`)
+- [ ] System boots and auto-unlocks with TPM (test by rebooting)
 - [ ] Login works (password and/or fingerprint)
 - [ ] Ethernet works
 - [ ] WiFi connects successfully
