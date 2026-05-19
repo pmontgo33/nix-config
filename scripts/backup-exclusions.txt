@@ -7,8 +7,11 @@
 */.local/share/Trash
 */.thumbnails
 */Downloads
+Downloads
 */Nextcloud
+Nextcloud
 */mnt
+mnt
 */.npm
 */.cargo/registry
 */.cargo/git
