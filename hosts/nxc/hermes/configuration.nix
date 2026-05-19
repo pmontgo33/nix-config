@@ -91,7 +91,7 @@ in
   services.hermes-agent = {
     enable = true;
     extraPythonPackages = with pkgs.python312Packages; [ ];
-    extraDependencyGroups = [ "messaging" ];
+    extraDependencyGroups = [ "messaging" "anthropic" ];
 
     mcpServers.forgejo = {
       url = "http://192.168.86.120:8080/sse";
