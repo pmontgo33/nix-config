@@ -1,60 +1,48 @@
 # ThinkPad T15 Gen 2 Installation Guide
 ## NixOS Installation via nixos-anywhere
 
-This guide covers installing NixOS on the Lenovo ThinkPad T15 Gen 2 (i7-1185G7, 24GB RAM, Intel Iris Xe Graphics) using nixos-anywhere for automated deployment.
+This guide covers installing NixOS on the Lenovo ThinkPad T15 Gen 2 (i7-1185G7, 24GB RAM, Intel Iris Xe Graphics) using nixos-anywhere. The T15 is booted from the `rescue` NixOS ISO host and connected via ethernet.
 
 ---
 
 ## Prerequisites
 
-### On Your Current Machine (Installation Host)
+### On Your Installation Host (tesseract)
 - [ ] NixOS configuration repository cloned and up-to-date
-- [ ] SSH access configured
-- [ ] nixos-anywhere installed: `nix-shell -p nixos-anywhere`
+- [ ] SSH access to `rescue` working (Tailscale or local network)
+- [ ] nix flakes enabled (already the case)
 
-### On the T15 Gen 2 (Target Machine)
-- [ ] Boot from NixOS minimal ISO
-- [ ] Connect to network (ethernet recommended)
-- [ ] Note the IP address
+### On the T15 Gen 2
+- [ ] Connected via ethernet
+- [ ] Booted into the `rescue` NixOS ISO
 
 ---
 
-## Phase 1: Prepare the T15 for Installation
+## Phase 1: Prepare the T15
 
-### Step 1: Boot T15 into NixOS Live Environment
+### Step 1: Boot T15 into the Rescue ISO
 
-1. Download the latest NixOS minimal ISO
-2. Create a bootable USB drive:
-   ```bash
-   sudo dd if=nixos-minimal-XX.XX-x86_64-linux.iso of=/dev/sdX bs=4M status=progress
-   sudo sync
-   ```
-3. Boot from USB (press F12 at boot for boot menu)
+Boot the T15 from the rescue NixOS ISO. It should acquire an IP via DHCP over ethernet automatically.
 
-### Step 2: Configure Network on T15
+### Step 2: Get the T15's IP Address and Enable SSH
+
+On the T15 (or check your router/Tailscale admin for the lease):
 
 ```bash
-# If using WiFi:
-sudo systemctl start wpa_supplicant
-wpa_cli
-> add_network
-> set_network 0 ssid "YourSSID"
-> set_network 0 psk "YourPassword"
-> enable_network 0
-> quit
-
 ip addr show
-# Note the IP address
+# Note the ethernet IP (e.g. 192.168.1.100)
+
+# Set a temporary root password so nixos-anywhere can connect
+sudo passwd
 ```
 
-### Step 3: Enable SSH on T15
+SSH should already be running on the rescue ISO. Verify from tesseract:
 
 ```bash
-sudo passwd
-sudo systemctl start sshd
+ssh root@<T15-IP>
 ```
 
-### Step 4: Verify Hardware Details
+### Step 3: Verify Hardware Details (from the T15)
 
 ```bash
 # Check NVMe device name
@@ -72,38 +60,54 @@ free -h
 # Check Intel GPU PCI Bus ID
 lspci | grep VGA
 # Expected: 00:02.0 VGA compatible controller: Intel Corporation TigerLake-LP GT2
-# The config assumes PCI:0:2:0 — update hardware.graphics if different
+# The config assumes PCI:0:2:0 — update configuration.nix if different
 
 # Check USB IDs for Bluetooth and fingerprint reader
 lsusb
-# Note the vendor:product for the Bluetooth adapter and fingerprint reader
 # Config assumes: Bluetooth 8087:0aaa, Fingerprint 06cb:00bd
-# Update udev rules in configuration.nix if different
+# Note actual values — you'll update configuration.nix after install if they differ
 ```
 
 ---
 
 ## Phase 2: Install NixOS via nixos-anywhere
 
-### Step 5: Run nixos-anywhere
+Run all of these commands **on tesseract** (your installation host).
 
-From your installation host:
+### Step 4: Stage the SOPS Age Key
+
+nixos-anywhere's `--extra-files` flag copies files onto the target after partitioning, before activation. This is how the age key gets onto murdock so sops-nix can decrypt secrets on first boot.
 
 ```bash
-nixos-anywhere --flake .#murdock root@<T15-IP>
+mkdir -p /tmp/host-secrets/etc/sops/age
+sudo cp /etc/sops/age/keys.txt /tmp/host-secrets/etc/sops/age/keys.txt
+sudo chmod 600 /tmp/host-secrets/etc/sops/age/keys.txt
 ```
 
-### Step 6: Set LUKS Encryption Password
+### Step 5: Run nixos-anywhere
 
-During installation you will be prompted for a LUKS password. Choose a strong one and write it down — you will need it at every boot until TPM2 is enrolled.
+```bash
+nix run github:nix-community/nixos-anywhere -- \
+  --flake ~/nix-config#murdock \
+  --extra-files /tmp/host-secrets \
+  root@<T15-IP>
+```
+
+You will be prompted to set the LUKS encryption password during the install. Choose a strong one and write it down — you will need it at every boot until TPM2 is enrolled.
+
+### Step 6: Clean Up the Staged Key
+
+```bash
+rm -rf /tmp/host-secrets
+```
 
 ### Step 7: Wait for Installation to Complete
 
-The installation will:
-1. Partition the NVMe drive (GPT + ESP + LUKS)
+nixos-anywhere will:
+1. Partition the NVMe drive (GPT + 1G ESP + LUKS)
 2. Create btrfs subvolumes (root, home, nix, log, swap)
-3. Install NixOS
-4. Reboot
+3. Copy the age key into place
+4. Install NixOS and reboot
 
 ---
 
@@ -111,20 +115,20 @@ The installation will:
 
 ### Step 8: First Boot
 
-1. Remove the USB drive after reboot
+1. The T15 will reboot automatically after install
 2. Enter your LUKS password at the prompt
 3. The system will boot to the SDDM login screen
 
 ### Step 9: Migrate Home Directories (BEFORE first GUI login)
 
-**Do this before logging into the desktop** to avoid Firefox lock file conflicts and KDE state collisions.
+**Do this before logging into the desktop** to avoid Firefox lock file conflicts and KDE state collisions. The migration script runs on murdock and pulls files from tesseract over SSH via ethernet.
 
 ```bash
-# Press Ctrl+Alt+F2 to switch to a TTY virtual console
+# At the SDDM screen, press Ctrl+Alt+F2 to switch to a TTY
 # Log in as patrick
 
-# Connect to WiFi
-nmcli device wifi connect "YourSSID" password "YourPassword"
+# The network is already up via ethernet — verify connectivity
+ping -c 3 tesseract
 
 # Clone the config repo
 git clone <your-repo-url> ~/nix-config
@@ -135,14 +139,14 @@ ssh patrick@tesseract
 # Migrate patrick's home directory
 ~/nix-config/scripts/migrate-home.sh patrick tesseract /home/patrick/
 
-# Migrate lina's home directory (run as root)
+# Migrate lina's home directory
 sudo ~/nix-config/scripts/migrate-home.sh lina tesseract /home/lina/
 
 # Return to display manager
-# Press Ctrl+Alt+F1
+# Press Ctrl+Alt+F1, then log in graphically
 ```
 
-### Step 10: Login and Verify System
+### Step 10: Verify System
 
 ```bash
 nixos-version
@@ -175,17 +179,26 @@ Edit [hosts/murdock/configuration.nix](configuration.nix) — uncomment and upda
 "resume_offset=533760"  # Replace with your actual value
 ```
 
-Rebuild:
+Commit, push, and rebuild:
 
 ```bash
 sudo nixos-rebuild switch --flake .#murdock
+```
+
+### Step 13: Update Fingerprint + Bluetooth USB IDs (if needed)
+
+```bash
+lsusb
+# Find your Bluetooth adapter and fingerprint reader
+# Config assumes: Bluetooth 8087:0aaa, Fingerprint 06cb:00bd
+# If different, update the udev rules and sleep hook in configuration.nix and rebuild
 ```
 
 ---
 
 ## Phase 4: Hardware Verification
 
-### Step 13: Verify Intel GPU
+### Step 14: Verify Intel GPU
 
 ```bash
 glxinfo | grep "OpenGL renderer"
@@ -195,36 +208,29 @@ vainfo
 # Should show iHD driver and supported profiles
 ```
 
-### Step 14: Test Power Management
+### Step 15: Test Power Management
 
 ```bash
-# Check power profile daemon
 systemctl status power-profiles-daemon
-
-# Monitor power consumption
 sudo powertop
-
-# Check thermal status
 sensors
-
-# Verify throttled service
 sudo systemctl status throttled
 ```
 
-### Step 15: Test Hibernate/Resume
+### Step 16: Test Hibernate/Resume
 
 ```bash
-# Test suspend
+# Test suspend first
 systemctl suspend
 # Resume with power button — verify everything works
 
-# Test hibernation
+# Test hibernation (requires resume_offset to be set)
 systemctl hibernate
 # Power on, enter LUKS password if TPM fails
 # Verify applications resumed correctly
 ```
 
-### Step 16: Verify WiFi and Bluetooth
+### Step 17: Verify WiFi and Bluetooth
 
 ```bash
 nmcli device status
@@ -233,20 +239,11 @@ bluetoothctl
 > scan on
 ```
 
-### Step 17: Enroll Fingerprint
+### Step 18: Enroll Fingerprint
 
 ```bash
 fprintd-enroll
 # Follow prompts; test by locking screen and using fingerprint
-```
-
-### Step 18: Verify Fingerprint + Bluetooth USB IDs
-
-```bash
-lsusb
-# Find your Bluetooth adapter and fingerprint reader
-# If vendor:product differs from 8087:0aaa (BT) or 06cb:00bd (fingerprint),
-# update the udev rules and sleep hook in configuration.nix and rebuild
 ```
 
 ---
@@ -261,7 +258,7 @@ If you later upgrade the RAM:
 4. Recalculate resume_offset: `sudo btrfs inspect-internal map-swapfile -r /swap/swapfile`
 5. Update `resume_offset` in configuration.nix and rebuild again
 
-No partition changes needed — the swapfile is inside btrfs.
+No partition changes needed — the swapfile lives inside btrfs.
 
 ---
 
@@ -269,11 +266,12 @@ No partition changes needed — the swapfile is inside btrfs.
 
 - [ ] System boots and prompts for LUKS password (or auto-unlocks with TPM)
 - [ ] Login works (password and/or fingerprint)
+- [ ] Ethernet works
 - [ ] WiFi connects successfully
 - [ ] Bluetooth works
-- [ ] Intel Iris Xe GPU works (check with `glxinfo`, `vainfo`)
+- [ ] Intel Iris Xe GPU works (`glxinfo`, `vainfo`)
 - [ ] Suspend works correctly
-- [ ] Hibernate works correctly (resume_offset set)
+- [ ] Hibernate works correctly (resume_offset set and verified)
 - [ ] Lid close triggers suspend-then-hibernate
 - [ ] Audio works (PipeWire)
 - [ ] Touchpad gestures work
@@ -283,7 +281,6 @@ No partition changes needed — the swapfile is inside btrfs.
 - [ ] Auto-updates are scheduled
 - [ ] Tailscale connected
 - [ ] LUKS header backed up: `sudo cryptsetup luksHeaderBackup /dev/nvme0n1p2 --header-backup-file ~/luks-header-backup-murdock.img`
-- [ ] Hardware info documented
 
 ---
 
@@ -296,8 +293,8 @@ sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+7 /dev/nvme0n1p2
 ```
 
 ### Hibernate Fails to Resume
-- Verify `resume_offset` is set correctly in configuration.nix: `cat /proc/cmdline | grep resume_offset`
-- Verify `boot.resumeDevice = "/dev/mapper/cryptroot"` is set
+- Verify `resume_offset` is set: `cat /proc/cmdline | grep resume_offset`
+- Verify `boot.resumeDevice = "/dev/mapper/cryptroot"` is set in configuration.nix
 
 ### WiFi Not Working
 - Check firmware: `dmesg | grep iwlwifi`
@@ -305,3 +302,4 @@ sudo systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+7 /dev/nvme0n1p2
 
 ### Fingerprint Not Working After Resume
 - Check USB IDs with `lsusb` and update udev rules in configuration.nix
+- The sleep hook in configuration.nix handles stopping/restarting fprintd around suspend
