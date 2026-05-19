@@ -184,8 +184,8 @@
     # The values below are from the P53s and may differ on this hardware.
     # Bluetooth: 8087:0aaa, Fingerprint: 06cb:00bd (update if different)
     udev.extraRules = ''
-      ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0aaa", TEST=="power/control", ATTR{power/control}="on"
-      ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0aaa", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
+      ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0026", TEST=="power/control", ATTR{power/control}="on"
+      ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0026", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
       ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="06cb", ATTR{idProduct}=="00bd", TEST=="power/control", ATTR{power/control}="on"
       ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="06cb", ATTR{idProduct}=="00bd", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
       ACTION=="add", SUBSYSTEM=="usb", DRIVER=="btusb", TEST=="power/control", ATTR{power/control}="on"
