@@ -199,14 +199,14 @@
     fwupd.enable = true;
 
     logind.settings.Login = {
-      HandleLidSwitch = "suspend";
+      HandleLidSwitch = "suspend-then-hibernate";
       HandleLidSwitchDocked = "ignore";
-      HandleLidSwitchExternalPower = "suspend";
+      HandleLidSwitchExternalPower = "suspend-then-hibernate";
     };
   };
 
   systemd.sleep.extraConfig = ''
-    HibernateDelaySec=2h
+    HibernateDelaySec=20min
   '';
 
   systemd.services.btrfs-balance = {

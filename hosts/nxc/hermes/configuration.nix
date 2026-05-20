@@ -1,4 +1,4 @@
-{ config, pkgs, modulesPath, inputs, ... }:
+{ config, pkgs, lib, modulesPath, inputs, ... }:
 
 let
   pkgs-unstable = import inputs.nixpkgs-unstable {
@@ -17,6 +17,25 @@ let
       httpx pydantic websockets
     ];
     doCheck = false;
+  };
+  profileConfigs = {
+    rocket = {
+      model = {
+        default = "kimi-k2.6";
+        provider = "opencode-go";
+      };
+      fallback_providers = [
+        { provider = "minimax"; model = "MiniMax-M2.7"; }
+        { provider = "google"; model = "gemini-flash-latest"; }
+      ];
+    };
+    friday = {
+      model = {
+        default = "deepseek-v4-flash";
+        provider = "opencode-go";
+      };
+      fallback_providers = [];
+    };
   };
 in
 
@@ -113,7 +132,7 @@ in
 
     settings = {
       model = {
-        default = "deepseek-v4-flash";
+        default = "deepseek-v4-pro";
         provider = "opencode-go";
       };
 
@@ -232,18 +251,25 @@ in
   users.users.hermes.linger = true;
   users.users.root.linger = true;
 
-  # Profile directories for named subagents (Rocket, Friday)
+  # Profile directories and declarative config.yaml for named subagents (Rocket, Friday)
   systemd.services.hermes-profiles = {
     wantedBy = [ "multi-user.target" ];
-    script = ''
-      for profile in rocket friday; do
-        for subdir in cron sessions logs logs/curator memories; do
-          mkdir -p "/var/lib/hermes/.hermes/profiles/$profile/$subdir"
-          chown -R hermes:users "/var/lib/hermes/.hermes/profiles/$profile"
-          chmod 2775 "/var/lib/hermes/.hermes/profiles/$profile/$subdir"
-        done
-      done
-    '';
+    script =
+      let
+        writeProfile = name: cfg:
+          let
+            configFile = (pkgs.formats.yaml {}).generate "hermes-profile-${name}.yaml" cfg;
+          in ''
+            for subdir in cron sessions logs logs/curator memories; do
+              mkdir -p "/var/lib/hermes/.hermes/profiles/${name}/$subdir"
+            done
+            chown -R hermes:users "/var/lib/hermes/.hermes/profiles/${name}"
+            chmod 2775 "/var/lib/hermes/.hermes/profiles/${name}"
+            install -o hermes -g users -m 0640 ${configFile} \
+              /var/lib/hermes/.hermes/profiles/${name}/config.yaml
+          '';
+      in
+        lib.concatStringsSep "\n" (lib.mapAttrsToList writeProfile profileConfigs);
   };
 
   systemd.services.rocket-githook = {
