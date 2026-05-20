@@ -109,8 +109,7 @@ in
 
   services.hermes-agent = {
     enable = true;
-    extraPythonPackages = with pkgs.python312Packages; [ ];
-    extraDependencyGroups = [ "messaging" "anthropic" ];
+    extraDependencyGroups = [ "messaging" "anthropic" "voice" ];
 
     mcpServers.forgejo = {
       url = "http://192.168.86.120:8080/sse";
@@ -191,6 +190,15 @@ in
         fresh_final_after_seconds = 60;
       };
 
+      # Voice transcription (STT) — local faster-whisper, no API key needed
+      stt = {
+        enabled = true;
+        provider = "local";
+        local = {
+          model = "base";
+        };
+      };
+
       # Telegram — requires a NEW bot token separate from openclaw's.
       # Set TELEGRAM_BOT_TOKEN in openclaw-env to hermes's bot token.
       # Allow-list mirrors openclaw (user 748642877 = Monty).
@@ -203,7 +211,7 @@ in
           enabled = true;
           extra = {
             url = "http://192.168.86.100:8123";
-            watch_entities = [ "binary_sensor.away_mode" ];
+            watch_entities = [ "binary_sensor.away_mode" "sensor.pat_phone_next_alarm" ];
             watch_all = false;
             cooldown_seconds = 10;
           };
