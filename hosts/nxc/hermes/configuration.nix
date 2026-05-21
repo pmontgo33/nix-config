@@ -256,7 +256,10 @@ in
     ANTHROPIC_TOKEN = "sk-ant-oat-hermes";
   };
 
-  users.users.hermes.linger = true;
+  users.users.hermes = {
+    extraGroups = [ "obsidian-headless" ];
+    linger = true;
+  };
   users.users.root.linger = true;
 
   # Profile directories and declarative config.yaml for named subagents (Rocket, Friday)
