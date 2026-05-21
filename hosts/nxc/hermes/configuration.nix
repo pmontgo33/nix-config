@@ -68,7 +68,7 @@ in
   extra-services.host-checkin.enable = true;
   extra-services.obsidian-headless = {
     enable = true;
-    vaultPath = "/var/lib/hermes/vault";
+    vaults.MontyVault.path = "/var/lib/hermes/vault/MontyVault";
   };
 
   services.openssh.enable = true;

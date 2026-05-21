@@ -1,21 +1,61 @@
 # Obsidian Headless sync daemon using the official obsidian-headless npm CLI
-# First-time setup (run once after deploy):
-#   bash -c 'set -a; source /run/secrets/obsidian-env; set +a;
-#     sudo -u obsidian-headless env HOME=<dataDir> ob login --email "$OBSIDIAN_EMAIL" --password "$OBSIDIAN_PASSWORD"
-#     sudo -u obsidian-headless env HOME=<dataDir> ob sync-setup --path <vaultPath> --vault <vaultName> --password "$OBSIDIAN_SYNC_PASSWORD"'
+# First-time setup per vault: ob-sync-setup <vaultName> <localPath>
+# Then: systemctl start obsidian-headless-<vaultName>
 # obsidian-env must contain: OBSIDIAN_EMAIL, OBSIDIAN_PASSWORD, OBSIDIAN_SYNC_PASSWORD (E2E key)
 
 { config, lib, pkgs, ... }:
 with lib; let
   cfg = config.extra-services.obsidian-headless;
   ob = pkgs.callPackage ../packages/obsidian-headless.nix {};
+
+  setupScript = pkgs.writeShellScriptBin "ob-sync-setup" ''
+    set -euo pipefail
+    VAULT_NAME="''${1:?Usage: ob-sync-setup <vaultName> <localPath>}"
+    VAULT_PATH="''${2:?Usage: ob-sync-setup <vaultName> <localPath>}"
+    set -a; source /run/secrets/obsidian-env; set +a
+    sudo -u obsidian-headless env HOME=${cfg.dataDir} ${ob}/bin/ob sync-setup \
+      --path "$VAULT_PATH" --vault "$VAULT_NAME" --password "$OBSIDIAN_SYNC_PASSWORD"
+    echo "Done. Run: systemctl start obsidian-headless-''${VAULT_NAME}"
+  '';
+
+  mkVaultService = name: vault: {
+    description = "Obsidian Headless sync daemon (${name})";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    startLimitIntervalSec = 600;
+    startLimitBurst = 5;
+    serviceConfig = {
+      Type = "simple";
+      User = "obsidian-headless";
+      Group = "obsidian-headless";
+      WorkingDirectory = cfg.dataDir;
+      EnvironmentFile = config.sops.secrets.obsidian-env.path;
+      # Exit 0 (not a failure) if vault hasn't been configured via ob-sync-setup yet.
+      ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null || { echo \"Vault not configured — run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
+      UMask = "0002";
+      Restart = "on-failure";
+      RestartSec = "60s";
+    };
+  };
 in {
   options.extra-services.obsidian-headless = {
     enable = mkEnableOption "obsidian-headless sync daemon";
 
-    vaultPath = mkOption {
-      type = types.str;
-      description = "Local path to the Obsidian vault to sync";
+    vaults = mkOption {
+      type = types.attrsOf (types.submodule {
+        options.path = mkOption {
+          type = types.str;
+          description = "Local path where this vault will be synced";
+        };
+      });
+      default = {};
+      description = "Obsidian vaults to sync, keyed by vault name";
+      example = literalExpression ''
+        {
+          MontyVault.path = "/var/lib/hermes/vault/MontyVault";
+        }
+      '';
     };
 
     dataDir = mkOption {
@@ -26,7 +66,7 @@ in {
   };
 
   config = mkIf cfg.enable {
-    environment.systemPackages = [ ob ];
+    environment.systemPackages = [ ob setupScript ];
 
     users.users.obsidian-headless = {
       isSystemUser = true;
@@ -39,36 +79,19 @@ in {
     systemd.tmpfiles.rules = [
       "d  ${cfg.dataDir}  0750 obsidian-headless obsidian-headless -"
       "e  ${cfg.dataDir}  0750 obsidian-headless obsidian-headless -"
-      "d  ${cfg.vaultPath} 2770 obsidian-headless obsidian-headless -"
-      "e  ${cfg.vaultPath} 2770 obsidian-headless obsidian-headless -"
-    ];
+    ] ++ lib.concatLists (lib.mapAttrsToList (_name: vault: [
+      "d  ${vault.path} 2770 obsidian-headless obsidian-headless -"
+      "e  ${vault.path} 2770 obsidian-headless obsidian-headless -"
+    ]) cfg.vaults);
 
     sops.secrets.obsidian-env = {
       owner = "obsidian-headless";
       mode = "0400";
     };
 
-    systemd.services.obsidian-headless = {
-      description = "Obsidian Headless sync daemon";
-      wantedBy = [ "multi-user.target" ];
-      wants = [ "network-online.target" ];
-      after = [ "network-online.target" ];
-      startLimitIntervalSec = 600;
-      startLimitBurst = 5;
-      serviceConfig = {
-        Type = "simple";
-        User = "obsidian-headless";
-        Group = "obsidian-headless";
-        WorkingDirectory = cfg.dataDir;
-        EnvironmentFile = config.sops.secrets.obsidian-env.path;
-        ExecStartPre = "${ob}/bin/ob login --email $OBSIDIAN_EMAIL --password $OBSIDIAN_PASSWORD";
-        # Exit 0 (not a failure) if vault hasn't been configured via ob sync-setup yet.
-        ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${cfg.vaultPath} &>/dev/null || { echo \"Vault not configured — run ob sync-setup first\"; exit 0; }; exec ${ob}/bin/ob sync --path ${cfg.vaultPath} --continuous'";
-        UMask = "0002";
-        Restart = "on-failure";
-        RestartSec = "60s";
-      };
-    };
+    systemd.services = lib.mapAttrs' (name: vault:
+      lib.nameValuePair "obsidian-headless-${name}" (mkVaultService name vault)
+    ) cfg.vaults;
 
     networking.firewall.allowedTCPPorts = [
       8080  # TaskNotes MCP server (Obsidian plugin)
