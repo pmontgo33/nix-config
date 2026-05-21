@@ -53,18 +53,20 @@ in {
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
+      startLimitIntervalSec = 600;
+      startLimitBurst = 5;
       serviceConfig = {
         Type = "simple";
         User = "obsidian-headless";
         Group = "obsidian-headless";
         WorkingDirectory = cfg.dataDir;
         EnvironmentFile = config.sops.secrets.obsidian-env.path;
-        # Log in using credentials from env file, then run continuous sync
         ExecStartPre = "${ob}/bin/ob login --email $OBSIDIAN_EMAIL --password $OBSIDIAN_PASSWORD";
-        ExecStart = "${ob}/bin/ob sync --path ${cfg.vaultPath} --continuous";
+        # Exit 0 (not a failure) if vault hasn't been configured via ob sync-setup yet.
+        ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${cfg.vaultPath} &>/dev/null || { echo \"Vault not configured — run ob sync-setup first\"; exit 0; }; exec ${ob}/bin/ob sync --path ${cfg.vaultPath} --continuous'";
         UMask = "0002";
         Restart = "on-failure";
-        RestartSec = "30s";
+        RestartSec = "60s";
       };
     };
 

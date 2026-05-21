@@ -76,6 +76,13 @@ in
     ];
   };
 
+  systemd.services.gitea-runner-default = {
+    after = [ "forgejo.service" ];
+    wants = [ "forgejo.service" ];
+    startLimitBurst = 10;
+    startLimitIntervalSec = 120;
+  };
+
   sops.secrets."forgejo-runner-token" = {
     mode = "0400";
     restartUnits = [ "gitea-runner-default.service" ];
