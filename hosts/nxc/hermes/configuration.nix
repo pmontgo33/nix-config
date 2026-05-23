@@ -128,6 +128,10 @@ in
       auxiliary = {
         provider = "minimax";
         model = "MiniMax-M2.7";
+        vision = {
+          provider = "minimax";
+          model = "MiniMax-M2.7";
+        };
       };
 
       homeassistant = {
