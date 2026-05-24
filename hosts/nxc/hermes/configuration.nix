@@ -157,8 +157,8 @@ in
         provider = "minimax";
         model = "MiniMax-M2.7";
         vision = {
-          provider = "minimax";
-          model = "MiniMax-M2.7";
+          provider = "opencode-go";
+          model = "mimo-v2-omni";
         };
       };
 
