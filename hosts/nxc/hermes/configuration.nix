@@ -75,7 +75,6 @@ in
 
   environment.systemPackages = with pkgs; [
     pkgs-unstable.claude-code
-    hermes-agent
     tmux
     pkgs.jq
     (pkgs.python312.withPackages (ps: with ps; [
@@ -92,14 +91,7 @@ in
     ]))
   ];
 
-  programs.fish = {
-    enable = true;
-    interactiveShellInit = ''
-      function hermes
-        HERMES_HOME=/var/lib/hermes/.hermes /run/current-system/sw/bin/hermes $argv
-      end
-    '';
-  };
+  programs.fish.enable = true;
 
   # Reuses openclaw-env secret — contains shared API keys (Anthropic, OpenRouter,
   # MiniMax, etc.). Telegram token must be a NEW bot separate from openclaw's to
@@ -109,6 +101,7 @@ in
 
   services.hermes-agent = {
     enable = true;
+    addToSystemPackages = true;
     extraDependencyGroups = [ "messaging" "anthropic" "voice" ];
 
     mcpServers.forgejo = {
