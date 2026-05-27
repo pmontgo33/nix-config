@@ -95,6 +95,7 @@ in
       ps.ptyprocess
       ps.python-telegram-bot
       pkgs-unstable.python312Packages.mcp
+      ps.icalendar
       agentmail
     ]))
   ];
