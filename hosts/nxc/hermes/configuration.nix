@@ -73,6 +73,14 @@ in
 
   services.openssh.enable = true;
 
+  # SSH client: trust Home Assistant's host key declaratively
+  programs.ssh.knownHosts = {
+    "home-assistant" = {
+      hostNames = [ "192.168.86.100" "homeassistant" "ha" ];
+      publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMzBHEg142uYU3qgiuUa3afGEVcI9JPe5a4aX4gnyHJ1";
+    };
+  };
+
   environment.systemPackages = with pkgs; [
     pkgs-unstable.claude-code
     tmux
