@@ -125,7 +125,7 @@
       };
 
       transmission_novpn = {
-        image = "lscr.io/linuxserver/transmission:latest";
+        image = "lscr.io/linuxserver/transmission:4.0.5";
         autoStart = true;
         extraOptions = [
           "--network=media-network"
