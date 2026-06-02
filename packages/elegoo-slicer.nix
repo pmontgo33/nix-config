@@ -76,14 +76,14 @@ appimageTools.wrapType1 rec {
     glibc
   ];
 
-  # Point fontconfig at our self-contained config instead of the host NixOS one,
-  # which triggers SIGSEGV in Pango's ensure_faces when opening GTK file dialogs.
+  # Point fontconfig at our self-contained config instead of the host NixOS one.
+  # NOTE: do NOT set FONTCONFIG_SYSROOT — even an empty string causes fontconfig
+  # 2.17.1 to return NULL from FcConfigFilename(), breaking all font rendering.
   # Also add /usr/lib64 to LD_LIBRARY_PATH because the AppImage binary has a
   # hardcoded RUNPATH pointing to the developer's build machine and falls through
   # to system paths, which on NixOS FHS env puts 64-bit libs in /usr/lib64 only.
   extraPreBwrapCmds = ''
     export FONTCONFIG_FILE=${fontsConf}
-    export FONTCONFIG_SYSROOT=""
     export LD_LIBRARY_PATH="/usr/lib64:/usr/lib:$LD_LIBRARY_PATH"
   '';
 

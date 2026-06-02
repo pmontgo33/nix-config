@@ -304,8 +304,7 @@
               widget = {
                 type = "truenas";
                 url = "https://truenas.montycasa.net";
-                username = "{{HOMEPAGE_VAR_TRUENAS_USERNAME}}";
-                password = "{{HOMEPAGE_VAR_TRUENAS_PASSWORD}}";
+                key = "{{HOMEPAGE_VAR_TRUENAS_API_KEY}}";
                 nasType = "scale";
               };
             };
@@ -383,8 +382,7 @@
               widget = {
                 type = "truenas";
                 url = "https://bucky.montycasa.net/";
-                username = "{{HOMEPAGE_VAR_BUCKY_USERNAME}}";
-                password = "{{HOMEPAGE_VAR_BUCKY_PASSWORD}}";
+                key = "{{HOMEPAGE_VAR_BUCKY_API_KEY}}";
                 nasType = "scale";
               };
             };
