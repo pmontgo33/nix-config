@@ -160,7 +160,7 @@ in
         model = "MiniMax-M2.7";
         vision = {
           provider = "opencode-go";
-          model = "mimo-v2-omni";
+          model = "mimo-v2.5";
         };
       };
 
