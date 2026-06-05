@@ -102,6 +102,7 @@ in
       ps.pillow
       ps.pyinstaller
       ps.darkdetect
+      ps.tkinter
       agentmail
     ]))
   ];
