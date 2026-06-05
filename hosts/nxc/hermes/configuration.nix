@@ -85,6 +85,7 @@ in
     pkgs-unstable.claude-code
     tmux
     pkgs.jq
+    pkgs.tesseract
     (pkgs.python312.withPackages (ps: with ps; [
       ps.pandas
       ps.pdfplumber
@@ -96,6 +97,11 @@ in
       ps.python-telegram-bot
       pkgs-unstable.python312Packages.mcp
       ps.icalendar
+      ps.pymupdf
+      ps.pytesseract
+      ps.pillow
+      ps.pyinstaller
+      ps.darkdetect
       agentmail
     ]))
   ];
