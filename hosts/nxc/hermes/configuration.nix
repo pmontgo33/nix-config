@@ -140,7 +140,7 @@ in
 
     settings = {
       model = {
-        default = "deepseek-v4-pro";
+        default = "mimo-v2.5";
         provider = "opencode-go";
       };
 
