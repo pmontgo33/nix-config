@@ -4,7 +4,25 @@
 
 { config, lib, pkgs, inputs, ... }:
 
+let
+  pkgs-unstable = import inputs.nixpkgs-unstable { inherit (pkgs) system; config = pkgs.config; };
+  pkgs-elegoo-compat = import inputs.nixpkgs-elegoo-compat { inherit (pkgs.stdenv) system; config = pkgs.config; };
+in
 {
+  nixpkgs.overlays = [
+    (final: prev: {
+      orca-slicer = prev.symlinkJoin {
+        name = "orca-slicer-wrapped";
+        paths = [ prev.orca-slicer ];
+        buildInputs = [ prev.makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/orca-slicer \
+            --prefix LD_LIBRARY_PATH : "${pkgs-unstable.pango}/lib:${pkgs-unstable.pango.out}/lib"
+        '';
+      };
+    })
+  ];
+
   imports = [
     # ./hardware-configuration.nix  # Not needed - disko manages filesystems
     ./disk-config.nix
@@ -411,7 +429,7 @@
 
     # 3D printing
     orca-slicer
-    (pkgs.callPackage ../../packages/elegoo-slicer.nix {})
+    (pkgs-elegoo-compat.callPackage ../../packages/elegoo-slicer.nix {})
   ];
 
   fonts.packages = with pkgs; [

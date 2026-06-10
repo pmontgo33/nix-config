@@ -4,6 +4,9 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Pinned to last known-good nixos-25.11 rev for elegoo-slicer AppImage compatibility
+    # (glib 2.86 broke wx's g_dbus_proxy_call_sync; this rev has the last working glib)
+    nixpkgs-elegoo-compat.url = "github:NixOS/nixpkgs/10e7ad5bbcb421fe07e3a4ad53a634b0cd57ffac";
 
     home-manager = {
       url = "github:nix-community/home-manager/release-25.11";
