@@ -3,10 +3,8 @@
 , appimageTools
 , writeText
 , dejavu_fonts
-, noto-fonts
 , source-han-sans
 , runCommand
-, fontconfig
 }:
 
 let
@@ -24,10 +22,15 @@ let
 
   # Font bundle placed at share/fonts so the FHS env merges it into
   # /usr/share/fonts, where WebKit's subprocess can find it.
+  # NOTE: noto-fonts is intentionally NOT bundled. fontconfig 2.17.1
+  # NULL-derefs in its dir-cache writer when scanning Noto variable fonts
+  # whose filenames contain [ ] (e.g. NotoKufiArabic[wght].ttf). Source
+  # Han Sans + DejaVu cover everything the WebKit UI actually requests,
+  # and the <alias> rules below route every sans-serif / CJK request to
+  # Source Han Sans anyway.
   webFonts = runCommand "elegoo-slicer-web-fonts" {} ''
     mkdir -p $out/share/fonts
     ln -s ${dejavu_fonts}/share/fonts $out/share/fonts/dejavu
-    ln -s ${noto-fonts}/share/fonts $out/share/fonts/noto
     ln -s ${source-han-sans}/share/fonts $out/share/fonts/source-han-sans
   '';
 
@@ -39,7 +42,6 @@ let
     <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
     <fontconfig>
       <dir>${dejavu_fonts}/share/fonts</dir>
-      <dir>${noto-fonts}/share/fonts</dir>
       <dir>${source-han-sans}/share/fonts</dir>
       <dir>/usr/share/fonts</dir>
       <cachedir prefix="xdg">elegoo-slicer-fontconfig-cache</cachedir>
