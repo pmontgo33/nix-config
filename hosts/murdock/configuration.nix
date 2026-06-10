@@ -198,9 +198,8 @@ in
       };
     };
 
-    # IMPORTANT: Verify these USB vendor:product IDs on the T15 Gen 2 with `lsusb`.
-    # The values below are from the P53s and may differ on this hardware.
-    # Bluetooth: 8087:0aaa, Fingerprint: 06cb:00bd (update if different)
+    # Verified USB IDs from `lsusb` on T15 Gen 2:
+    # Bluetooth: 8087:0026, Fingerprint: 06cb:00bd
     udev.extraRules = ''
       ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0026", TEST=="power/control", ATTR{power/control}="on"
       ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8087", ATTR{idProduct}=="0026", TEST=="power/autosuspend", ATTR{power/autosuspend}="-1"
@@ -285,6 +284,18 @@ in
       [ -w "$dev_path/power/autosuspend" ] && printf '%s\n' '-1' > "$dev_path/power/autosuspend" || true
     }
 
+    rebind_usb_device() {
+      dev="$1"
+      dev_path="/sys/bus/usb/devices/$dev"
+      [ -d "$dev_path" ] || return 0
+      driver_path="$dev_path/driver"
+      [ -L "$driver_path" ] || return 0
+      driver_dir="$(readlink -f "$driver_path")"
+      [ -w "$driver_dir/unbind" ] && printf '%s\n' "$dev" > "$driver_dir/unbind" || true
+      "$sleep_bin" 1
+      [ -w "$driver_dir/bind" ] && printf '%s\n' "$dev" > "$driver_dir/bind" || true
+    }
+
     case $1 in
       pre)
         "$systemctl_bin" stop fprintd.service || true
@@ -293,14 +304,20 @@ in
       post)
         "$sleep_bin" 2
 
-        bluetooth_usb_device="$(find_usb_device 8087 0aaa || true)"
+        bluetooth_usb_device="$(find_usb_device 8087 0026 || true)"
         fingerprint_usb_device="$(find_usb_device 06cb 00bd || true)"
 
         [ -n "$bluetooth_usb_device" ] && set_usb_power_policy "$bluetooth_usb_device"
         [ -n "$fingerprint_usb_device" ] && set_usb_power_policy "$fingerprint_usb_device"
 
+        if [ -n "$fingerprint_usb_device" ]; then
+          rebind_usb_device "$fingerprint_usb_device"
+          "$sleep_bin" 1
+        fi
+
         "$systemctl_bin" reset-failed bluetooth.service fprintd.service || true
         "$systemctl_bin" start bluetooth.service || true
+        "$systemctl_bin" start fprintd.service || true
         ;;
     esac
   '';
