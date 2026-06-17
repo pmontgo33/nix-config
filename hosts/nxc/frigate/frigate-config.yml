@@ -29,8 +29,10 @@ ffmpeg:
 
 record:
   enabled: true
-  retain:
-    days: 0
+  continuous:
+    days: 1
+  motion:
+    days: 7
   alerts:
     retain:
       days: 10
@@ -64,6 +66,14 @@ lpr:
 classification:
   bird:
     enabled: false
+  custom:
+    dog:
+      enabled: true
+      threshold: 0.8
+      object_config:
+        objects:
+          - dog
+        classification_type: sub_label
 
 go2rtc:
   rtsp:
@@ -104,8 +114,6 @@ cameras:
             - detect
     record:
       enabled: true
-      retain:
-        days: 3
       alerts:
         retain:
           days: 10
@@ -139,8 +147,10 @@ cameras:
             - detect
     record:
       enabled: true
-      retain:
-        days: 3
+      continuous:
+        days: 1
+      motion:
+        days: 7
       alerts:
         retain:
           days: 10
@@ -177,8 +187,12 @@ cameras:
             - detect
     record:
       enabled: true
-      retain:
-        days: 0.125
+      alerts:
+        retain:
+          days: 0.125
+      detections:
+        retain:
+          days: 0.125
     detect:
       enabled: true
     objects:
@@ -204,8 +218,12 @@ cameras:
             - detect
     record:
       enabled: true
-      retain:
-        days: 0.125
+      alerts:
+        retain:
+          days: 0.125
+      detections:
+        retain:
+          days: 0.125
     detect:
       enabled: true
     objects:
@@ -231,8 +249,12 @@ cameras:
             - detect
     record:
       enabled: true
-      retain:
-        days: 0.25
+      alerts:
+        retain:
+          days: 0.25
+      detections:
+        retain:
+          days: 0.25
     detect:
       enabled: true
     objects:
