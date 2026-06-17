@@ -64,8 +64,8 @@ let
         done
         CONTAINER_INFO="$TEMP_INFO"
       fi
-    elif command -v ${pkgs.docker}/bin/docker &> /dev/null; then
-      CONTAINER_INFO=$(${pkgs.docker}/bin/docker ps --format "{{.Names}}\t{{.Image}}" 2>/dev/null | \
+    elif command -v docker &> /dev/null; then
+      CONTAINER_INFO=$(docker ps --format "{{.Names}}\t{{.Image}}" 2>/dev/null | \
         while IFS=$'\t' read -r name image; do
           if ! echo "$image" | ${pkgs.gnugrep}/bin/grep -qiE "(postgres|mysql|mariadb|mongodb|redis|cassandra|elasticsearch)"; then
             # Extract tag
@@ -75,7 +75,7 @@ let
             fi
 
             # Get RepoDigest from image inspection
-            repo_digest=$(${pkgs.docker}/bin/docker image inspect "$image" 2>/dev/null | \
+            repo_digest=$(docker image inspect "$image" 2>/dev/null | \
               ${pkgs.jq}/bin/jq -r '.[0].RepoDigests[0] // ""' 2>/dev/null | cut -d'@' -f2 || echo "")
 
             ${pkgs.jq}/bin/jq -n \
@@ -147,8 +147,8 @@ let
         done
         CONTAINER_INFO="$TEMP_INFO"
       fi
-    elif command -v ${pkgs.docker}/bin/docker &> /dev/null; then
-      CONTAINER_INFO=$(${pkgs.docker}/bin/docker ps --format "{{.Names}}\t{{.Image}}" 2>/dev/null | \
+    elif command -v docker &> /dev/null; then
+      CONTAINER_INFO=$(docker ps --format "{{.Names}}\t{{.Image}}" 2>/dev/null | \
         while IFS=$'\t' read -r name image; do
           if ! echo "$image" | ${pkgs.gnugrep}/bin/grep -qiE "(postgres|mysql|mariadb|mongodb|redis|cassandra|elasticsearch)"; then
             # Extract tag
@@ -158,7 +158,7 @@ let
             fi
 
             # Get RepoDigest from image inspection
-            repo_digest=$(${pkgs.docker}/bin/docker image inspect "$image" 2>/dev/null | \
+            repo_digest=$(docker image inspect "$image" 2>/dev/null | \
               ${pkgs.jq}/bin/jq -r '.[0].RepoDigests[0] // ""' 2>/dev/null | cut -d'@' -f2 || echo "")
 
             ${pkgs.jq}/bin/jq -n \
