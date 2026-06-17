@@ -38,7 +38,7 @@
     };
 
     nix-hermes-agent = {
-      url = "github:NousResearch/hermes-agent";
+      url = "github:NousResearch/hermes-agent/c349eca823a35ab2397bb14c4f2463d092ad8767";
     };
   };
 
