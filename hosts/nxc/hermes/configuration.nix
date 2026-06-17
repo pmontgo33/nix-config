@@ -120,9 +120,9 @@ in
     addToSystemPackages = true;
     extraDependencyGroups = [ "messaging" "anthropic" "voice" ];
 
-    mcpServers.forgejo = {
-      url = "http://192.168.86.120:8080/sse";
-    };
+    # mcpServers.forgejo = {
+    #   url = "http://192.168.86.120:8080/sse";
+    # };
     user = "hermes";
     group = "users";
     createUser = true;
