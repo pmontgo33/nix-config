@@ -152,9 +152,7 @@
       dns cloudflare {env.CLOUDFLARE_API_TOKEN}
     }
     root * /var/www/ical
-    file_server {
-      browse off
-    }
+    file_server
     header Content-Type "text/calendar; charset=utf-8"
   '';
 
