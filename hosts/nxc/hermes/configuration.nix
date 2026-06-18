@@ -266,8 +266,17 @@ in
   systemd.services.hermes-agent.environment = {
     TELEGRAM_ALLOWED_USERS = "748642877";
     HERMES_MANAGED = "true";
-    ANTHROPIC_TOKEN = "sk-ant-oat-hermes";
+    ANTHROPIC_TOKEN = "***";
   };
+
+  # Fix file ownership after nix rebuilds. The activation script chowns
+  # directories but not individual files — if anything runs as root and
+  # touches a file under .hermes/ (e.g. cron/jobs.json during a service
+  # restart race), it becomes root-owned and the gateway can't read it.
+  # This self-heals on every service start.
+  systemd.services.hermes-agent.postStart = ''
+    find /var/lib/hermes/.hermes -maxdepth 3 \! -user hermes -exec chown hermes:users {} + 2>/dev/null || true
+  '';
 
   users.users.hermes = {
     extraGroups = [ "obsidian-headless" ];
