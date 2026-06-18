@@ -158,9 +158,10 @@
     header Content-Type "text/calendar; charset=utf-8"
   '';
 
-  # Web root for ICS calendar files — created declaratively, world-readable so caddy can serve
+  # Web root for ICS calendar files — owned by patrick so deploy script can rsync without sudo
   systemd.tmpfiles.rules = [
-    "d /var/www/ical 0755 root root -"
+    "d /var/www/ical 0755 patrick users -"
+    "d /var/www/ical/sports 0755 patrick users -"
   ];
 
   networking.useDHCP = false;
