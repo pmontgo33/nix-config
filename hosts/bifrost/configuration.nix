@@ -143,6 +143,26 @@
     };
   };
 
+  # ICS calendar server — static file serving
+  # Bypasses caddy-proxy module (which only supports reverse_proxy) by
+  # configuring the virtualHost directly. The CF token is already in the
+  # caddy environment via extra-services.caddy-proxy.cloudflareTokenFile.
+  services.caddy.virtualHosts."ical.montycasa.com".extraConfig = ''
+    tls {
+      dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    }
+    root * /var/www/ical
+    file_server {
+      browse off
+    }
+    header Content-Type "text/calendar; charset=utf-8"
+  '';
+
+  # Web root for ICS calendar files — created declaratively, world-readable so caddy can serve
+  systemd.tmpfiles.rules = [
+    "d /var/www/ical 0755 root root -"
+  ];
+
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = true;
   networking.firewall.allowedUDPPorts = [ 40000 ];
