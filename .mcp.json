@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "hermes": {
+      "type": "stdio",
+      "command": "ssh",
+      "args": ["-l", "hermes", "hermes", "/run/current-system/sw/bin/hermes", "mcp", "serve"]
+    }
+  }
+}
