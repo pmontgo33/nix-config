@@ -5,6 +5,23 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
+  hermesPython = pkgs.python312.withPackages (ps: [
+    ps.pandas
+    ps.pdfplumber
+    ps.openpyxl
+    ps.reportlab
+    ps.fastapi
+    ps.uvicorn
+    ps.ptyprocess
+    ps.python-telegram-bot
+    pkgs-unstable.python312Packages.mcp
+    ps.icalendar
+    ps.pymupdf
+    ps.pytesseract
+    ps.pillow
+    ps.darkdetect
+    agentmail
+  ]);
   agentmail = pkgs.python312Packages.buildPythonPackage rec {
     pname = "agentmail";
     version = "0.5.0";
@@ -86,25 +103,7 @@ in
     tmux
     pkgs.jq
     pkgs.tesseract
-    (pkgs.python312.withPackages (ps: with ps; [
-      ps.pandas
-      ps.pdfplumber
-      ps.openpyxl
-      ps.reportlab
-      ps.fastapi
-      ps.uvicorn
-      ps.ptyprocess
-      ps.python-telegram-bot
-      pkgs-unstable.python312Packages.mcp
-      ps.icalendar
-      ps.pymupdf
-      ps.pytesseract
-      ps.pillow
-      ps.pyinstaller
-      ps.darkdetect
-      ps.tkinter
-      agentmail
-    ]))
+    hermesPython
   ];
 
   programs.fish.enable = true;

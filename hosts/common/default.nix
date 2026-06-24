@@ -29,6 +29,13 @@
   # Enable the Flakes feature and the accompanying new nix command-line tool
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
+  # Cachix binary cache — fills from cache.nixos.org first, then this.
+  # Push access requires a Cachix auth token at ~/.config/cachix/token on the builder.
+  nix.settings.substituters = [ "https://monty-nix-config.cachix.org" ];
+  nix.settings.trusted-public-keys = [
+    "monty-nix-config.cachix.org-1:DYj9HWPgt1EBfsSOc1JEbqFGM5xAN0ZcykEmzb8uny4="
+  ];
+
   # Add public keys for management machines
   users.users.root = {
     hashedPassword = lib.mkForce "$6$fu.ra7ConU15mC8P$kMM7PcKtpo3ruRpqncC47lbRKYK3/f2z4shsK8pewbxohu6OjpxdJP/NYLLvEg4NjN29BSt3zPq6UwSxK1Zn90";
