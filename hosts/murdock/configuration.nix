@@ -167,6 +167,19 @@ in
     priority = 100;
   };
 
+  # Offload builds to nix-fury. Applies to `nix build` / `nixos-rebuild`
+  # commands run locally on murdock — including cross-host builds like
+  # `nix build .#nixosConfigurations.hermes.config.system.toplevel` and
+  # `nixos-rebuild switch --target-host hermes`.
+  nix.buildMachines = [{
+    hostName = "nix-fury";
+    systems = [ "x86_64-linux" ];
+    maxJobs = 8;
+    speedFactor = 4;
+    supportedFeatures = [ "big-parallel" "nixos-test" "kvm" ];
+  }];
+  nix.distributedBuilds = true;
+
   services = {
 
     power-profiles-daemon.enable = true;
