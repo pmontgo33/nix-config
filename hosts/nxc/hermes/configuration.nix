@@ -139,7 +139,7 @@ in
 
     settings = {
       model = {
-        default = "mimo-v2.5";
+        default = "MiniMax-M3";
         provider = "opencode-go";
       };
 
