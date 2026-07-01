@@ -1,6 +1,6 @@
 # Common configuration for all hosts
 
-{ lib, pkgs, inputs, outputs, ... }: {
+{ config, lib, pkgs, inputs, outputs, ... }: {
 
   imports = [
       ../../modules
@@ -15,6 +15,7 @@
     vim
     just
     fail2ban
+    cachix
   ];
 
   # Set Timezone
@@ -55,6 +56,30 @@
     cp -f ${./.dotfiles/justfile} /root/justfile
     chmod 644 /root/justfile
   '';
+
+  # Cachix auth token — mounted from sops secrets and templated into
+  # ~/.config/cachix/cachix.dhall at activation time so cachix CLI works
+  # out-of-the-box for the patrick user on every host.
+  sops.secrets."cachix-auth-token" = {
+    mode = "0600";
+    owner = "patrick";
+    group = "users";
+  };
+
+  system.activationScripts.cachix-config = {
+    deps = [ ];
+    text = ''
+      mkdir -p /home/patrick/.config/cachix
+      cat > /home/patrick/.config/cachix/cachix.dhall <<EOF
+{ authToken = "$(cat ${config.sops.secrets."cachix-auth-token".path})"
+, hostname = "https://cachix.org"
+, binaryCaches = [] : List { name : Text, secretKey : Text }
+}
+EOF
+      chown patrick:users /home/patrick/.config/cachix/cachix.dhall
+      chmod 0600 /home/patrick/.config/cachix/cachix.dhall
+    '';
+  };
 
   # Automatic Garbage Collection
   programs.nh = {

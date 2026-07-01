@@ -4,6 +4,23 @@ nrs host="$HOSTNAME":
 nrs-r host:
   sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --target-host root@{{host}}
 
+cache-push host="":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ -n "{{host}}" ]; then
+    ssh root@{{host}} 'cachix push monty-nix-config /run/current-system' &
+  else
+    cachix push monty-nix-config /run/current-system &
+  fi
+
+cache-nrs host="$HOSTNAME":
+  sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}}
+  just cache-push
+
+cache-nrs-r host:
+  sudo nixos-rebuild switch --flake /home/patrick/nix-config#{{host}} --target-host root@{{host}} --build-host root@nix-fury
+  just cache-push {{host}}
+
 nrb-r host:
   sudo nixos-rebuild boot --flake /home/patrick/nix-config#{{host}} --target-host root@{{host}}
 
