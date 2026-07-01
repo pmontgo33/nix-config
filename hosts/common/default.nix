@@ -66,9 +66,20 @@
     group = "users";
   };
 
-  system.activationScripts.cachix-config = {
-    deps = [ ];
-    text = ''
+  # Run as a systemd service (not activation script) so it executes AFTER
+  # sops-install-secrets mounts /run/secrets/cachix-auth-token. Avoids the
+  # race where the activation script fires before sops has populated the
+  # secret directory.
+  systemd.services.cachix-config = {
+    description = "Template Cachix auth token for patrick";
+    wantedBy = [ "multi-user.target" "sops-install-secrets.service" ];
+    after = [ "sops-install-secrets.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      User = "root";
+    };
+    script = ''
       mkdir -p /home/patrick/.config/cachix
       cat > /home/patrick/.config/cachix/cachix.dhall <<EOF
 { authToken = "$(cat ${config.sops.secrets."cachix-auth-token".path})"
