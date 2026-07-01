@@ -58,12 +58,13 @@
   '';
 
   # Cachix auth token — mounted from sops secrets and templated into
-  # ~/.config/cachix/cachix.dhall at activation time so cachix CLI works
-  # out-of-the-box for the patrick user on every host.
+  # /root/.config/cachix/cachix.dhall at activation time so cachix CLI
+  # works out-of-the-box. Root-owned since not every host has a
+  # 'patrick' user (e.g. LXCs running dedicated services).
   sops.secrets."cachix-auth-token" = {
     mode = "0600";
-    owner = "patrick";
-    group = "users";
+    owner = "root";
+    group = "root";
   };
 
   # Run as a systemd service (not activation script) so it executes AFTER
@@ -71,7 +72,7 @@
   # race where the activation script fires before sops has populated the
   # secret directory.
   systemd.services.cachix-config = {
-    description = "Template Cachix auth token for patrick";
+    description = "Template Cachix auth token";
     wantedBy = [ "multi-user.target" "sops-install-secrets.service" ];
     after = [ "sops-install-secrets.service" ];
     serviceConfig = {
@@ -80,15 +81,14 @@
       User = "root";
     };
     script = ''
-      mkdir -p /home/patrick/.config/cachix
-      cat > /home/patrick/.config/cachix/cachix.dhall <<EOF
+      mkdir -p /root/.config/cachix
+      cat > /root/.config/cachix/cachix.dhall <<EOF
 { authToken = "$(cat ${config.sops.secrets."cachix-auth-token".path})"
 , hostname = "https://cachix.org"
 , binaryCaches = [] : List { name : Text, secretKey : Text }
 }
 EOF
-      chown patrick:users /home/patrick/.config/cachix/cachix.dhall
-      chmod 0600 /home/patrick/.config/cachix/cachix.dhall
+      chmod 0600 /root/.config/cachix/cachix.dhall
     '';
   };
 

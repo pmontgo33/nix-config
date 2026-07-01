@@ -10,7 +10,9 @@ cache-push host="":
   if [ -n "{{host}}" ]; then
     ssh root@{{host}} 'cachix push monty-nix-config /run/current-system' &
   else
-    cachix push monty-nix-config /run/current-system &
+    # sudo so cachix picks up /root/.config/cachix/cachix.dhall (root-owned).
+    # cachix reads from $HOME/.config/cachix, not $XDG_CONFIG_HOME.
+    sudo cachix push monty-nix-config /run/current-system &
   fi
 
 cache-nrs host="$HOSTNAME":
