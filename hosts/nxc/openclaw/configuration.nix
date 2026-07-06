@@ -42,7 +42,7 @@ in
   extra-services.host-checkin.enable = true;
   extra-services.obsidian-headless = {
     enable = true;
-    vaultPath = "/var/lib/obsidian-headless/MontyVault";
+    vaults.MontyVault.path = "/var/lib/obsidian-headless/MontyVault";
   };
 
   # OpenClaw justfile for common commands

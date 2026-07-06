@@ -6,7 +6,7 @@
 
 let
   pkgs-unstable = import inputs.nixpkgs-unstable { inherit (pkgs) system; config = pkgs.config; };
-  pkgs-elegoo-compat = import inputs.nixpkgs-elegoo-compat { inherit (pkgs.stdenv) system; config = pkgs.config; };
+  pkgs-elegoo-compat = import inputs.nixpkgs-elegoo-compat { inherit (pkgs.stdenv) system; config = { allowUnfree = true; }; };
 in
 {
   nixpkgs.overlays = [
@@ -77,10 +77,15 @@ in
       "usb_storage"
       "sd_mod"
       "rtsx_pci_sdmmc"
-      "iwlwifi"
     ];
 
-    kernelModules = [ "kvm-intel" "iwlwifi" "iwlmvm" ];
+    # NOTE: iwlwifi/iwlmvm are deliberately NOT force-loaded here. Loading them
+    # in the initrd or eagerly at stage-2 races the linux-firmware store mount:
+    # the AX201 firmware (iwlwifi-QuZ-a0-hr-b0-77.ucode) lives in /nix/store and
+    # isn't reachable that early, so the request fails with ENOENT and the kernel
+    # never retries → no wlan interface. Letting PCI probing auto-load the module
+    # after userspace/firmware is up makes wifi come up reliably.
+    kernelModules = [ "kvm-intel" ];
     initrd.kernelModules = [ "i915" ];
 
     resumeDevice = "/dev/mapper/cryptroot";
@@ -235,9 +240,9 @@ in
     };
   };
 
-  systemd.sleep.extraConfig = ''
-    HibernateDelaySec=20min
-  '';
+  systemd.sleep.settings.Sleep = {
+    HibernateDelaySec = "20min";
+  };
 
   systemd.services.btrfs-balance = {
     description = "Balance btrfs filesystem";
@@ -368,11 +373,20 @@ in
   services.displayManager.sddm = {
     enable = true;
     autoNumlock = true;
+    # Run the greeter on Wayland to match the Plasma Wayland session. On 26.05
+    # a Wayland session started under an X11 greeter can hang after login
+    # (wallpaper shows, plasmashell never finishes). Aligning both avoids that.
+    wayland.enable = true;
   };
 
-  services.xserver.displayManager.sessionCommands = ''
-    ${pkgs.numlockx}/bin/numlockx on
-  '';
+  # Pin the Plasma Wayland session explicitly ("plasma" is the Wayland session
+  # on 26.05); plasmax11 stays selectable in SDDM as a manual fallback if a
+  # boot hangs.
+  services.displayManager.defaultSession = "plasma";
+
+  # Auto-unlock KWallet with the login password so it can't block session
+  # startup with a prompt (a known Plasma-6 post-login hang cause).
+  security.pam.services.sddm.kwallet.enable = true;
 
   services.libinput = {
     enable = true;

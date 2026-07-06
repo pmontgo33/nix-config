@@ -2,14 +2,14 @@
   description = "Monty's NixOS flake";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     # Pinned to last known-good nixos-25.11 rev for elegoo-slicer AppImage compatibility
     # (glib 2.86 broke wx's g_dbus_proxy_call_sync; this rev has the last working glib)
     nixpkgs-elegoo-compat.url = "github:NixOS/nixpkgs/10e7ad5bbcb421fe07e3a4ad53a634b0cd57ffac";
 
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -33,6 +33,8 @@
       inputs.home-manager.follows = "home-manager";
     };
 
+    nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
+
     nix-openclaw = {
       url = "github:openclaw/nix-openclaw";
     };
@@ -42,7 +44,7 @@
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-openclaw, nix-hermes-agent, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, nixpkgs-2511, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-openclaw, nix-hermes-agent, ... }: {
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
@@ -740,27 +742,13 @@
     };
 
     ## openclaw ##
-    nixosConfigurations.openclaw = nixpkgs.lib.nixosSystem {
+    # Pinned to nixos-25.11: python3.11-doc build broken in 26.05 (upstream #529084)
+    nixosConfigurations.openclaw = nixpkgs-2511.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
         {
           nixpkgs.overlays = [
             nix-openclaw.overlays.default
-            # Disable Python package test suites — many fail in LXC due to
-            # timing constraints and network limitations
-            (final: prev: {
-              python311 = prev.python311.override {
-                packageOverrides = _self: super:
-                  builtins.mapAttrs (_name: val:
-                    if builtins.isAttrs val && val ? overrideAttrs
-                    then val.overrideAttrs (_: {
-                      doCheck = false;
-                      doInstallCheck = false;
-                    })
-                    else val
-                  ) super;
-              };
-            })
           ];
         }
         ./hosts/nxc/openclaw

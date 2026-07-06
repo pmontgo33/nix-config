@@ -97,7 +97,7 @@ in
     };
   };
 
-  programs.vscode = {
+  programs.vscodium = {
     enable = true;
     package = pkgs-unstable.vscodium;
     profiles.default.extensions = with pkgs.vscode-extensions; [

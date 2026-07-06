@@ -4,7 +4,7 @@ let
   cfg = config.extra-services.flutter;
   androidComposition = pkgs.androidenv.composeAndroidPackages {
     toolsVersion = "26.1.1";
-    platformToolsVersion = "35.0.1";
+    platformToolsVersion = "35.0.2";
     buildToolsVersions = [
       "28.0.3"
       "30.0.3"
@@ -21,7 +21,7 @@ let
     ];
     abiVersions = [ "x86_64" ];
     includeEmulator = true;
-    emulatorVersion = "35.1.4";
+    emulatorVersion = "36.6.9";
     includeSystemImages = true;
     systemImageTypes = [ "google_apis_playstore" ];
     includeSources = false;
@@ -56,7 +56,7 @@ in {
       # android-studio
       jdk17
       firebase-tools
-    ];
+    ] ++ (optional cfg.enableAdb android-tools);
 
     nixpkgs.config = {
       android_sdk.accept_license = true;
@@ -73,8 +73,6 @@ in {
       export PATH=$PATH:${androidSdk}/libexec/android-sdk/emulator
       export PATH="$PATH":"$HOME/.pub-cache/bin"
     '';
-
-    programs.adb.enable = cfg.enableAdb;
 
     users.users.${cfg.user}.extraGroups =
       (optional cfg.addToKvmGroup "kvm") ++ (optional cfg.enableAdb "adbusers");

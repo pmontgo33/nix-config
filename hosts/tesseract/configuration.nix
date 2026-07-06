@@ -303,9 +303,9 @@
   };
 
   # Configure suspend-then-hibernate timing
-  systemd.sleep.extraConfig = ''
-    HibernateDelaySec=2h
-  '';
+  systemd.sleep.settings.Sleep = {
+    HibernateDelaySec = "2h";
+  };
 
   # Btrfs automatic balance for metadata optimization
   # Runs monthly to prevent metadata fragmentation and maintain performance

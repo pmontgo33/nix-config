@@ -12,9 +12,10 @@
   security.sudo.wheelNeedsPassword = lib.mkForce true;
 
   boot.kernelParams = [ "copytoram" ];
+  boot.zfs.forceImportRoot = false;
 
   environment.etc."sops/age/keys.txt" = {
-    source = "/etc/sops/age/keys.txt";
+    text = builtins.readFile /etc/sops/age/keys.txt;
     mode = "0400";
   };
 
