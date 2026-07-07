@@ -5,7 +5,14 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
-  hermesPython = pkgs.python312.withPackages (ps: [
+  python312 = pkgs.python312.override {
+    packageOverrides = _self: super: {
+      sse-starlette = super.sse-starlette.overridePythonAttrs (_: { dontCheckRuntimeDeps = true; });
+      pymupdf = super.pymupdf.overridePythonAttrs (_: { doCheck = false; });
+      pdfplumber = super.pdfplumber.overridePythonAttrs (_: { doCheck = false; });
+    };
+  };
+  hermesPython = lib.getOutput "out" (python312.withPackages (ps: [
     ps.pandas
     ps.pdfplumber
     ps.openpyxl
@@ -14,15 +21,15 @@ let
     ps.uvicorn
     ps.ptyprocess
     ps.python-telegram-bot
-    pkgs-unstable.python312Packages.mcp
+    ps.mcp
     ps.icalendar
     ps.pymupdf
     ps.pytesseract
     ps.pillow
     ps.darkdetect
     agentmail
-  ]);
-  agentmail = pkgs.python312Packages.buildPythonPackage rec {
+  ]));
+  agentmail = python312.pkgs.buildPythonPackage rec {
     pname = "agentmail";
     version = "0.5.0";
     src = pkgs.fetchurl {
@@ -30,7 +37,7 @@ let
       hash = "sha256-ALyfhuTG/i9aMibBZg3boq3LgGPIBUD+Pp5WT+KFsjM=";
     };
     format = "wheel";
-    propagatedBuildInputs = with pkgs.python312Packages; [
+    propagatedBuildInputs = with python312.pkgs; [
       httpx pydantic websockets
     ];
     doCheck = false;
@@ -77,6 +84,10 @@ in
 
   networking.hostName = "hermes";
   networking.firewall.allowedTCPPorts = [ 8642 8644 9119 ];
+
+  # python3.12 doc build broken in nixpkgs 26.05 (upstream issue #529084)
+  documentation.man.enable = false;
+  documentation.doc.enable = false;
 
   extra-services.tailscale = {
     enable = true;
@@ -140,7 +151,7 @@ in
     settings = {
       model = {
         default = "MiniMax-M3";
-        provider = "opencode-go";
+        provider = "minimax";
       };
 
       custom_providers = [
