@@ -226,6 +226,10 @@ in
       memory = {
         memory_enabled = true;
         user_profile_enabled = true;
+        # Holographic — bundled first-party memory provider (SQLite + FTS5 +
+        # HRR compositional retrieval). Pure local, no network, no embeddings.
+        # Coexists additively with built-in MEMORY.md/USER.md.
+        provider = "holographic";
       };
 
       # Real-time token streaming over Telegram (editMessageText / sendMessageDraft)
