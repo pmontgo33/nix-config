@@ -209,7 +209,7 @@ in
         mode = "smart";
       };
 
-      toolsets = [ "hermes-cli" "files" "web" "computer" ];
+      toolsets = [ "hermes-cli" "files" "web" "computer" "memory" ];
 
       agent = {
         max_turns = 90;
