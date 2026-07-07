@@ -77,12 +77,7 @@
         upstream = "192.168.86.1:80"; 
       };
       
-      "netalertx.montycasa.net" = { 
-        protocol = "http"; 
-        upstream = "192.168.86.101:20211"; 
-      };
-      
-      "blocker.montycasa.net" = { 
+      "blocker.montycasa.net" = {
         protocol = "http"; 
         upstream = "192.168.86.1:3000"; 
       };
@@ -157,12 +152,7 @@
         upstream = "192.168.86.99:20910"; 
       };
 
-      "openclaw.montycasa.net" = { 
-        protocol = "http"; 
-        upstream = "192.168.86.136:18789"; 
-      };
-
-      "search.montycasa.net" = { 
+      "search.montycasa.net" = {
         protocol = "http"; 
         upstream = "192.168.86.137:8080"; 
       };
