@@ -87,8 +87,25 @@ in {
       # with read(+X for dirs) regardless of creator's umask. Fixes the case
       # where login.defs UMASK 077 makes fresh subprocesses write 0600 files,
       # which obsidian-headless sync daemon (in obsidian-headless group) can't read.
+      # NOTE: systemd-tmpfiles refuses to apply this rule when the parent path
+      # has an "unsafe" ownership transition (e.g. /var/lib/hermes owned by
+      # hermes → /var/lib/hermes/vault owned by obsidian-headless). The
+      # activationScript below applies the same ACL via setfacl and works
+      # regardless of path ownership.
       "a+ ${vault.path} - - - - d:u::rwx,d:g::r-x,d:o::-"
     ]) cfg.vaults);
+
+    # Backup path: apply default ACLs via activation script. systemd-tmpfiles
+    # skips rules on unsafe path transitions; activation scripts run as root
+    # and call setfacl directly, so they work in all cases.
+    system.activationScripts.obsidian-headless-vault-acls = {
+      deps = [ "users" "groups" ];
+      text = lib.concatStringsSep "\n" (lib.mapAttrsToList (_name: vault: ''
+        if [ -d "${vault.path}" ]; then
+          ${pkgs.acl}/bin/setfacl -d -m u::rwx,g::r-x,o::- "${vault.path}" || true
+        fi
+      '') cfg.vaults);
+    };
 
     sops.secrets.obsidian-env = {
       owner = "obsidian-headless";
