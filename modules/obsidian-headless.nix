@@ -98,11 +98,13 @@ in {
     # Backup path: apply default ACLs via activation script. systemd-tmpfiles
     # skips rules on unsafe path transitions; activation scripts run as root
     # and call setfacl directly, so they work in all cases.
+    # -R applies recursively so existing subdirs (created before the parent
+    # got its default ACL) also inherit group-read for new files inside them.
     system.activationScripts.obsidian-headless-vault-acls = {
       deps = [ "users" "groups" ];
       text = lib.concatStringsSep "\n" (lib.mapAttrsToList (_name: vault: ''
         if [ -d "${vault.path}" ]; then
-          ${pkgs.acl}/bin/setfacl -d -m u::rwx,g::r-x,o::- "${vault.path}" || true
+          ${pkgs.acl}/bin/setfacl -R -d -m u::rwx,g::r-x,o::- "${vault.path}" || true
         fi
       '') cfg.vaults);
     };
