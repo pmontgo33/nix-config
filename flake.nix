@@ -35,16 +35,12 @@
 
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
 
-    nix-openclaw = {
-      url = "github:openclaw/nix-openclaw";
-    };
-
     nix-hermes-agent = {
       url = "github:NousResearch/hermes-agent";
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, nixpkgs-2511, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-openclaw, nix-hermes-agent, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, nixpkgs-2511, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-hermes-agent, ... }: {
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
@@ -465,25 +461,6 @@
       ];
     };
 
-    ## netalertx ##
-    nixosConfigurations.netalertx = nixpkgs.lib.nixosSystem {
-      specialArgs = { inherit inputs; };
-      modules = [
-        ./hosts/nxc/netalertx
-        sops-nix.nixosModules.sops
-
-        home-manager.nixosModules.home-manager
-        {
-          home-manager.useGlobalPkgs = true;
-          home-manager.useUserPackages = true;
-          home-manager.backupFileExtension = "backup";
-          home-manager.extraSpecialArgs = { inherit inputs; };
-
-          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
-        }
-      ];
-    };
-
     ## mealie ##
     nixosConfigurations.mealie = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
@@ -737,33 +714,6 @@
           home-manager.extraSpecialArgs = { inherit inputs; };
 
           home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
-        }
-      ];
-    };
-
-    ## openclaw ##
-    # Pinned to nixos-25.11: python3.11-doc build broken in 26.05 (upstream #529084)
-    nixosConfigurations.openclaw = nixpkgs-2511.lib.nixosSystem {
-      specialArgs = { inherit inputs; };
-      modules = [
-        {
-          nixpkgs.overlays = [
-            nix-openclaw.overlays.default
-          ];
-        }
-        ./hosts/nxc/openclaw
-        sops-nix.nixosModules.sops
-
-        home-manager.nixosModules.home-manager
-        {
-          home-manager.useGlobalPkgs = true;
-          home-manager.useUserPackages = true;
-          home-manager.backupFileExtension = "backup";
-          home-manager.extraSpecialArgs = { inherit inputs; };
-
-          home-manager.sharedModules = [
-            sops-nix.homeManagerModules.sops
-          ];
         }
       ];
     };

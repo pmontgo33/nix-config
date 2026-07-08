@@ -23,14 +23,12 @@ Last updated: 2026-07-06
 | mealie | 25.11 (Xantusia) | 2026-06-24 | 2026-06-05 | None | Upgraded to 25.11 |
 | moltbot | 25.11 (Xantusia) | 2026-02-03 | 2026-01-30 | None | Upgraded to 25.11 |
 | murdock | 25.11 (Xantusia) | 2026-07-05 | 2026-07-05 | None | Upgraded to 25.11 |
-| netalertx | 25.11 (Xantusia) | 2026-07-06 | 2026-07-05 | **netalertx**: 25.11 ⚠️ | Upgraded to 25.11 |
 | nextcloud | 25.11 (Xantusia) | 2026-07-06 | 2026-02-10 | None | Upgraded to 25.11 |
 | nix-fury | lxc-proxmox-26.05.20260630.95ca1e2 | 2026-07-06 | 2026-07-05 | **myspeed**: latest ✓ | Unknown version |
 | obsidian | 25.11 (Xantusia) | 2026-07-06 | 2026-06-05 | None | Upgraded to 25.11 |
 | ollama | 25.11 (Xantusia) | 2026-07-06 | 2026-05-23 | None | Upgraded to 25.11 |
 | omada | 25.11 (Xantusia) | 2026-06-21 | 2026-05-13 | **omada-controller**: 6.0.0.25 ⚠️ | Upgraded to 25.11 |
 | omnitools | 25.11 (Xantusia) | 2026-02-15 | 2025-12-10 | **omni-tools**: 0.6.0 ✓ | Upgraded to 25.11 |
-| openclaw | 25.11 (Xantusia) | 2026-05-23 | 2026-04-30 | None | Upgraded to 25.11 |
 | paperless-ngx | 25.11 (Xantusia) | 2026-07-06 | 2026-06-05 | **paperless-ai**: latest ⚠️ | Upgraded to 25.11 |
 | plasma-vm-nixos | 25.11 (Xantusia) | 2026-05-14 | 2026-05-12 | None | Upgraded to 25.11 |
 | pocket-id | 25.11 (Xantusia) | 2026-07-06 | 2026-06-05 | None | Upgraded to 25.11 |
