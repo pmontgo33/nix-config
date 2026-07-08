@@ -80,8 +80,14 @@ in {
       "d  ${cfg.dataDir}  0750 obsidian-headless obsidian-headless -"
       "e  ${cfg.dataDir}  0750 obsidian-headless obsidian-headless -"
     ] ++ lib.concatLists (lib.mapAttrsToList (_name: vault: [
+      # Directory + existing files: setgid + group-rwx for obsidian-headless
       "d  ${vault.path} 2770 obsidian-headless obsidian-headless -"
       "e  ${vault.path} 2770 obsidian-headless obsidian-headless -"
+      # Default ACL: every new file/dir inside inherits group=obsidian-headless
+      # with read(+X for dirs) regardless of creator's umask. Fixes the case
+      # where login.defs UMASK 077 makes fresh subprocesses write 0600 files,
+      # which obsidian-headless sync daemon (in obsidian-headless group) can't read.
+      "a+ ${vault.path} - - - - d:u::rwx,d:g::r-x,d:o::-"
     ]) cfg.vaults);
 
     sops.secrets.obsidian-env = {
