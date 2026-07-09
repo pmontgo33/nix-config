@@ -153,23 +153,23 @@ in
         { provider = "opencode-go"; model = "minimax-m2.7"; }
       ];
 
-      # Mixture of Agents preset: MiniMax-M3 (minimax) aggregates three
-      # opencode-go references — Xiaomi MiMo for reasoning-style analysis,
-      # DeepSeek v4 Flash for fast/cost perspectives, Qwen 3.6 Plus for
-      # breadth. Use via `/model explain --provider moa` or one-shot
-      # `/moa <prompt>`. Set per-preset `enabled = false` to fall back to
-      # the aggregator acting alone.
+      # Mixture of Agents preset: DeepSeek v4 Flash (opencode-go) aggregates
+      # three references — Xiaomi MiMo for reasoning-style analysis,
+      # MiniMax-M3 (minimax) for synthesis depth, Qwen 3.6 Plus for breadth.
+      # Use via `/model hydra --provider moa` or one-shot `/moa <prompt>`.
+      # Set per-preset `enabled = false` to fall back to the aggregator
+      # acting alone.
       moa = {
-        default_preset = "explain";
-        presets.explain = {
+        default_preset = "hydra";
+        presets.hydra = {
           reference_models = [
             { provider = "opencode-go"; model = "mimo-v2.5"; }
-            { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+            { provider = "minimax"; model = "MiniMax-M3"; }
             { provider = "opencode-go"; model = "qwen3.6-plus"; }
           ];
           aggregator = {
-            provider = "minimax";
-            model = "MiniMax-M3";
+            provider = "opencode-go";
+            model = "deepseek-v4-flash";
           };
           max_tokens = 4096;
           reference_max_tokens = 600;  # cap advisor output for snappier turns
