@@ -153,26 +153,60 @@ in
         { provider = "opencode-go"; model = "minimax-m2.7"; }
       ];
 
-      # Mixture of Agents preset: DeepSeek v4 Flash (opencode-go) aggregates
-      # three references — Xiaomi MiMo for reasoning-style analysis,
-      # MiniMax-M3 (minimax) for synthesis depth, Qwen 3.6 Plus for breadth.
-      # Use via `/model hydra --provider moa` or one-shot `/moa <prompt>`.
-      # Set per-preset `enabled = false` to fall back to the aggregator
-      # acting alone.
+      # Mixture of Agents presets. Three profiles, each tuned for a
+      # different cost/quality tradeoff:
+      #   - hydra (default): heavy MoA — DeepSeek V4-Pro aggregator pulling
+      #     from three diverse references. Best for deep multi-perspective
+      #     synthesis where latency is acceptable.
+      #   - coder: code-tuned aggregator (Kimi K2.7 Code) with coding-
+      #     oriented references. For implementation tasks and code review.
+      #   - lite: cheap/fast aggregator (MiniMax M3 minimax) for
+      #     short-turn routing and simple queries. Lowest cost.
+      # Use via `/model <preset> --provider moa` or one-shot
+      # `/moa <prompt>`. Set per-preset `enabled = false` to fall back
+      # to the aggregator acting alone.
       moa = {
         default_preset = "hydra";
         presets.hydra = {
           reference_models = [
-            { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "opencode-go"; model = "glm-5.2"; }
+            { provider = "opencode-go"; model = "kimi-k2.7-code"; }
             { provider = "minimax"; model = "MiniMax-M3"; }
-            { provider = "opencode-go"; model = "qwen3.6-plus"; }
           ];
           aggregator = {
             provider = "opencode-go";
-            model = "deepseek-v4-flash";
+            model = "deepseek-v4-pro";
           };
           max_tokens = 4096;
-          reference_max_tokens = 600;  # cap advisor output for snappier turns
+          reference_max_tokens = 700;
+          enabled = true;
+        };
+        presets.coder = {
+          reference_models = [
+            { provider = "opencode-go"; model = "qwen3.7-max"; }
+            { provider = "opencode-go"; model = "glm-5.2"; }
+            { provider = "minimax"; model = "MiniMax-M3"; }
+          ];
+          aggregator = {
+            provider = "opencode-go";
+            model = "kimi-k2.7-code";
+          };
+          max_tokens = 4096;
+          reference_max_tokens = 700;
+          enabled = true;
+        };
+        presets.lite = {
+          reference_models = [
+            { provider = "opencode-go"; model = "deepseek-v4-pro"; }
+            { provider = "opencode-go"; model = "mimo-v2.5-pro"; }
+            { provider = "opencode-go"; model = "qwen3.7-plus"; }
+          ];
+          aggregator = {
+            provider = "minimax";
+            model = "MiniMax-M3";
+          };
+          max_tokens = 4096;
+          reference_max_tokens = 500;
           enabled = true;
         };
       };
