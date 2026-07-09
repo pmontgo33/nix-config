@@ -265,3 +265,21 @@ cameras:
         labels: []
       detections:
         labels: []
+
+  kitchen:
+    ffmpeg:
+      hwaccel_args: []
+      inputs:
+        - path: "/run/frigate-snapshots/kitchen.jpg"
+          input_args: "-readrate 1 -framerate 2 -loop 1 -f image2"
+          roles:
+            - detect
+    detect:
+      width: 640
+      height: 480
+      fps: 2
+    record:
+      enabled: false
+    objects:
+      track:
+        - person

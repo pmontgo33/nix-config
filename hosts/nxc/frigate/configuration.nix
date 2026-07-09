@@ -23,6 +23,7 @@
     "d /var/lib/frigate/model_cache 0755 frigate frigate -"
     "d /media 0755 root root -"
     "L+ /media/frigate - - - - /var/lib/frigate"
+    "d /run/frigate-snapshots 0755 root root -"
   ];
 
   extra-services.mount_media.enable = true;
@@ -43,7 +44,7 @@
   virtualisation.oci-containers = {
     backend = "podman";
     containers.frigate = {
-      image = "ghcr.io/blakeblackshear/frigate:0.17.1";
+      image = "ghcr.io/blakeblackshear/frigate:0.17.2";
 
       # Use host network mode for easier access to go2rtc
       extraOptions = [
@@ -63,12 +64,14 @@
         "/run/frigate-config:/config"
         "/var/lib/frigate/model_cache:/config/model_cache"
         "/etc/localtime:/etc/localtime:ro"  # Match host timezone
+        "/run/frigate-snapshots:/run/frigate-snapshots:ro"  # Polled kiosk camera snapshots
       ];
 
       environment = {
         LIBVA_DRIVER_NAME = "iHD";
         FRIGATE_MQTT_PASSWORD = "\${FRIGATE_MQTT_PASSWORD}";
         FRIGATE_CAMERA_PASSWORD = "\${FRIGATE_CAMERA_PASSWORD}";
+        FRIGATE_KIOSK_PASSWORD = "\${FRIGATE_KIOSK_PASSWORD}";
       };
 
       environmentFiles = [
@@ -83,21 +86,64 @@
       # Create config directory
       mkdir -p /run/frigate-config
 
-      # Load environment variables
-      set -a
-      source ${config.sops.secrets.frigate-env.path}
-      set +a
+      # Load environment variables without letting bash expand $ sequences
+      # in the values (source/set -a would treat e.g. a literal "$4" in a
+      # password as a positional parameter and silently truncate it)
+      while IFS='=' read -r key value; do
+        [ -z "$key" ] && continue
+        case "$key" in \#*) continue ;; esac
+        export "$key=$value"
+      done < ${config.sops.secrets.frigate-env.path}
+
+      # Escape sed metacharacters (\, /, &) in secret values so passwords
+      # containing them don't corrupt or truncate the substitution
+      escape_sed() {
+        printf '%s' "$1" | ${pkgs.gnused}/bin/sed -e 's/[\/&\\]/\\&/g'
+      }
 
       # Substitute environment variables in config
       ${pkgs.gnused}/bin/sed \
-        -e "s/{FRIGATE_MQTT_PASSWORD}/$FRIGATE_MQTT_PASSWORD/g" \
-        -e "s/{FRIGATE_CAMERA_PASSWORD}/$FRIGATE_CAMERA_PASSWORD/g" \
+        -e "s/{FRIGATE_MQTT_PASSWORD}/$(escape_sed "$FRIGATE_MQTT_PASSWORD")/g" \
+        -e "s/{FRIGATE_CAMERA_PASSWORD}/$(escape_sed "$FRIGATE_CAMERA_PASSWORD")/g" \
+        -e "s/{FRIGATE_KIOSK_PASSWORD}/$(escape_sed "$FRIGATE_KIOSK_PASSWORD")/g" \
         ${./frigate-config.yml} > /run/frigate-config/config.yml
     '';
 
     # Ensure NFS mount is available before starting Frigate
     requires = [ "mnt-media.mount" ];
     after = [ "mnt-media.mount" ];
+  };
+
+  # Poll the kitchen kiosk's snapshot endpoint and write it to a local file.
+  # ffmpeg's image2/mjpeg demuxers can't reliably probe a fresh single-JPEG
+  # HTTP response as a "stream" (no seeking, no re-fetch on loop), so we
+  # fetch it ourselves and let frigate's ffmpeg read a local file instead,
+  # which -loop 1 -f image2 handles natively.
+  systemd.services.frigate-kitchen-snapshot = {
+    description = "Poll kitchen kiosk camera snapshot";
+    serviceConfig.Type = "oneshot";
+    script = ''
+      while IFS='=' read -r key value; do
+        [ -z "$key" ] && continue
+        case "$key" in \#*) continue ;; esac
+        export "$key=$value"
+      done < ${config.sops.secrets.frigate-env.path}
+
+      ${pkgs.curl}/bin/curl -s --max-time 5 \
+        "http://192.168.86.228:2323/?cmd=getCamshot&password=$FRIGATE_KIOSK_PASSWORD" \
+        -o /run/frigate-snapshots/kitchen.jpg.tmp \
+      && mv -f /run/frigate-snapshots/kitchen.jpg.tmp /run/frigate-snapshots/kitchen.jpg
+    '';
+  };
+
+  systemd.timers.frigate-kitchen-snapshot = {
+    description = "Poll kitchen kiosk camera snapshot on a timer";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "5s";
+      OnUnitActiveSec = "1s";
+      AccuracySec = "500ms";
+    };
   };
 
   # GPU access for LXC - match host device GIDs
