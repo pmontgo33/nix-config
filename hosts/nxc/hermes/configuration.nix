@@ -128,13 +128,12 @@ in
       TELEGRAM_ALLOWED_USERS = "748642877";
       TELEGRAM_HOME_CHANNEL = "748642877";
 
-      # Mattermost — fill in after first boot (create the bot, note your MM
-      # user id and the ops channel id). Also mirror MATTERMOST_ALLOWED_USERS
-      # into systemd.services.hermes-agent.environment below (the allow-list
-      # check reads it via os.getenv at startup). The bot token itself lives in
-      # the openclaw-env secret as MATTERMOST_TOKEN.
-      # MATTERMOST_ALLOWED_USERS = "<monty-mm-user-id>";
-      # MATTERMOST_HOME_CHANNEL = "<ops-channel-id>";
+      # Mattermost — MATTERMOST_ALLOWED_USERS is also mirrored into
+      # systemd.services.hermes-agent.environment below (the allow-list check
+      # reads it via os.getenv at startup). The bot token lives in the
+      # openclaw-env secret as MATTERMOST_TOKEN.
+      MATTERMOST_ALLOWED_USERS = "yyhr83fpj3n3fpnjzf3o1zah6r";
+      MATTERMOST_HOME_CHANNEL = "s5yp7xu9iif3mjrw9zczwcg5ro";
     };
 
     settings = {
@@ -342,8 +341,7 @@ in
     HERMES_MANAGED = "true";
     ANTHROPIC_TOKEN = "***";
     # Mirror of the Mattermost allow-list (read via os.getenv at startup).
-    # Uncomment and fill in once the MM user id is known (see environment above).
-    # MATTERMOST_ALLOWED_USERS = "<monty-mm-user-id>";
+    MATTERMOST_ALLOWED_USERS = "yyhr83fpj3n3fpnjzf3o1zah6r";
   };
 
   # Fix file ownership after nix rebuilds. The activation script chowns
