@@ -127,6 +127,14 @@ in
       SEARXNG_BASE_URL = "http://192.168.86.137:8080";
       TELEGRAM_ALLOWED_USERS = "748642877";
       TELEGRAM_HOME_CHANNEL = "748642877";
+
+      # Mattermost — fill in after first boot (create the bot, note your MM
+      # user id and the ops channel id). Also mirror MATTERMOST_ALLOWED_USERS
+      # into systemd.services.hermes-agent.environment below (the allow-list
+      # check reads it via os.getenv at startup). The bot token itself lives in
+      # the openclaw-env secret as MATTERMOST_TOKEN.
+      # MATTERMOST_ALLOWED_USERS = "<monty-mm-user-id>";
+      # MATTERMOST_HOME_CHANNEL = "<ops-channel-id>";
     };
 
     settings = {
@@ -296,6 +304,19 @@ in
             };
           };
         };
+
+        # Mattermost ops surface. hermes reaches the server over Tailscale
+        # (bifrost is only for the phone/browser). The bot token comes from
+        # MATTERMOST_TOKEN in the openclaw-env secret; MATTERMOST_ALLOWED_USERS
+        # and MATTERMOST_HOME_CHANNEL are set in the environment blocks below.
+        # Fill those in after creating the bot account on first boot.
+        mattermost = {
+          enabled = true;
+          extra = {
+            url = "http://mattermost:8065";
+            reply_mode = "off";
+          };
+        };
       };
 
       terminal = {
@@ -320,6 +341,9 @@ in
     TELEGRAM_ALLOWED_USERS = "748642877";
     HERMES_MANAGED = "true";
     ANTHROPIC_TOKEN = "***";
+    # Mirror of the Mattermost allow-list (read via os.getenv at startup).
+    # Uncomment and fill in once the MM user id is known (see environment above).
+    # MATTERMOST_ALLOWED_USERS = "<monty-mm-user-id>";
   };
 
   # Fix file ownership after nix rebuilds. The activation script chowns

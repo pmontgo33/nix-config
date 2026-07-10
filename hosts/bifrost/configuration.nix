@@ -83,9 +83,14 @@
         upstream = "http://karakeep:3000"; 
       };
 
-      "mealie.montycasa.com" = { 
-        protocol = "http"; 
-        upstream = "http://mealie:9000"; 
+      "mealie.montycasa.com" = {
+        protocol = "http";
+        upstream = "http://mealie:9000";
+      };
+
+      "chat.montycasa.com" = {
+        protocol = "http";
+        upstream = "http://mattermost:8065";
       };
 
       "auth.montycasa.com" = { 
