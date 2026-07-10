@@ -128,10 +128,14 @@ in
       TELEGRAM_ALLOWED_USERS = "748642877";
       TELEGRAM_HOME_CHANNEL = "748642877";
 
-      # Mattermost — MATTERMOST_ALLOWED_USERS is also mirrored into
-      # systemd.services.hermes-agent.environment below (the allow-list check
-      # reads it via os.getenv at startup). The bot token lives in the
-      # openclaw-env secret as MATTERMOST_TOKEN.
+      # Mattermost — MATTERMOST_URL must be an env var: when MATTERMOST_TOKEN
+      # is set, gateway/config.py overwrites platforms.mattermost.extra.url
+      # with $MATTERMOST_URL (empty if unset), so the declarative extra.url is
+      # ignored. hermes reaches the server over Tailscale. MATTERMOST_ALLOWED_USERS
+      # is also mirrored into systemd.services.hermes-agent.environment below
+      # (the allow-list check reads it via os.getenv at startup). The bot token
+      # lives in the openclaw-env secret as MATTERMOST_TOKEN.
+      MATTERMOST_URL = "http://mattermost:8065";
       MATTERMOST_ALLOWED_USERS = "yyhr83fpj3n3fpnjzf3o1zah6r";
       MATTERMOST_HOME_CHANNEL = "s5yp7xu9iif3mjrw9zczwcg5ro";
     };
@@ -305,14 +309,14 @@ in
         };
 
         # Mattermost ops surface. hermes reaches the server over Tailscale
-        # (bifrost is only for the phone/browser). The bot token comes from
-        # MATTERMOST_TOKEN in the openclaw-env secret; MATTERMOST_ALLOWED_USERS
-        # and MATTERMOST_HOME_CHANNEL are set in the environment blocks below.
-        # Fill those in after creating the bot account on first boot.
+        # (bifrost is only for the phone/browser). Connection is driven by the
+        # MATTERMOST_* env vars in the environment block above (url, token,
+        # allowed users, home channel) — when MATTERMOST_TOKEN is set the
+        # gateway sources the url from $MATTERMOST_URL, overriding extra.url,
+        # so the url lives there, not here.
         mattermost = {
           enabled = true;
           extra = {
-            url = "http://mattermost:8065";
             reply_mode = "off";
           };
         };
