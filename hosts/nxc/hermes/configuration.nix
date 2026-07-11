@@ -100,9 +100,9 @@ in
 
   programs.fish.enable = true;
 
-  # Reuses openclaw-env secret — contains shared API keys (Anthropic, OpenRouter,
-  # MiniMax, etc.). Telegram token must be a NEW bot separate from openclaw's to
-  # avoid double-responses; add TELEGRAM_BOT_TOKEN to this secret for hermes's bot.
+  # Reuses openclaw-env secret — contains Hermes runtime API keys. Telegram
+  # token must be a NEW bot separate from openclaw's to avoid double-responses;
+  # add TELEGRAM_BOT_TOKEN to this secret for hermes's bot.
   sops.secrets."openclaw-env".mode = "0444";
   sops.secrets."hermes-webhook".mode = "0444";
 
@@ -146,22 +146,13 @@ in
         provider = "minimax";
       };
 
-      custom_providers = [
-        {
-          name = "google";
-          base_url = "https://generativelanguage.googleapis.com/v1beta";
-          api_key_env = "GEMINI_API_KEY";
-          models = [
-            { id = "gemini-flash-latest"; context_length = 1000000; }
-            { id = "gemini-3-flash-preview"; context_length = 1000000; }
-          ];
-        }
-      ];
-
+      # Fallbacks are ordered availability routes: two OpenCode Go models
+      # precede Codex Luna so a proxy/provider outage does not spend Codex
+      # subscription quota unless both routes fail.
       fallback_providers = [
-        { provider = "minimax"; model = "MiniMax-M2.7"; }
-        { provider = "google"; model = "gemini-flash-latest"; }
-        { provider = "opencode-go"; model = "minimax-m2.7"; }
+        { provider = "opencode-go"; model = "minimax-m3"; }
+        { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+        { provider = "openai-codex"; model = "gpt-5.6-luna"; }
       ];
 
       # Mixture of Agents presets. Three profiles, each tuned for a
@@ -343,8 +334,6 @@ in
   systemd.services.hermes-agent.environment = {
     TELEGRAM_ALLOWED_USERS = "748642877";
     HERMES_MANAGED = "true";
-    ANTHROPIC_TOKEN = "***";
-    # Mirror of the Mattermost allow-list (read via os.getenv at startup).
     MATTERMOST_ALLOWED_USERS = "yyhr83fpj3n3fpnjzf3o1zah6r";
   };
 
