@@ -146,6 +146,12 @@ in
         provider = "minimax";
       };
 
+      # Keep active topic sessions intact. Context compression remains the
+      # capacity guard; use /reset explicitly for a deliberate clean slate.
+      session_reset = {
+        mode = "none";
+      };
+
       # Fallbacks are ordered availability routes: two OpenCode Go models
       # precede Codex Luna so a proxy/provider outage does not spend Codex
       # subscription quota unless both routes fail.
