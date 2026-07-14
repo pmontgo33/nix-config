@@ -114,6 +114,16 @@ in
     # mcpServers.forgejo = {
     #   url = "http://192.168.86.120:8080/sse";
     # };
+
+    # MCP-NixOS (https://github.com/utensils/mcp-nixos) — package/option/flake
+    # discovery across search.nixos.org, NixHub, FlakeHub, Noogle, NixOS Wiki,
+    # nix.dev, and the local /nix/store. Read-only; no credentials required.
+    # Binary comes from pinned nixpkgs; smoke-tested in /tmp/mcp-smoke4.py.
+    mcpServers.nixos = {
+      command = "${pkgs.mcp-nixos}/bin/mcp-nixos";
+      timeout = 60;
+      connect_timeout = 30;
+    };
     user = "hermes";
     group = "users";
     createUser = true;
