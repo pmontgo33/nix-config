@@ -341,7 +341,7 @@ in
     TELEGRAM_ALLOWED_USERS = "748642877";
     HERMES_MANAGED = "true";
     MATTERMOST_ALLOWED_USERS = "yyhr83fpj3n3fpnjzf3o1zah6r";
-    WIKI_PATH = "/var/lib/hermes/vault/MontyVault/Hermes/LLM-Wiki";
+    WIKI_PATH = "/var/lib/hermes/vault/MontyVault/Hermes/Wiki";
   };
 
   # Fix file ownership after nix rebuilds. The activation script chowns
