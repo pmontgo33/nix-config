@@ -16,6 +16,12 @@ jobs:
 
           echo "Checking nixosConfigurations one-by-one..."
           for host in $hosts; do
+            # rescue reads the runner host's root-only SOPS key during evaluation;
+            # keep that special-purpose host out of unprivileged CI checks.
+            if [ "$host" = "rescue" ]; then
+              echo " - $host (skipped: requires host SOPS key)"
+              continue
+            fi
             echo " - $host"
             nix --extra-experimental-features 'nix-command flakes' \
               eval ".#nixosConfigurations.${host}.config.system.build.toplevel.drvPath" \
