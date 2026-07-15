@@ -92,7 +92,7 @@ in
 
   environment.systemPackages = with pkgs; [
     pkgs-unstable.claude-code
-    codex
+    pkgs-unstable.codex
     graphviz
     tmux
     pkgs.jq
