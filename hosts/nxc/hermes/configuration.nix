@@ -328,7 +328,11 @@ in
           enabled = true;
           extra = {
             url = "http://192.168.86.100:8123";
-            watch_entities = [ "binary_sensor.away_mode" "sensor.pat_phone_next_alarm" ];
+            watch_entities = [
+              "binary_sensor.away_mode"
+              "sensor.pat_phone_next_alarm"
+              "sensor.last_activity"
+            ];
             watch_all = false;
             cooldown_seconds = 10;
           };
