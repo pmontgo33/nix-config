@@ -152,6 +152,18 @@ in
       MATTERMOST_HOME_CHANNEL = "s5yp7xu9iif3mjrw9zczwcg5ro";
     };
 
+    # The voice-only health plugin owns a single write capability. Its Google
+    # client dependencies are added to Hermes' runtime Python, not the global OS.
+    extraPlugins = [
+      (pkgs.runCommand "health-log-hermes-plugin" { } ''
+        cp -r ${./plugins/health-log} $out
+      '')
+    ];
+    extraPythonPackages = [
+      pkgs.python312Packages."google-api-python-client"
+      pkgs.python312Packages.google-auth-oauthlib
+    ];
+
     settings = {
       model = {
         default = "MiniMax-M3";
@@ -246,10 +258,10 @@ in
 
       toolsets = [ "hermes-cli" "files" "web" "computer" "memory" ];
 
-      # Voice requests are untrusted ambient input. The API server gets only
-      # Home Assistant control/read tools — never shell, files, browser, cron,
-      # skills, or deployment capabilities.
-      platform_toolsets.api_server = [ "homeassistant" ];
+      # Voice requests get Home Assistant plus one narrow health write action.
+      # They never receive generic file, shell, browser, or Google tools.
+      platform_toolsets.api_server = [ "homeassistant" "health_log" ];
+      plugins.enabled = [ "health-log" ];
 
       agent = {
         max_turns = 90;

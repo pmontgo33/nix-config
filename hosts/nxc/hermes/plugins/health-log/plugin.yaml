@@ -1,0 +1,5 @@
+name: health-log
+version: "1.0.0"
+description: "Voice-safe health logging: records today's body weight in the canonical journal and challenge spreadsheet."
+provides_tools:
+  - log_weight
