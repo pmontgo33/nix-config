@@ -246,6 +246,11 @@ in
 
       toolsets = [ "hermes-cli" "files" "web" "computer" "memory" ];
 
+      # Voice requests are untrusted ambient input. The API server gets only
+      # Home Assistant control/read tools — never shell, files, browser, cron,
+      # skills, or deployment capabilities.
+      platform_toolsets.api_server = [ "homeassistant" ];
+
       agent = {
         max_turns = 90;
         gateway_timeout = 1800;
@@ -293,6 +298,20 @@ in
       };
 
       platforms = {
+        # Voice Assistant endpoint. HA's OpenClaw Assistant sends model
+        # `bernie-voice`, which is routed to DeepSeek V4 Flash without changing
+        # Bernie's MiniMax-M3 default for Telegram and other gateway clients.
+        api_server = {
+          enabled = true;
+          extra = {
+            model_name = "hermes-agent";
+            model_routes.bernie-voice = {
+              provider = "opencode-go";
+              model = "deepseek-v4-flash";
+            };
+          };
+        };
+
         homeassistant = {
           enabled = true;
           extra = {
