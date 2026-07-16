@@ -3,6 +3,7 @@ let
   homepage-with-assets = pkgs.symlinkJoin {
     name = "homepage-dashboard-with-monty-casa-assets";
     paths = [ pkgs.homepage-dashboard ];
+    meta.mainProgram = "homepage";
     postBuild = ''
       mkdir -p $out/share/homepage/public/images
       cp ${./assets/monty-casa-crest.svg} $out/share/homepage/public/images/monty-casa-crest.svg
