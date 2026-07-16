@@ -8,6 +8,12 @@ let
       mkdir -p $out/share/homepage/public/images
       cp ${./assets/monty-casa-crest.svg} $out/share/homepage/public/images/monty-casa-crest.svg
 
+      # symlinkJoin links server.js to the original package. Next resolves that
+      # symlink and uses the original directory as its static-asset root, so
+      # materialize the entrypoint inside this overlay instead.
+      rm $out/share/homepage/server.js
+      cp ${pkgs.homepage-dashboard}/share/homepage/server.js $out/share/homepage/server.js
+
       rm $out/bin/homepage
       cat > $out/bin/homepage <<EOF
       #!${pkgs.runtimeShell}
