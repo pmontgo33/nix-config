@@ -7,6 +7,14 @@ let
     postBuild = ''
       mkdir -p $out/share/homepage/public/images
       cp ${./assets/monty-casa-crest.svg} $out/share/homepage/public/images/monty-casa-crest.svg
+
+      rm $out/bin/homepage
+      cat > $out/bin/homepage <<EOF
+      #!${pkgs.runtimeShell}
+      cd "$out/share/homepage"
+      exec ${pkgs.nodejs}/bin/node "$out/share/homepage/server.js" "\$@"
+      EOF
+      chmod +x $out/bin/homepage
     '';
   };
 in
