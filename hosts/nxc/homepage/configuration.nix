@@ -1,4 +1,14 @@
 { config, pkgs, lib, modulesPath, inputs, outputs, ... }:
+let
+  homepage-with-assets = pkgs.symlinkJoin {
+    name = "homepage-dashboard-with-monty-casa-assets";
+    paths = [ pkgs.homepage-dashboard ];
+    postBuild = ''
+      mkdir -p $out/share/homepage/public/images
+      cp ${./assets/monty-casa-crest.svg} $out/share/homepage/public/images/monty-casa-crest.svg
+    '';
+  };
+in
 {
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
@@ -7,15 +17,12 @@
   sops = {
     secrets = {
       "homepage-dashboard-env" = {
-        # owner = "homepage-dashboard";
-        # group = "homepage-dashboard";
         mode = "0400";
         restartUnits = [ "homepage-dashboard.service" ];
       };
     };
   };
 
-  environment.systemPackages = with pkgs; [ ];
 
   extra-services.tailscale = {
     enable = true;
@@ -27,22 +34,18 @@
 
   services.homepage-dashboard = {
     enable = true;
-    # package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.homepage-dashboard;
-    allowedHosts = "*";
+    package = homepage-with-assets;
+    allowedHosts = "192.168.86.118:8082,homepage.skink-galaxy.ts.net:8082,homepage.montycasa.net";
     environmentFile = config.sops.secrets."homepage-dashboard-env".path;
     openFirewall = true;
     
     settings = {
       title = "Monty Casa Homelab";
-      favicon = "https://1.bp.blogspot.com/-8pXESPi3igc/XoC5nUl5dcI/AAAAAAAAqwg/-iz6DADXKJQLoB78_Ri7g9637RlRZV2sgCLcBGAsYHQ/s1600/HomeLab_icon.png";
+      favicon = "/images/monty-casa-crest.svg";
       quicklaunch = {
         searchDescriptions = true;
         hideInternetSearch = true;
         hideVisitURL = true;
-      };
-      providers = {
-        openweathermap = "openweathermapapikey";
-        weatherapi = "weatherapiapikey";
       };
 
       layout = [
@@ -65,7 +68,7 @@
     widgets = [
       {
         logo = {
-          icon = "https://1.bp.blogspot.com/-8pXESPi3igc/XoC5nUl5dcI/AAAAAAAAqwg/-iz6DADXKJQLoB78_Ri7g9637RlRZV2sgCLcBGAsYHQ/s1600/HomeLab_icon.png";
+          icon = "/images/monty-casa-crest.svg";
         };
       }
       {
@@ -109,40 +112,12 @@
         ];
       }
       {
-        "Networking" = [
-          {
-            "Tailscale" = [
-              {
-                icon = "sh-tailscale.svg";
-                href = "https://login.tailscale.com/admin/machines";
-              }
-            ];
-          }
-          {
-            "Cloudflare" = [
-              {
-                icon = "sh-cloudflare.svg";
-                href = "https://dash.cloudflare.com/login";
-              }
-            ];
-          }
-        ];
-      }
-      {
         "Cloud Storage" = [
           {
             "TrueCloud - Storj" = [
               {
                 icon = "https://us1.storj.io/static/dist/assets/logo-dark-B-1o513O.svg";
                 href = "https://us1.storj.io/projects/KCrA-smpTX2/dashboard";
-              }
-            ];
-          }
-          {
-            "Backblaze" = [
-              {
-                icon = "sh-backblaze.svg";
-                href = "https://secure.backblaze.com/user_signin.htm";
               }
             ];
           }

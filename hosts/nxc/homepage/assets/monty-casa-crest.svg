@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Monty Casa Homelab crest</title>
+  <desc id="desc">A house and server network crest in copper, navy, cyan, and ivory.</desc>
+  <rect width="512" height="512" rx="112" fill="#101A2B"/>
+  <path d="M256 54 425 139v119c0 105-68 170-169 202C155 428 87 363 87 258V139L256 54Z" fill="#162740" stroke="#E8EDF3" stroke-width="14"/>
+  <path d="m145 225 111-90 111 90v120H145Z" fill="#D66E35"/>
+  <path d="m128 225 128-104 128 104" fill="none" stroke="#F1A564" stroke-linecap="round" stroke-linejoin="round" stroke-width="22"/>
+  <path d="M189 251h134v96H189z" fill="#101A2B" stroke="#E8EDF3" stroke-width="10"/>
+  <path d="M213 278h86M213 307h86M213 336h86" stroke="#65C9DA" stroke-linecap="round" stroke-width="10"/>
+  <circle cx="286" cy="278" r="5" fill="#F1A564"/>
+  <circle cx="286" cy="307" r="5" fill="#F1A564"/>
+  <circle cx="286" cy="336" r="5" fill="#F1A564"/>
+  <path d="M256 372v36m0 0-56-30m56 30 56-30" fill="none" stroke="#65C9DA" stroke-linecap="round" stroke-linejoin="round" stroke-width="10"/>
+  <circle cx="200" cy="378" r="16" fill="#E8EDF3"/>
+  <circle cx="256" cy="408" r="16" fill="#F1A564"/>
+  <circle cx="312" cy="378" r="16" fill="#E8EDF3"/>
+</svg>
