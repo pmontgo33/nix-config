@@ -341,6 +341,25 @@ in
       };
 
       platforms = {
+        # Native Telegram DM-topic routing. Each topic starts with one compact
+        # umbrella skill; the umbrella loads specialist skills only when needed.
+        telegram = {
+          extra.dm_topics = [
+            {
+              chat_id = 748642877;
+              topics = [
+                { name = "Hermes"; skill = "topic-hermes"; }
+                { name = "Health & Fitness"; skill = "topic-health-fitness"; }
+                { name = "Homelab"; skill = "topic-homelab"; }
+                { name = "Tasks"; skill = "topic-tasks"; }
+                { name = "Briefing"; skill = "topic-briefing"; }
+                { name = "General"; skill = "topic-general"; }
+                { name = "CHOP"; skill = "topic-chop"; }
+              ];
+            }
+          ];
+        };
+
         # Voice Assistant endpoint. HA's OpenClaw Assistant sends model
         # `bernie-voice`, which is routed to DeepSeek V4 Flash without changing
         # Bernie's MiniMax-M3 default for Telegram and other gateway clients.
