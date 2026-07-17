@@ -295,9 +295,15 @@ in
 
       compression = {
         enabled = true;
+        # threshold kept at 0.85 by user preference — compactions were firing
+        # too often at lower values. in_place keeps the same session id
+        # across the rewrite, so gateway routing, /goal, and session_search
+        # stay coherent across long topic sessions.
         threshold = 0.85;
         target_ratio = 0.20;
         protect_last_n = 120;
+        protect_first_n = 3;
+        in_place = true;
       };
 
       memory = {
