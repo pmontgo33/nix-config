@@ -343,21 +343,26 @@ in
       platforms = {
         # Native Telegram DM-topic routing. Each topic starts with one compact
         # umbrella skill; the umbrella loads specialist skills only when needed.
+        # disable_topic_auto_rename stops Hermes from rewriting the Telegram
+        # topic title on /new and similar session resets.
         telegram = {
-          extra.dm_topics = [
-            {
-              chat_id = 748642877;
-              topics = [
-                { name = "Hermes"; skill = "topic-hermes"; }
-                { name = "Health & Fitness"; skill = "topic-health-fitness"; }
-                { name = "Homelab"; skill = "topic-homelab"; }
-                { name = "Tasks"; skill = "topic-tasks"; }
-                { name = "Briefing"; skill = "topic-briefing"; }
-                { name = "General"; skill = "topic-general"; }
-                { name = "CHOP"; skill = "topic-chop"; }
-              ];
-            }
-          ];
+          extra = {
+            disable_topic_auto_rename = true;
+            dm_topics = [
+              {
+                chat_id = 748642877;
+                topics = [
+                  { name = "Hermes"; skill = "topic-hermes"; }
+                  { name = "Health & Fitness"; skill = "topic-health-fitness"; }
+                  { name = "Homelab"; skill = "topic-homelab"; }
+                  { name = "Tasks"; skill = "topic-tasks"; }
+                  { name = "Briefing"; skill = "topic-briefing"; }
+                  { name = "General"; skill = "topic-general"; }
+                  { name = "CHOP"; skill = "topic-chop"; }
+                ];
+              }
+            ];
+          };
         };
 
         # Voice Assistant endpoint. HA's OpenClaw Assistant sends model
