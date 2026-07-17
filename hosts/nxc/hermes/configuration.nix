@@ -42,6 +42,22 @@ let
     ];
     doCheck = false;
   };
+  forgejo-credential-helper = pkgs.writeShellScript "forgejo-credential-helper" ''
+    host=""
+    protocol=""
+    while IFS="=" read -r key value; do
+      case "$key" in
+        host) host="$value" ;;
+        protocol) protocol="$value" ;;
+      esac
+    done
+
+    if [ "$protocol" = "https" ] && [ "$host" = "git.montycasa.net" ]; then
+      printf '%s\n' 'username=openclaw'
+      printf 'password='
+      cat ${config.sops.secrets."forgejo-token".path}
+    fi
+  '';
 in
 
 {
@@ -102,11 +118,20 @@ in
 
   programs.fish.enable = true;
 
-  # Reuses openclaw-env secret — contains Hermes runtime API keys. Telegram
-  # token must be a NEW bot separate from openclaw's to avoid double-responses;
-  # add TELEGRAM_BOT_TOKEN to this secret for hermes's bot.
+  # Hermes gateway API keys stay in openclaw-env. Forgejo Git authentication is
+  # a separate, runtime-only file consumed solely by the URL-scoped helper.
   sops.secrets."openclaw-env".mode = "0444";
   sops.secrets."hermes-webhook".mode = "0444";
+  sops.secrets."forgejo-token" = {
+    owner = "hermes";
+    group = "users";
+    mode = "0400";
+  };
+
+  programs.git = {
+    enable = true;
+    config.credential."https://git.montycasa.net".helper = "!${forgejo-credential-helper}";
+  };
 
   services.hermes-agent = {
     enable = true;
