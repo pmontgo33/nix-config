@@ -348,17 +348,22 @@ in
         telegram = {
           extra = {
             disable_topic_auto_rename = true;
+            # Hermes 0.18.0 does not perform name-based topic discovery; if
+            # thread_id is absent it calls createForumTopic on startup, which
+            # created 7 duplicates (97639-97651) on the post-rebuild restart
+            # and orphaned the originals. Pinning the originals here so
+            # future restarts bind idempotently.
             dm_topics = [
               {
                 chat_id = 748642877;
                 topics = [
-                  { name = "Hermes"; skill = "topic-hermes"; }
-                  { name = "Health & Fitness"; skill = "topic-health-fitness"; }
-                  { name = "Homelab"; skill = "topic-homelab"; }
-                  { name = "Tasks"; skill = "topic-tasks"; }
-                  { name = "Briefing"; skill = "topic-briefing"; }
-                  { name = "General"; skill = "topic-general"; }
-                  { name = "CHOP"; skill = "topic-chop"; }
+                  { name = "Hermes";           skill = "topic-hermes";          thread_id = 87624; }
+                  { name = "Health & Fitness"; skill = "topic-health-fitness";  thread_id = 92608; }
+                  { name = "Homelab";          skill = "topic-homelab";         thread_id = 87193; }
+                  { name = "Tasks";            skill = "topic-tasks";           thread_id = 87814; }
+                  { name = "Briefing";         skill = "topic-briefing";        thread_id = 90466; }
+                  { name = "General";          skill = "topic-general";         thread_id = 87664; }
+                  { name = "CHOP";             skill = "topic-chop";            thread_id = 88598; }
                 ];
               }
             ];
