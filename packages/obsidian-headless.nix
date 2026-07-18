@@ -2,21 +2,19 @@
 
 buildNpmPackage rec {
   pname = "obsidian-headless";
-  version = "0.0.8";
+  version = "0.0.13";
 
   src = fetchurl {
     url = "https://registry.npmjs.org/obsidian-headless/-/obsidian-headless-${version}.tgz";
-    hash = "sha256-+fg6tr69/7n73KhlJxAb4ujMOvH64hLwIt/6MeAiNtU=";
+    hash = "sha256-m44a05F6ZdU8WrdNBqz17I2UHjsCvZvV0DXWgA5TMZg=";
   };
 
-  # No lock file in the tarball — patch one in that we generated
   postPatch = ''
     cp ${./obsidian-headless-lock.json} package-lock.json
   '';
 
-  npmDepsHash = "sha256-+ZBZifTz5liTuu2Evf64iAPgOZvOBCHkbPERKw2T2aQ=";
+  npmDepsHash = "sha256-9CrEHMWe3fhqk6gK/jtU01RaZWVxcKEG5ItRgIYO0FQ=";
 
-  # cli.js is the entry point; no build step needed
   dontNpmBuild = true;
 
   meta = {
