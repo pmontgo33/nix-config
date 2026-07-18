@@ -34,6 +34,10 @@ with lib; let
       User = cfg.user;
       Group = cfg.group;
       WorkingDirectory = cfg.dataDir;
+      # Keep auth and sync state in the configured data directory. Without
+      # this, systemd's login environment uses /var/lib/<user> as HOME and
+      # the service cannot see setup performed with HOME=cfg.dataDir.
+      Environment = "HOME=${cfg.dataDir}";
       EnvironmentFile = config.sops.secrets.obsidian-env.path;
       # Exit 0 (not a failure) if vault hasn't been configured via ob-sync-setup yet.
       ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null || { echo \"Vault not configured -- run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
