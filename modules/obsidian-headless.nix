@@ -8,12 +8,16 @@ with lib; let
   cfg = config.extra-services.obsidian-headless;
   ob = pkgs.callPackage ../packages/obsidian-headless.nix {};
 
+  # When running as an existing user (e.g. hermes), we do NOT create a
+  # system user. Detection is by name only — host config decides.
+  isInternalUser = cfg.user == "obsidian-headless";
+
   setupScript = pkgs.writeShellScriptBin "ob-sync-setup" ''
     set -euo pipefail
     VAULT_NAME="''${1:?Usage: ob-sync-setup <vaultName> <localPath>}"
     VAULT_PATH="''${2:?Usage: ob-sync-setup <vaultName> <localPath>}"
     set -a; source /run/secrets/obsidian-env; set +a
-    sudo -u obsidian-headless env HOME=${cfg.dataDir} ${ob}/bin/ob sync-setup \
+    sudo -u ${cfg.user} env HOME=${cfg.dataDir} ${ob}/bin/ob sync-setup \
       --path "$VAULT_PATH" --vault "$VAULT_NAME" --password "$OBSIDIAN_SYNC_PASSWORD"
     echo "Done. Run: systemctl start obsidian-headless-''${VAULT_NAME}"
   '';
@@ -27,12 +31,12 @@ with lib; let
     startLimitBurst = 5;
     serviceConfig = {
       Type = "simple";
-      User = "obsidian-headless";
-      Group = "obsidian-headless";
+      User = cfg.user;
+      Group = cfg.group;
       WorkingDirectory = cfg.dataDir;
       EnvironmentFile = config.sops.secrets.obsidian-env.path;
       # Exit 0 (not a failure) if vault hasn't been configured via ob-sync-setup yet.
-      ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null || { echo \"Vault not configured — run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
+      ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null || { echo \"Vault not configured -- run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
       UMask = "0002";
       Restart = "on-failure";
       RestartSec = "60s";
@@ -41,6 +45,29 @@ with lib; let
 in {
   options.extra-services.obsidian-headless = {
     enable = mkEnableOption "obsidian-headless sync daemon";
+
+    user = mkOption {
+      type = types.str;
+      default = "obsidian-headless";
+      description = ''
+        Unix user the sync daemon runs as. When set to a pre-existing
+        user (e.g. "hermes"), the module skips user/group creation
+        and the running identity matches the writer of vault files,
+        eliminating the cross-user permission contract. When set to
+        "obsidian-headless" (the default), the module creates the
+        system user on activation.
+      '';
+    };
+
+    group = mkOption {
+      type = types.str;
+      default = "obsidian-headless";
+      description = ''
+        Unix group the sync daemon runs as. Default "obsidian-headless"
+        pairs with the internal default user. Configure to "users" or
+        another existing group when running as a pre-existing user.
+      '';
+    };
 
     vaults = mkOption {
       type = types.attrsOf (types.submodule {
@@ -60,39 +87,52 @@ in {
 
     dataDir = mkOption {
       type = types.str;
-      default = "/var/lib/obsidian-headless";
-      description = "Home/state directory for the obsidian-headless user (stores auth session)";
+      default = if isInternalUser then "/var/lib/obsidian-headless"
+               else "/var/lib/${cfg.user}/.obsidian-headless";
+      description = ''
+        Home/state directory for the sync daemon (stores auth session).
+        Falls under the configured user so the same identity owns
+        credentials and writes.
+      '';
     };
   };
 
   config = mkIf cfg.enable {
     environment.systemPackages = [ ob setupScript ];
 
-    users.users.obsidian-headless = {
-      isSystemUser = true;
-      group = "obsidian-headless";
-      extraGroups = [ "users" ];
-      home = cfg.dataDir;
+    # Only create the dedicated system user when running as the
+    # internal identity. For other configurations (e.g. user = "hermes")
+    # we rely on the existing account and skip creation entirely.
+    users.users = mkIf isInternalUser {
+      obsidian-headless = {
+        isSystemUser = true;
+        group = "obsidian-headless";
+        extraGroups = [ "users" ];
+        home = cfg.dataDir;
+      };
+      groups.obsidian-headless = {};
     };
-    users.groups.obsidian-headless = {};
 
     systemd.tmpfiles.rules = [
-      "d  ${cfg.dataDir}  0750 obsidian-headless obsidian-headless -"
-      "e  ${cfg.dataDir}  0750 obsidian-headless obsidian-headless -"
+      "d  ${cfg.dataDir}  0750 ${cfg.user} ${cfg.group} -"
+      "e  ${cfg.dataDir}  0750 ${cfg.user} ${cfg.group} -"
     ] ++ lib.concatLists (lib.mapAttrsToList (_name: vault: [
-      # Directory + existing files: setgid + group-rwx for obsidian-headless
-      "d  ${vault.path} 2770 obsidian-headless obsidian-headless -"
-      "e  ${vault.path} 2770 obsidian-headless obsidian-headless -"
-      # Default ACL: every new file/dir inside inherits group=obsidian-headless
-      # with read(+X for dirs) regardless of creator's umask. Fixes the case
-      # where login.defs UMASK 077 makes fresh subprocesses write 0600 files,
-      # which obsidian-headless sync daemon (in obsidian-headless group) can't read.
-      # NOTE: systemd-tmpfiles refuses to apply this rule when the parent path
-      # has an "unsafe" ownership transition (e.g. /var/lib/hermes owned by
-      # hermes → /var/lib/hermes/vault owned by obsidian-headless). The
-      # activationScript below applies the same ACL via setfacl and works
-      # regardless of path ownership.
-      "a+ ${vault.path} - - - - d:u::rwx,d:g::r-x,d:o::-"
+      # Directory + existing files: setgid + group-rwx for the configured
+      # user/group. When running as hermes this is hermes:users.
+      "d  ${vault.path} 2770 ${cfg.user} ${cfg.group} -"
+      "e  ${vault.path} 2770 ${cfg.user} ${cfg.group} -"
+      # Default ACL: every new file/dir inside inherits group=cfg.group
+      # with read(+X for dirs) regardless of creator's umask. This is the
+      # belt-and-suspenders fix for the case where a different process
+      # (e.g. git, editor, MCP subprocess) writes into the vault with a
+      # restrictive umask and leaves an unreadable file behind.
+      #
+      # NOTE: systemd-tmpfiles refuses to apply this rule when the parent
+      # path has an "unsafe" ownership transition (e.g. /var/lib/hermes
+      # owned by hermes -> /var/lib/hermes/vault owned by obsidian-headless).
+      # The activationScript below applies the same ACL via setfacl and
+      # works regardless of path ownership.
+      "a+ ${vault.path} - - - - d:u::rwx,d:g::rwx,d:o::-"
     ]) cfg.vaults);
 
     # Backup path: apply default ACLs via activation script. systemd-tmpfiles
@@ -104,13 +144,13 @@ in {
       deps = [ "users" "groups" ];
       text = lib.concatStringsSep "\n" (lib.mapAttrsToList (_name: vault: ''
         if [ -d "${vault.path}" ]; then
-          ${pkgs.acl}/bin/setfacl -R -d -m u::rwx,g::r-x,o::- "${vault.path}" || true
+          ${pkgs.acl}/bin/setfacl -R -d -m u::rwx,g::rwx,o::- "${vault.path}" || true
         fi
       '') cfg.vaults);
     };
 
     sops.secrets.obsidian-env = {
-      owner = "obsidian-headless";
+      owner = cfg.user;
       mode = "0400";
     };
 
@@ -123,3 +163,4 @@ in {
     ];
   };
 }
+

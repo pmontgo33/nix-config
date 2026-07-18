@@ -93,6 +93,11 @@ in
   extra-services.host-checkin.enable = true;
   extra-services.obsidian-headless = {
     enable = true;
+    # Run the sync daemon as the same Unix user that writes vault files
+    # (hermes), so cross-user permission/ACL coordination is unnecessary.
+    # See modules/obsidian-headless.nix for the broader parameterization.
+    user = "hermes";
+    group = "users";
     vaults.MontyVault.path = "/var/lib/hermes/vault/MontyVault";
   };
 
@@ -461,7 +466,6 @@ in
   '';
 
   users.users.hermes = {
-    extraGroups = [ "obsidian-headless" ];
     linger = true;
   };
   users.users.root.linger = true;
