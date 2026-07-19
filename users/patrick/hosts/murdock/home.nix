@@ -27,7 +27,7 @@ in
     pkgs-unstable.codex
     pkgs-unstable.opencode
     pkgs-unstable.opencode-desktop
-    pkgs-unstable.freecad
+    # pkgs-unstable.freecad
     pkgs-unstable.telegram-desktop
   ];
 

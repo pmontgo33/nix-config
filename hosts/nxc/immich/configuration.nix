@@ -11,6 +11,11 @@
     userspace-networking = true;
   };
 
+  # Required by immich-kiosk 0.31.0 until nixpkgs updates it away from pnpm 9.
+  nixpkgs.config.permittedInsecurePackages = [
+    "pnpm-9.15.9"
+  ];
+
   # sops secrets configuration
   sops.secrets."immich-secrets" = {
     owner = "immich";
