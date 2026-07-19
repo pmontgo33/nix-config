@@ -296,6 +296,9 @@ in
       agent = {
         max_turns = 90;
         gateway_timeout = 1800;
+        # Default reasoning effort for sessions that don't override with /reasoning.
+        # Per-session overrides via `/reasoning [low|medium|high|xhigh]` still win.
+        reasoning_effort = "high";
       };
 
       compression = {
