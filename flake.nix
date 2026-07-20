@@ -36,7 +36,7 @@
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
 
     nix-hermes-agent = {
-      url = "github:NousResearch/hermes-agent/830165473e0920c2baf8c2a6863976edb0c52943";
+      url = "github:NousResearch/hermes-agent/v2026.7.20";
     };
   };
 
