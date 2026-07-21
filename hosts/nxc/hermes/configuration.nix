@@ -217,7 +217,7 @@ in
 
       # Mixture of Agents presets. Three profiles, each tuned for a
       # different cost/quality tradeoff:
-      #   - hydra (default): heavy MoA — DeepSeek V4-Pro aggregator pulling
+      #   - hydra (default): heavy MoA — Codex Sol aggregator pulling
       #     from three diverse references. Best for deep multi-perspective
       #     synthesis where latency is acceptable.
       #   - coder: code-tuned aggregator (Kimi K2.7 Code) with coding-
@@ -232,12 +232,12 @@ in
         presets.hydra = {
           reference_models = [
             { provider = "opencode-go"; model = "glm-5.2"; }
+            { provider = "opencode-go"; model = "deepseek-v4-pro"; reasoning_effort = "high"; }
             { provider = "opencode-go"; model = "kimi-k2.7-code"; }
-            { provider = "minimax"; model = "MiniMax-M3"; }
           ];
           aggregator = {
-            provider = "opencode-go";
-            model = "deepseek-v4-pro";
+            provider = "openai-codex";
+            model = "gpt-5.6-sol";
           };
           max_tokens = 4096;
           reference_max_tokens = 700;
@@ -245,13 +245,13 @@ in
         };
         presets.coder = {
           reference_models = [
-            { provider = "opencode-go"; model = "qwen3.7-max"; }
+            { provider = "opencode-go"; model = "kimi-k2.7-code"; }
             { provider = "opencode-go"; model = "glm-5.2"; }
-            { provider = "minimax"; model = "MiniMax-M3"; }
+            { provider = "opencode-go"; model = "deepseek-v4-pro"; }
           ];
           aggregator = {
-            provider = "opencode-go";
-            model = "kimi-k2.7-code";
+            provider = "openai-codex";
+            model = "gpt-5.6-terra";
           };
           max_tokens = 4096;
           reference_max_tokens = 700;
@@ -259,17 +259,14 @@ in
         };
         presets.lite = {
           reference_models = [
-            { provider = "opencode-go"; model = "deepseek-v4-pro"; }
-            { provider = "opencode-go"; model = "mimo-v2.5-pro"; }
-            { provider = "opencode-go"; model = "qwen3.7-plus"; }
+            { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+            { provider = "opencode-go"; model = "mimo-v2.5"; }
           ];
           aggregator = {
             provider = "minimax";
             model = "MiniMax-M3";
           };
-          max_tokens = 4096;
-          reference_max_tokens = 500;
-          enabled = true;
+          reference_max_tokens = 400;
         };
       };
 
