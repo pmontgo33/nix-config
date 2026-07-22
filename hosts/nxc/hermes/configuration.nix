@@ -329,6 +329,19 @@ in
         fresh_final_after_seconds = 60;
       };
 
+      # Per-platform display settings (tool-progress messages, busy-ack detail,
+      # reasoning style). Telegram defaults tool_progress to "off" in Hermes
+      # 0.18+/0.19+, which suppresses the "🛠 reading file" / "📡 calling
+      # provider" status bubbles the user relied on. Re-enable with "all";
+      # busy_ack_detail restores the iteration counter. The setting is
+      # scoped to Telegram only — other platforms keep their defaults.
+      display = {
+        platforms.telegram = {
+          tool_progress = "all";
+          busy_ack_detail = true;
+        };
+      };
+
       # Voice transcription (STT) — local faster-whisper, no API key needed
       stt = {
         enabled = true;
