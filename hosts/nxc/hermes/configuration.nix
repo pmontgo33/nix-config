@@ -200,6 +200,11 @@ in
         provider = "minimax";
       };
 
+      tts = {
+        provider = "edge";
+        edge.voice = "en-GB-RyanNeural";
+      };
+
       # Keep active topic sessions intact. Context compression remains the
       # capacity guard; use /reset explicitly for a deliberate clean slate.
       session_reset = {
