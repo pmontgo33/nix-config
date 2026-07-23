@@ -141,7 +141,7 @@ in
   services.hermes-agent = {
     enable = true;
     addToSystemPackages = true;
-    extraDependencyGroups = [ "messaging" "anthropic" "voice" ];
+    extraDependencyGroups = [ "messaging" "anthropic" "voice" "edge-tts" ];
 
     # mcpServers.forgejo = {
     #   url = "http://192.168.86.120:8080/sse";
