@@ -170,6 +170,11 @@ in
       TELEGRAM_ALLOWED_USERS = "748642877";
       TELEGRAM_HOME_CHANNEL = "748642877";
 
+      # WhatsApp self-chat is enabled declaratively. The personal allowlist
+      # remains in the SOPS-backed openclaw-env as WHATSAPP_ALLOWED_USERS.
+      WHATSAPP_ENABLED = "true";
+      WHATSAPP_MODE = "self-chat";
+
       # Mattermost — MATTERMOST_URL must be an env var: when MATTERMOST_TOKEN
       # is set, gateway/config.py overwrites platforms.mattermost.extra.url
       # with $MATTERMOST_URL (empty if unset), so the declarative extra.url is
