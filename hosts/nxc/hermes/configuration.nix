@@ -339,16 +339,18 @@ in
         fresh_final_after_seconds = 60;
       };
 
-      # Per-platform display settings (tool-progress messages, busy-ack detail,
-      # reasoning style). Telegram defaults tool_progress to "off" in Hermes
-      # 0.18+/0.19+, which suppresses the "🛠 reading file" / "📡 calling
-      # provider" status bubbles the user relied on. Re-enable with "all";
-      # busy_ack_detail restores the iteration counter. The setting is
-      # scoped to Telegram only — other platforms keep their defaults.
+      # Per-platform display settings (tool-progress messages, busy-ack
+      # detail, reasoning style). Reverted to the Hermes 0.18+/0.19+ tier
+      # defaults for Telegram: tool_progress = "off" (no per-tool bubbles)
+      # and busy_ack_detail = false (no iteration counter). The "all" /
+      # true values added in #159 restored those bubbles, but on
+      # retrospect the in-chat noise outweighed the visibility gain.
+      # Dropping the override lets the upstream default take over, so
+      # future Hermes tier-default changes do not need a follow-up PR.
       display = {
         platforms.telegram = {
-          tool_progress = "all";
-          busy_ack_detail = true;
+          tool_progress = "off";
+          busy_ack_detail = false;
         };
       };
 
