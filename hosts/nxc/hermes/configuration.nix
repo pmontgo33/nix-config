@@ -300,6 +300,10 @@ in
       platform_toolsets.api_server = [ "homeassistant" "health_log" ];
       plugins.enabled = [ "health-log" ];
 
+      # The v0.19 migration is blocked in Nix-managed mode. Declare its schema
+      # marker here; the disposable migration lab validated this is sufficient.
+      _config_version = 33;
+
       agent = {
         max_turns = 90;
         gateway_timeout = 1800;
