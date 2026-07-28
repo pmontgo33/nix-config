@@ -306,6 +306,9 @@ in
         # Default reasoning effort for sessions that don't override with /reasoning.
         # Per-session overrides via `/reasoning [low|medium|high|xhigh]` still win.
         reasoning_effort = "medium";
+        # Hermes v0.19 schema migration makes this explicit. Keeping it in Nix
+        # prevents the next activation from leaving migration-only drift.
+        verify_on_stop = false;
       };
 
       compression = {
