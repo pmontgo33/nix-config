@@ -304,6 +304,10 @@ in
       # marker here; the disposable migration lab validated this is sufficient.
       _config_version = 33;
 
+      # Persist delivery obligations before platform sends; this is a durable
+      # reliability boundary, not a one-off runtime default.
+      gateway.delivery_ledger = true;
+
       agent = {
         max_turns = 90;
         gateway_timeout = 1800;
