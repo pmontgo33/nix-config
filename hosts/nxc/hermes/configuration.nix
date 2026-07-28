@@ -511,13 +511,16 @@ in
     wantedBy = [ "multi-user.target" ];
     after = [ "hermes-agent.service" ];
     environment = {
+      HOME = "/var/lib/hermes";
       HERMES_HOME = "/var/lib/hermes/.hermes";
     };
     serviceConfig = {
       User = "hermes";
       Group = "users";
-      ExecStart = "${pkgs.hermes-agent}/bin/hermes dashboard --host 0.0.0.0 --port 9119 --no-open --insecure";
+      EnvironmentFile = config.sops.secrets."openclaw-env".path;
+      ExecStart = "${config.services.hermes-agent.package}/bin/hermes dashboard --host 0.0.0.0 --port 9119 --no-open --skip-build";
       Restart = "on-failure";
+      RestartSec = 5;
     };
   };
 
