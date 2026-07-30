@@ -26,6 +26,20 @@ with lib; let
     declaredTypes = cfg.fileTypes.${name} or null;
     typesCsv = if declaredTypes == null then null
                else lib.concatStringsSep "," declaredTypes;
+
+    # A script file avoids systemd's ExecStart argument parser corrupting
+    # shell control operators in an inline `bash -c` expression. It runs as
+    # cfg.user with HOME=cfg.dataDir, exactly like the sync daemon.
+    configureFileTypes = pkgs.writeShellScript "obsidian-headless-config-${name}" ''
+      if ! ${ob}/bin/ob sync-status --path ${lib.escapeShellArg vault.path} >/dev/null 2>&1; then
+        # Initial sync setup has not happened yet; preserve the daemon's
+        # historical clean no-op behaviour.
+        exit 0
+      fi
+      exec ${ob}/bin/ob sync-config \
+        --path ${lib.escapeShellArg vault.path} \
+        --file-types ${lib.escapeShellArg typesCsv}
+    '';
   in {
     description = "Obsidian Headless sync daemon (${name})";
     wantedBy = [ "multi-user.target" ];
@@ -43,19 +57,12 @@ with lib; let
       # the service cannot see setup performed with HOME=cfg.dataDir.
       Environment = "HOME=${cfg.dataDir}";
       EnvironmentFile = config.sops.secrets.obsidian-env.path;
-      # 1. If a Nix-declared fileTypes list exists for this vault, reapply
-      #    it via `ob sync-config`. The daemon does not re-read its own
-      #    state.db while running, so a service restart is the only way
-      #    a changed allowlist takes effect -- and a Nix rebuild restarts
-      #    the service, so this is the right hook.
-      # 2. Bail out cleanly if the vault hasn't been initialised yet.
-      # 3. Hand off to continuous sync.
-      ExecStart = "${pkgs.bash}/bin/bash -c '"
-        + (if typesCsv == null then ""
-           else "${ob}/bin/ob sync-config --path ${lib.escapeShellArg vault.path} --file-types ${lib.escapeShellArg typesCsv} || true; ")
-        + "${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null "
-          + "|| { echo \"Vault not configured -- run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; "
-          + "exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
+      # Reapply the declared file type allowlist before the continuous daemon
+      # starts. A changed unit is restarted by nixos-rebuild, which matters
+      # because `ob sync --continuous` never re-reads state.db in place.
+      ExecStartPre = lib.optional (typesCsv != null) configureFileTypes;
+      # Exit 0 (not a failure) if vault hasn't been configured via ob-sync-setup yet.
+      ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null || { echo \"Vault not configured -- run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
       UMask = "0002";
       Restart = "on-failure";
       RestartSec = "60s";
