@@ -27,18 +27,24 @@ with lib; let
     typesCsv = if declaredTypes == null then null
                else lib.concatStringsSep "," declaredTypes;
 
-    # A script file avoids systemd's ExecStart argument parser corrupting
-    # shell control operators in an inline `bash -c` expression. It runs as
-    # cfg.user with HOME=cfg.dataDir, exactly like the sync daemon.
-    configureFileTypes = pkgs.writeShellScript "obsidian-headless-config-${name}" ''
+    # systemd's ExecStart parser must not receive an inline `bash -c` program
+    # containing shell control operators. Put the complete service lifecycle
+    # in one executable script instead; systemd executes the file directly.
+    runVault = pkgs.writeShellScript "obsidian-headless-${name}" ''
       if ! ${ob}/bin/ob sync-status --path ${lib.escapeShellArg vault.path} >/dev/null 2>&1; then
         # Initial sync setup has not happened yet; preserve the daemon's
         # historical clean no-op behaviour.
+        echo "Vault not configured -- run ob-sync-setup ${name} ${vault.path}"
         exit 0
       fi
-      exec ${ob}/bin/ob sync-config \
-        --path ${lib.escapeShellArg vault.path} \
-        --file-types ${lib.escapeShellArg typesCsv}
+
+      ${lib.optionalString (typesCsv != null) ''
+        ${ob}/bin/ob sync-config \
+          --path ${lib.escapeShellArg vault.path} \
+          --file-types ${lib.escapeShellArg typesCsv}
+      ''}
+
+      exec ${ob}/bin/ob sync --path ${lib.escapeShellArg vault.path} --continuous
     '';
   in {
     description = "Obsidian Headless sync daemon (${name})";
@@ -57,12 +63,10 @@ with lib; let
       # the service cannot see setup performed with HOME=cfg.dataDir.
       Environment = "HOME=${cfg.dataDir}";
       EnvironmentFile = config.sops.secrets.obsidian-env.path;
-      # Reapply the declared file type allowlist before the continuous daemon
-      # starts. A changed unit is restarted by nixos-rebuild, which matters
-      # because `ob sync --continuous` never re-reads state.db in place.
-      ExecStartPre = lib.optional (typesCsv != null) configureFileTypes;
-      # Exit 0 (not a failure) if vault hasn't been configured via ob-sync-setup yet.
-      ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null || { echo \"Vault not configured -- run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
+      # The script owns setup detection, file type configuration, and the
+      # long-lived sync process. A changed script changes the service unit,
+      # so nixos-rebuild restarts it and applies a changed allowlist.
+      ExecStart = runVault;
       UMask = "0002";
       Restart = "on-failure";
       RestartSec = "60s";
