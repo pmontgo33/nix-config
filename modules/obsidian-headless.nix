@@ -22,7 +22,11 @@ with lib; let
     echo "Done. Run: systemctl start obsidian-headless-''${VAULT_NAME}"
   '';
 
-  mkVaultService = name: vault: {
+  mkVaultService = name: vault: let
+    declaredTypes = cfg.fileTypes.${name} or null;
+    typesCsv = if declaredTypes == null then null
+               else lib.concatStringsSep "," declaredTypes;
+  in {
     description = "Obsidian Headless sync daemon (${name})";
     wantedBy = [ "multi-user.target" ];
     wants = [ "network-online.target" ];
@@ -39,8 +43,19 @@ with lib; let
       # the service cannot see setup performed with HOME=cfg.dataDir.
       Environment = "HOME=${cfg.dataDir}";
       EnvironmentFile = config.sops.secrets.obsidian-env.path;
-      # Exit 0 (not a failure) if vault hasn't been configured via ob-sync-setup yet.
-      ExecStart = "${pkgs.bash}/bin/bash -c '${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null || { echo \"Vault not configured -- run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
+      # 1. If a Nix-declared fileTypes list exists for this vault, reapply
+      #    it via `ob sync-config`. The daemon does not re-read its own
+      #    state.db while running, so a service restart is the only way
+      #    a changed allowlist takes effect -- and a Nix rebuild restarts
+      #    the service, so this is the right hook.
+      # 2. Bail out cleanly if the vault hasn't been initialised yet.
+      # 3. Hand off to continuous sync.
+      ExecStart = "${pkgs.bash}/bin/bash -c '"
+        + (if typesCsv == null then ""
+           else "${ob}/bin/ob sync-config --path ${lib.escapeShellArg vault.path} --file-types ${lib.escapeShellArg typesCsv} || true; ")
+        + "${ob}/bin/ob sync-status --path ${vault.path} &>/dev/null "
+          + "|| { echo \"Vault not configured -- run ob-sync-setup ${name} ${vault.path}\"; exit 0; }; "
+          + "exec ${ob}/bin/ob sync --path ${vault.path} --continuous'";
       UMask = "0002";
       Restart = "on-failure";
       RestartSec = "60s";
@@ -99,10 +114,31 @@ in {
         credentials and writes.
       '';
     };
+
+    # Per-vault Obsidian Sync `--file-types` allowlist. Each list is
+    # reapplied via `ob sync-config` on every service start (i.e. after
+    # every `nixos-rebuild switch`). Include `unsupported` to synchronise
+    # .ics, .base, .canvas, and other extensions outside Obsidian's
+    # default allowlist.
+    fileTypes = mkOption {
+      type = types.attrsOf (types.listOf types.str);
+      default = {};
+      description = "Per-vault Obsidian Sync file types (image/audio/pdf/video/unsupported)";
+      example = literalExpression ''
+        {
+          MontyVault = [ "image" "audio" "pdf" "video" "unsupported" ];
+        }
+      '';
+    };
   };
 
   config = mkIf cfg.enable {
     environment.systemPackages = [ ob setupScript ];
+
+    assertions = lib.mapAttrsToList (name: _: {
+      assertion = cfg.vaults ? ${name};
+      message = "extra-services.obsidian-headless.fileTypes.${name} is not a declared vault; allowed: ${lib.concatStringsSep ", " (lib.attrNames cfg.vaults)}";
+    }) cfg.fileTypes;
 
     # Only create the dedicated system user when running as the
     # internal identity. For other configurations (e.g. user = "hermes")
