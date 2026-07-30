@@ -99,6 +99,11 @@ in
     user = "hermes";
     group = "users";
     vaults.MontyVault.path = "/var/lib/hermes/vault/MontyVault";
+    # `unsupported` is required for .ics / .base / .canvas and other
+    # extensions outside Obsidian's default allowlist. Without it, files
+    # like tasknotes-calendar.ics are silently dropped before upload even
+    # when the phone's "Sync all other types" toggle is on.
+    fileTypes.MontyVault = [ "image" "audio" "pdf" "video" "unsupported" ];
   };
 
   services.openssh.enable = true;
