@@ -335,18 +335,10 @@ in
       memory = {
         memory_enabled = true;
         user_profile_enabled = true;
-        # Stage background-review writes until Patrick explicitly approves them.
-        # This preserves automatic capture while preventing silent durable changes.
-        write_approval = true;
         # Holographic — bundled first-party memory provider (SQLite + FTS5 +
         # HRR compositional retrieval). Pure local, no network, no embeddings.
         # Coexists additively with built-in MEMORY.md/USER.md.
         provider = "holographic";
-      };
-
-      skills = {
-        # Apply the same approval boundary to background-created or patched skills.
-        write_approval = true;
       };
 
       # Real-time token streaming over Telegram (editMessageText / sendMessageDraft)
