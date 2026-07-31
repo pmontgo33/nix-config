@@ -230,21 +230,44 @@ in
         { provider = "openai-codex"; model = "gpt-5.6-luna"; }
       ];
 
-      # Mixture of Agents presets. Three profiles, each tuned for a
+      # Mixture of Agents presets. Five profiles, each tuned for a
       # different cost/quality tradeoff:
-      #   - hydra (default): heavy MoA — Codex Sol aggregator pulling
-      #     from three diverse references. Best for deep multi-perspective
-      #     synthesis where latency is acceptable.
-      #   - coder: code-tuned aggregator (Kimi K2.7 Code) with coding-
+      #   - standard (default): balanced MoA — Codex Sol aggregator with
+      #     cross-family references (minimax MiniMax-M3, opencode-go MiMo
+      #     2.5 Pro, opencode-go Qwen 3.7 Plus). Brings productive
+      #     disagreement from non-overlapping training lineages.
+      #   - max: heavy MoA — same Codex Sol aggregator over opencode-go
+      #     glm/deepseek-pro/kimi references. Best for deep multi-
+      #     perspective synthesis where latency is acceptable. Kept as a
+      #     proven safety net; opt in via `/model max --provider moa`.
+      #   - tool: tool-calling specialist — Codex Terra aggregator with
+      #     opencode-go Tencent Hy3 (tool-use specialist), minimax
+      #     MiniMax-M3 (diverse generalist), and opencode-go deepseek-v4-
+      #     flash (cheap diverse tiebreaker).
+      #   - coder: code-tuned aggregator (Codex Terra) with coding-
       #     oriented references. For implementation tasks and code review.
-      #   - lite: cheap/fast aggregator (MiniMax M3 minimax) for
+      #   - lite: cheap/fast aggregator (minimax MiniMax-M3) for
       #     short-turn routing and simple queries. Lowest cost.
       # Use via `/model <preset> --provider moa` or one-shot
       # `/moa <prompt>`. Set per-preset `enabled = false` to fall back
       # to the aggregator acting alone.
       moa = {
-        default_preset = "hydra";
-        presets.hydra = {
+        default_preset = "standard";
+        presets.standard = {
+          reference_models = [
+            { provider = "minimax"; model = "MiniMax-M3"; }
+            { provider = "opencode-go"; model = "MiMo 2.5 Pro"; }
+            { provider = "opencode-go"; model = "qwen3.7-plus"; }
+          ];
+          aggregator = {
+            provider = "openai-codex";
+            model = "gpt-5.6-sol";
+          };
+          max_tokens = 4096;
+          reference_max_tokens = 700;
+          enabled = true;
+        };
+        presets.max = {
           reference_models = [
             { provider = "opencode-go"; model = "glm-5.2"; }
             { provider = "opencode-go"; model = "deepseek-v4-pro"; reasoning_effort = "high"; }
@@ -256,6 +279,20 @@ in
           };
           max_tokens = 4096;
           reference_max_tokens = 700;
+          enabled = true;
+        };
+        presets.tool = {
+          reference_models = [
+            { provider = "opencode-go"; model = "tencent/hy3"; }
+            { provider = "minimax"; model = "MiniMax-M3"; }
+            { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+          ];
+          aggregator = {
+            provider = "openai-codex";
+            model = "gpt-5.6-terra";
+          };
+          max_tokens = 4096;
+          reference_max_tokens = 600;
           enabled = true;
         };
         presets.coder = {
