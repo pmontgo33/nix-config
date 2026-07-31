@@ -356,9 +356,12 @@ in
         # Default reasoning effort for sessions that don't override with /reasoning.
         # Per-session overrides via `/reasoning [low|medium|high|xhigh]` still win.
         reasoning_effort = "medium";
-        # Hermes v0.19 schema migration makes this explicit. Keeping it in Nix
-        # prevents the next activation from leaving migration-only drift.
-        verify_on_stop = false;
+        # Surface-aware verify-before-finish: ON for CLI/TUI/desktop/programmatic
+        # surfaces where the verification narrative is useful, OFF for messaging
+        # surfaces (Telegram/Discord/etc.) where it would arrive as chat noise.
+        # Setting this string explicitly preserves the upstream auto behavior
+        # against future schema-default drift.
+        verify_on_stop = "auto";
       };
 
       compression = {
