@@ -119,31 +119,62 @@
   # HTTP response as a "stream" (no seeking, no re-fetch on loop), so we
   # fetch it ourselves and let frigate's ffmpeg read a local file instead,
   # which -loop 1 -f image2 handles natively.
+  #
+  # Keep this as one persistent service rather than a one-shot service driven
+  # by a one-second timer. Five successful starts in systemd's default ten-
+  # second window hit the start-rate limiter even when every fetch succeeds.
   systemd.services.frigate-kitchen-snapshot = {
     description = "Poll kitchen kiosk camera snapshot";
-    serviceConfig.Type = "oneshot";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    startLimitIntervalSec = 10;
+    startLimitBurst = 5;
+    serviceConfig = {
+      Type = "simple";
+      Restart = "on-failure";
+      RestartSec = "30s";
+    };
     script = ''
+      set -u
+
       while IFS='=' read -r key value; do
         [ -z "$key" ] && continue
         case "$key" in \#*) continue ;; esac
         export "$key=$value"
       done < ${config.sops.secrets.frigate-env.path}
 
-      ${pkgs.curl}/bin/curl -s --max-time 5 \
-        "http://192.168.86.228:2323/?cmd=getCamshot&password=$FRIGATE_KIOSK_PASSWORD" \
-        -o /run/frigate-snapshots/kitchen.jpg.tmp \
-      && mv -f /run/frigate-snapshots/kitchen.jpg.tmp /run/frigate-snapshots/kitchen.jpg
-    '';
-  };
+      snapshot=/run/frigate-snapshots/kitchen.jpg
+      temporary="$snapshot.tmp"
+      consecutive_failures=0
 
-  systemd.timers.frigate-kitchen-snapshot = {
-    description = "Poll kitchen kiosk camera snapshot on a timer";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "5s";
-      OnUnitActiveSec = "1s";
-      AccuracySec = "500ms";
-    };
+      while :; do
+        if ${pkgs.curl}/bin/curl \
+          --fail --silent --show-error \
+          --connect-timeout 3 --max-time 5 \
+          "http://192.168.86.228:2323/?cmd=getCamshot&password=$FRIGATE_KIOSK_PASSWORD" \
+          --output "$temporary" \
+          && test -s "$temporary" \
+          && mv -f -- "$temporary" "$snapshot"; then
+          if [ "$consecutive_failures" -gt 0 ]; then
+            echo "Kitchen kiosk snapshot fetch recovered" >&2
+          fi
+          consecutive_failures=0
+        else
+          rm -f -- "$temporary"
+          consecutive_failures=$((consecutive_failures + 1))
+          echo "Kitchen kiosk snapshot fetch failed ($consecutive_failures consecutive failures)" >&2
+
+          if [ "$consecutive_failures" -ge 5 ]; then
+            rm -f -- "$snapshot"
+            echo "Kitchen kiosk snapshot is stale; removed it so Frigate can surface input loss" >&2
+            exit 1
+          fi
+        fi
+
+        sleep 1
+      done
+    '';
   };
 
   # GPU access for LXC - match host device GIDs
