@@ -247,11 +247,41 @@ def load_receipt(repo: Repository, state_dir: Path | str | None = None) -> dict[
         raise NixPrError(f"cannot read validation receipt {path}: {exc}") from exc
 
 
+REQUIRED_SECTIONS = ("why", "affected", "validation")
+SECTION_HEADERS = {
+    "why": re.compile(r"^why\s*:\s*\S", re.IGNORECASE | re.MULTILINE),
+    "affected": re.compile(r"^affected\s*:\s*\S", re.IGNORECASE | re.MULTILINE),
+    "validation": re.compile(r"^validation\s*:\s*\S", re.IGNORECASE | re.MULTILINE),
+}
+
+
 def _subject_without_prefix(subject: str) -> str:
     return re.sub(r"^[a-z][a-z0-9-]*(?:\([^)]*\))?!?:\s*", "", subject, flags=re.IGNORECASE)
 
 
-def validate_commit_message(message: str) -> list[str]:
+def is_substantive_change(changed_files: Sequence[str], diff_text: str) -> bool:
+    """Return True when the change is more than a small documentation edit.
+
+    A change is substantive when it touches any non-markdown file or exceeds
+    20 lines of diff. Documentation-only commits can use the relaxed body
+    check; everything else must carry Why, Affected, and Validation sections.
+    """
+
+    if any(not relative.endswith(".md") for relative in changed_files):
+        return True
+    return len(diff_text.splitlines()) > 20
+
+
+def missing_required_sections(message: str) -> list[str]:
+    return [name for name, pattern in SECTION_HEADERS.items() if not pattern.search(message)]
+
+
+def validate_commit_message(
+    message: str,
+    *,
+    changed_files: Sequence[str] | None = None,
+    diff_text: str = "",
+) -> list[str]:
     errors: list[str] = []
     if "\x00" in message:
         errors.append("message must not contain NUL bytes")
@@ -277,6 +307,14 @@ def validate_commit_message(message: str) -> list[str]:
     body = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
     if not body:
         errors.append("non-trivial commits require a body")
+    if changed_files is not None and is_substantive_change(changed_files, diff_text):
+        missing = missing_required_sections(message)
+        if missing:
+            errors.append(
+                "substantive commits require Why:, Affected:, and Validation: sections (missing: "
+                + ", ".join(missing)
+                + ")"
+            )
     lowered = message.lower()
     if "co-authored-by:" in lowered:
         errors.append("message must not contain forbidden attribution")
@@ -539,7 +577,12 @@ def commit(repo: Repository, message_file: Path, state_dir: Path | str | None = 
         message = message_file.read_text(encoding="utf-8")
     except OSError as exc:
         raise NixPrError(f"cannot read commit message file: {message_file}") from exc
-    errors = validate_commit_message(message)
+    diff_text = repo.git("diff", "--cached", "-U0", "--")
+    errors = validate_commit_message(
+        message,
+        changed_files=staged,
+        diff_text=diff_text,
+    )
     if errors:
         raise NixPrError("invalid commit message:\n- " + "\n- ".join(errors))
     repo.commit(message_file)
@@ -638,6 +681,20 @@ def submit(repo: Repository, *, state_dir: Path | str | None = None, dry_run: bo
         raise NixPrError(f"fork branch already exists; refusing to overwrite: {branch}")
     title = repo.git("log", "-1", "--format=%s").strip()
     body = repo.git("log", f"{live_base}..HEAD", "--format=%B").strip()
+    commit_message = title + "\n\n" + body if body else title
+    final_diff = repo.git("diff", f"{live_base}..HEAD", "-U0", "--")
+    final_files = sorted(repo.git("diff", "--name-only", f"{live_base}..HEAD", "-z").split("\0"))
+    final_files = [item for item in final_files if item]
+    message_errors = validate_commit_message(
+        commit_message,
+        changed_files=final_files,
+        diff_text=final_diff,
+    )
+    if message_errors:
+        raise NixPrError(
+            "committed message does not satisfy nix-pr message policy:\n- "
+            + "\n- ".join(message_errors)
+        )
     payload = {
         "title": title,
         "head": f"openclaw:{branch}",
