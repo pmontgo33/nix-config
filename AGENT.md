@@ -2,13 +2,19 @@
 
 ## Commit Workflow
 
-When asked to review and commit changes:
-1. Run `git diff` and `git status` to identify all unstaged changes.
-2. Group changes by logical concern — one commit per distinct change/update.
-3. Stage and commit each group separately.
-4. Write commit messages that explain the *why*, not just the *what*. Use imperative mood, no trailing period.
-5. Include enough context in the commit body that a future agent in a fresh session could understand the motivation, any non-obvious constraints, and what would be needed to continue or troubleshoot the change.
-6. Do not mention Claude or add `Co-Authored-By` lines in commit messages.
+When asked to review and commit changes in this repository:
+
+1. Use `scripts/nix-pr status` to inspect repository and validation state.
+2. For a new task, start from a clean checkout with `scripts/nix-pr start <slug>`.
+3. Run `git diff` and `git status` to identify all changes.
+4. Group changes by logical concern and stage only the intended files for one group.
+5. Run `scripts/nix-pr check`; pass `--second-review-file` for production Nix or systemd changes.
+6. Create the commit with `scripts/nix-pr commit --message-file <path>`.
+7. Submit only when authorized, using `scripts/nix-pr submit`; use `--dry-run` first when appropriate.
+
+The wrapper owns validation receipts, commit-message checks, pushing, and verified Forgejo PR creation. It does not edit files, merge PRs, deploy systems, resolve conflicts, or force-push.
+
+Commit messages must explain the *why*, not just the *what*. Use imperative mood with no trailing punctuation. Include enough context in the body for a fresh session to understand the motivation, non-obvious constraints, validation performed, and any operational implications. Do not mention an AI tool or add `Co-Authored-By` lines.
 
 ## Host Access
 
