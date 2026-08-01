@@ -31,6 +31,33 @@ just rescue-build            # build rescue ISO
 just ap HOST                 # run ansible playbook against host
 ```
 
+## Guarded PR workflow
+
+The repository-local `scripts/nix-pr` wrapper owns branch safety, validation
+receipts, commit-message checks, and verified Forgejo PR submission. It does
+not edit Nix, deploy systems, merge PRs, or depend on an LLM.
+
+```bash
+scripts/nix-pr start <slug>
+# edit normally, then stage one logical change group
+scripts/nix-pr check --second-review-file /path/to/review.txt
+scripts/nix-pr commit --message-file /path/to/commit-message.txt
+scripts/nix-pr submit --dry-run
+```
+
+Use `--host NAME` for a shared Nix change when the affected host cannot be
+inferred from the path, or `--all-hosts` when every flake configuration must
+be built. Validation receipts are stored outside the repository under the
+user's XDG state directory. Run the test suite with:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+Commit messages must use imperative mood, explain why the change is needed,
+include operational context and validation results, omit trailing punctuation,
+and contain no `Co-Authored-By` or AI attribution.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
