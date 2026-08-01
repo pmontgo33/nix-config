@@ -39,11 +39,16 @@ not edit Nix, deploy systems, merge PRs, or depend on an LLM.
 
 ```bash
 scripts/nix-pr start <slug>
+scripts/nix-pr status                 # confirm branch/base state
 # edit normally, then stage one logical change group
 scripts/nix-pr check --second-review-file /path/to/review.txt
 scripts/nix-pr commit --message-file /path/to/commit-message.txt
-scripts/nix-pr submit --dry-run
+scripts/nix-pr submit --dry-run       # inspect the Forgejo payload
+scripts/nix-pr submit                 # push and open the PR after review
 ```
+
+`status` and `submit --dry-run` are read-only. The final `submit` step is the
+only command in this sequence that pushes the branch and opens a Forgejo PR.
 
 Use `--host NAME` for a shared Nix change when the affected host cannot be
 inferred from the path, or `--all-hosts` when every flake configuration must
