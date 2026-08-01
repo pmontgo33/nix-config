@@ -18,7 +18,9 @@ sys.path.insert(0, str(SCRIPT_DIR))
 from nix_pr import (  # noqa: E402
     Repository,
     content_fingerprint,
+    is_substantive_change,
     load_receipt,
+    missing_required_sections,
     receipt_path,
     validate_commit_message,
     write_receipt,
@@ -80,6 +82,52 @@ class CommitMessageTests(unittest.TestCase):
     def test_rejects_obvious_past_tense_subject(self) -> None:
         errors = validate_commit_message("Added a workflow\n\nExplain why it exists\n")
         self.assertIn("subject should use imperative mood", errors)
+
+
+class SubstantiveMessageTests(unittest.TestCase):
+    def test_substantive_change_requires_why_affected_validation(self) -> None:
+        message = (
+            "calendars: publish private TaskNotes iCalendar feed\n\n"
+            "Add validated TaskNotes publication through Tailscale SSH.\n"
+        )
+        errors = validate_commit_message(
+            message,
+            changed_files=["hosts/bifrost/configuration.nix"],
+            diff_text="+" * 200,
+        )
+        joined = "\n".join(errors)
+        self.assertIn("Why", joined)
+        self.assertIn("Affected", joined)
+        self.assertIn("Validation", joined)
+
+    def test_documentation_change_below_threshold_relaxes_requirements(self) -> None:
+        message = "docs: clarify PR workflow\n\nDocument the complete guarded PR workflow.\n"
+        errors = validate_commit_message(
+            message,
+            changed_files=["README.md"],
+            diff_text="+ one line\n",
+        )
+        self.assertEqual(errors, [])
+
+    def test_large_markdown_change_still_requires_sections(self) -> None:
+        message = "docs: overhaul contributor guide\n\nMajor rewrite.\n"
+        errors = validate_commit_message(
+            message,
+            changed_files=["README.md"],
+            diff_text="\n".join("+ line" for _ in range(50)),
+        )
+        self.assertIn("substantive commits require Why:", "\n".join(errors))
+
+    def test_missing_sections_helper_reports_each(self) -> None:
+        body_only_validation = "Why: x\nAffected: y\n"
+        self.assertEqual(missing_required_sections(body_only_validation), ["validation"])
+        full = "Why: a\nAffected: b\nValidation: c\n"
+        self.assertEqual(missing_required_sections(full), [])
+
+    def test_is_substantive_change_classifies_correctly(self) -> None:
+        self.assertTrue(is_substantive_change(["hosts/bifrost/configuration.nix"], ""))
+        self.assertFalse(is_substantive_change(["README.md"], "+ a\n"))
+        self.assertTrue(is_substantive_change(["README.md"], "\n".join("+" for _ in range(30))))
 
 
 class RepositoryStateTests(unittest.TestCase):
