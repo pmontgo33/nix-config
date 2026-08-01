@@ -114,6 +114,10 @@ in
       hostNames = [ "192.168.86.100" "homeassistant" "ha" ];
       publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMzBHEg142uYU3qgiuUa3afGEVcI9JPe5a4aX4gnyHJ1";
     };
+    "bifrost" = {
+      hostNames = [ "bifrost" ];
+      publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEsVAXwCpidt9V/tx4/2E5jMyLDqvgnHYLv1ysQIOKRA";
+    };
   };
 
   environment.systemPackages = with pkgs; [
@@ -550,6 +554,54 @@ in
   systemd.services.hermes-agent.postStart = ''
     find /var/lib/hermes/.hermes -maxdepth 3 \! -user hermes -exec chown hermes:users {} + 2>/dev/null || true
   '';
+
+  systemd.tmpfiles.rules = [
+    "d /var/lib/hermes/.cache 0700 hermes users -"
+  ];
+
+  systemd.services.tasknotes-calendar-publish = {
+    description = "Publish the validated TaskNotes calendar to Bifrost";
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" "obsidian-headless-MontyVault.service" ];
+    environment = {
+      HOME = "/var/lib/hermes";
+      HERMES_HOME = "/var/lib/hermes/.hermes";
+    };
+    serviceConfig = {
+      Type = "oneshot";
+      User = "hermes";
+      Group = "users";
+      WorkingDirectory = "/var/lib/hermes";
+      # The publisher is maintained in Hermes Library, not nix-config. Fail
+      # clearly if the library deployment is missing rather than reporting a
+      # misleading Python/import failure.
+      ExecStartPre = [
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/publish_tasknotes_calendar.py"
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/normalize_tasknotes_calendar.py"
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/validate_ics.py"
+      ];
+      ExecStart = "${hermesPython}/bin/python3 /var/lib/hermes/.hermes/scripts/calendars/publish_tasknotes_calendar.py";
+      TimeoutStartSec = 120;
+    };
+  };
+
+  systemd.paths.tasknotes-calendar-publish = {
+    wantedBy = [ "multi-user.target" ];
+    pathConfig = {
+      PathChanged = "/var/lib/hermes/vault/MontyVault/tasknotes-calendar.ics";
+      Unit = "tasknotes-calendar-publish.service";
+    };
+  };
+
+  systemd.timers.tasknotes-calendar-publish-fallback = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "5min";
+      OnUnitActiveSec = "15min";
+      Persistent = true;
+      Unit = "tasknotes-calendar-publish.service";
+    };
+  };
 
   users.users.hermes = {
     linger = true;
