@@ -370,6 +370,12 @@ def start(repo: Repository, slug: str) -> str:
         raise NixPrError(f"local branch already exists: {slug}")
     live_origin = _live_origin(repo)
     remote_branch = repo.run(["git", "ls-remote", "--exit-code", "fork", f"refs/heads/{slug}"], check=False)
+    if remote_branch.returncode not in (0, 2):
+        raise CommandError(
+            ["git", "ls-remote", "--exit-code", "fork", f"refs/heads/{slug}"],
+            remote_branch.returncode,
+            remote_branch.stderr,
+        )
     if remote_branch.returncode == 0:
         raise NixPrError(f"fork branch already exists: {slug}")
     repo.git("checkout", "-b", slug, "origin/master")
