@@ -9,7 +9,6 @@ When asked to review and commit changes:
 4. Write commit messages that explain the *why*, not just the *what*. Use imperative mood, no trailing period.
 5. Include enough context in the commit body that a future agent in a fresh session could understand the motivation, any non-obvious constraints, and what would be needed to continue or troubleshoot the change.
 6. Do not mention Claude or add `Co-Authored-By` lines in commit messages.
-7. Pause for confirmation before each commit unless the user has said to proceed without asking.
 
 ## Host Access
 
