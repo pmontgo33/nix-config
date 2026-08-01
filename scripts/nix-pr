@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""Executable entry point for the nix-config PR workflow."""
+
+import sys
+
+sys.dont_write_bytecode = True
+
+from nix_pr import main
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
