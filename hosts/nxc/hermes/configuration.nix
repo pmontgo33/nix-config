@@ -212,6 +212,19 @@ in
       model = {
         default = "MiniMax-M3";
         provider = "minimax";
+        # User-defined model aliases — resolved before catalog lookup.
+        # Checked BEFORE built-in short names (sonnet/grok/...).
+        # See hermes_cli/model_switch.py::resolve_alias().
+        # `mm` is a stable short name for the current default
+        # (model.default above) — keeps `/model mm` working even
+        # if the default changes later.
+        aliases = {
+          luna = "openai-codex/gpt-5.6-luna";
+          terra = "openai-codex/gpt-5.6-terra";
+          sol = "openai-codex/gpt-5.6-sol";
+          mm = "minimax/MiniMax-M3";
+          flash = "opencode-go/deepseek-v4-flash";
+        };
       };
 
       tts = {
@@ -357,9 +370,14 @@ in
       agent = {
         max_turns = 90;
         gateway_timeout = 1800;
-        # Default reasoning effort for sessions that don't override with /reasoning.
         # Per-session overrides via `/reasoning [low|medium|high|xhigh]` still win.
         reasoning_effort = "medium";
+        # Per-model reasoning override. Keys are model IDs (spelling-tolerant
+        # resolver in hermes_constants.resolve_per_model_reasoning_effort).
+        # Session-scoped /reasoning --session always wins for that session.
+        reasoning_overrides = {
+          "gpt-5.6-luna" = "xhigh";
+        };
         # Surface-aware verify-before-finish: ON for CLI/TUI/desktop/programmatic
         # surfaces where the verification narrative is useful, OFF for messaging
         # surfaces (Telegram/Discord/etc.) where it would arrive as chat noise.
