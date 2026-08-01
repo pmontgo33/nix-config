@@ -85,7 +85,28 @@ class CommitMessageTests(unittest.TestCase):
 
 
 class SubstantiveMessageTests(unittest.TestCase):
-    def test_substantive_change_requires_why_affected_validation(self) -> None:
+    def test_accepts_historical_markdown_format(self) -> None:
+        message = (
+            "calendars: publish private TaskNotes iCalendar feed\n\n"
+            "## Summary\n\n"
+            "Add validated TaskNotes publication through Tailscale SSH with atomic "
+            "Bifrost-side feed replacement and Hermes path/timer triggers.\n\n"
+            "## Why this matters\n\n"
+            "The shared calendar needs a stable authenticated publication path without "
+            "exposing the vault.\n\n"
+            "## Verification\n\n"
+            "- `scripts/nix-pr check` passed\n"
+            "- Full affected-host build passed\n"
+            "- The generated service configuration was inspected after evaluation\n"
+        )
+        errors = validate_commit_message(
+            message,
+            changed_files=["hosts/bifrost/configuration.nix"],
+            diff_text="+" * 200,
+        )
+        self.assertEqual(errors, [])
+
+    def test_rejects_missing_markdown_sections(self) -> None:
         message = (
             "calendars: publish private TaskNotes iCalendar feed\n\n"
             "Add validated TaskNotes publication through Tailscale SSH.\n"
@@ -95,33 +116,53 @@ class SubstantiveMessageTests(unittest.TestCase):
             changed_files=["hosts/bifrost/configuration.nix"],
             diff_text="+" * 200,
         )
-        joined = "\n".join(errors)
-        self.assertIn("Why", joined)
-        self.assertIn("Affected", joined)
-        self.assertIn("Validation", joined)
+        self.assertIn("## Summary", "\n".join(errors))
+        self.assertIn("## Verification", "\n".join(errors))
 
-    def test_documentation_change_below_threshold_relaxes_requirements(self) -> None:
+    def test_rejects_short_substantive_body(self) -> None:
+        message = (
+            "calendars: publish private TaskNotes iCalendar feed\n\n"
+            "## Summary\n\n"
+            "Add the publisher.\n\n"
+            "## Verification\n\n"
+            "- Parse passed\n"
+        )
+        errors = validate_commit_message(
+            message,
+            changed_files=["hosts/bifrost/configuration.nix"],
+            diff_text="+" * 200,
+        )
+        self.assertIn("at least 350 body characters", "\n".join(errors))
+
+    def test_small_documentation_change_still_requires_format(self) -> None:
         message = "docs: clarify PR workflow\n\nDocument the complete guarded PR workflow.\n"
         errors = validate_commit_message(
             message,
             changed_files=["README.md"],
             diff_text="+ one line\n",
         )
-        self.assertEqual(errors, [])
+        self.assertIn("## Summary", "\n".join(errors))
+        self.assertIn("## Verification", "\n".join(errors))
 
-    def test_large_markdown_change_still_requires_sections(self) -> None:
-        message = "docs: overhaul contributor guide\n\nMajor rewrite.\n"
+    def test_large_markdown_change_requires_historical_detail(self) -> None:
+        message = (
+            "docs: overhaul contributor guide\n\n"
+            "## Summary\n\n"
+            "Rewrite the guide.\n\n"
+            "## Verification\n\n"
+            "- Read the file\n"
+        )
         errors = validate_commit_message(
             message,
             changed_files=["README.md"],
             diff_text="\n".join("+ line" for _ in range(50)),
         )
-        self.assertIn("substantive commits require Why:", "\n".join(errors))
+        self.assertIn("at least 350 body characters", "\n".join(errors))
 
-    def test_missing_sections_helper_reports_each(self) -> None:
-        body_only_validation = "Why: x\nAffected: y\n"
-        self.assertEqual(missing_required_sections(body_only_validation), ["validation"])
-        full = "Why: a\nAffected: b\nValidation: c\n"
+    def test_missing_sections_helper_reports_empty_and_missing(self) -> None:
+        empty = "## Summary\n\n## Verification\n\n"
+        self.assertEqual(missing_required_sections(empty), ["Summary", "Verification"])
+        full = "## Summary\n\nA summary\n\n## Verification\n\n- Check passed\n"
         self.assertEqual(missing_required_sections(full), [])
 
     def test_is_substantive_change_classifies_correctly(self) -> None:

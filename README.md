@@ -70,7 +70,30 @@ Validation receipts are stored outside the repository under the user's XDG state
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-Commit messages must use imperative mood, explain why the change is needed, include operational context and validation results, omit trailing punctuation, and contain no `Co-Authored-By` or AI attribution.
+Commit messages must use imperative mood, omit trailing punctuation, and contain no `Co-Authored-By` or AI attribution. They must use this Markdown format so the PR description and future `git log` history remain useful:
+
+```markdown
+<scope>: <imperative summary>
+
+## Summary
+
+What changed and what result it provides.
+
+## Why this matters
+
+The problem, root cause, constraints, or design decision.
+
+## Verification
+
+- Exact parse, evaluation, build, test, or runtime checks
+
+## Deployment / Post-merge checklist
+
+Only when relevant: rebuilds, restarts, migrations, rollback steps, or
+subscriber/user follow-up.
+```
+
+`## Summary` and `## Verification` must be populated. Substantive changes must provide at least 350 body characters. The wrapper validates this format before committing and again before submission.
 
 ## License
 
