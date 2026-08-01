@@ -247,12 +247,12 @@ def load_receipt(repo: Repository, state_dir: Path | str | None = None) -> dict[
         raise NixPrError(f"cannot read validation receipt {path}: {exc}") from exc
 
 
-REQUIRED_SECTIONS = ("why", "affected", "validation")
+REQUIRED_SECTIONS = ("Summary", "Verification")
 SECTION_HEADERS = {
-    "why": re.compile(r"^why\s*:\s*\S", re.IGNORECASE | re.MULTILINE),
-    "affected": re.compile(r"^affected\s*:\s*\S", re.IGNORECASE | re.MULTILINE),
-    "validation": re.compile(r"^validation\s*:\s*\S", re.IGNORECASE | re.MULTILINE),
+    title: re.compile(rf"^##\s+{title}\s*$", re.IGNORECASE | re.MULTILINE)
+    for title in REQUIRED_SECTIONS
 }
+MIN_SUBSTANTIVE_BODY_CHARS = 350
 
 
 def _subject_without_prefix(subject: str) -> str:
@@ -260,20 +260,37 @@ def _subject_without_prefix(subject: str) -> str:
 
 
 def is_substantive_change(changed_files: Sequence[str], diff_text: str) -> bool:
-    """Return True when the change is more than a small documentation edit.
-
-    A change is substantive when it touches any non-markdown file or exceeds
-    20 lines of diff. Documentation-only commits can use the relaxed body
-    check; everything else must carry Why, Affected, and Validation sections.
-    """
+    """Return True when the change needs the full historical message detail."""
 
     if any(not relative.endswith(".md") for relative in changed_files):
         return True
     return len(diff_text.splitlines()) > 20
 
 
+def _markdown_section_content(message: str, title: str) -> str | None:
+    lines = message.splitlines()
+    header = re.compile(rf"^##\s+{re.escape(title)}\s*$", re.IGNORECASE)
+    start: int | None = None
+    for index, line in enumerate(lines):
+        if header.match(line.strip()):
+            start = index + 1
+            break
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start, len(lines)):
+        if re.match(r"^##\s+\S", lines[index]):
+            end = index
+            break
+    return "\n".join(lines[start:end]).strip()
+
+
 def missing_required_sections(message: str) -> list[str]:
-    return [name for name, pattern in SECTION_HEADERS.items() if not pattern.search(message)]
+    missing: list[str] = []
+    for title, pattern in SECTION_HEADERS.items():
+        if not pattern.search(message) or not _markdown_section_content(message, title):
+            missing.append(title)
+    return missing
 
 
 def validate_commit_message(
@@ -307,13 +324,19 @@ def validate_commit_message(
     body = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
     if not body:
         errors.append("non-trivial commits require a body")
-    if changed_files is not None and is_substantive_change(changed_files, diff_text):
+    if changed_files is not None:
         missing = missing_required_sections(message)
         if missing:
             errors.append(
-                "substantive commits require Why:, Affected:, and Validation: sections (missing: "
+                "commits require populated Markdown sections ## Summary and ## Verification "
+                "(missing: "
                 + ", ".join(missing)
                 + ")"
+            )
+        if is_substantive_change(changed_files, diff_text) and len(body) < MIN_SUBSTANTIVE_BODY_CHARS:
+            errors.append(
+                f"substantive commits require at least {MIN_SUBSTANTIVE_BODY_CHARS} body characters "
+                f"of historical context and verification (found {len(body)})"
             )
     lowered = message.lower()
     if "co-authored-by:" in lowered:
@@ -680,7 +703,11 @@ def submit(repo: Repository, *, state_dir: Path | str | None = None, dry_run: bo
     if existing.returncode == 0:
         raise NixPrError(f"fork branch already exists; refusing to overwrite: {branch}")
     title = repo.git("log", "-1", "--format=%s").strip()
-    body = repo.git("log", f"{live_base}..HEAD", "--format=%B").strip()
+    commit_count = int(repo.git("rev-list", "--count", f"{live_base}..HEAD").strip())
+    if commit_count == 1:
+        body = repo.git("log", "-1", "--format=%b").strip()
+    else:
+        body = repo.git("log", f"{live_base}..HEAD", "--format=%B").strip()
     commit_message = title + "\n\n" + body if body else title
     final_diff = repo.git("diff", f"{live_base}..HEAD", "-U0", "--")
     final_files = sorted(repo.git("diff", "--name-only", f"{live_base}..HEAD", "-z").split("\0"))

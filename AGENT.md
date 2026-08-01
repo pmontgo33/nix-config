@@ -14,7 +14,30 @@ When asked to review and commit changes in this repository:
 
 The wrapper owns validation receipts, commit-message checks, pushing, and verified Forgejo PR creation. It does not edit files, merge PRs, deploy systems, resolve conflicts, or force-push.
 
-Commit messages must explain the *why*, not just the *what*. Use imperative mood with no trailing punctuation. Include enough context in the body for a fresh session to understand the motivation, non-obvious constraints, validation performed, and any operational implications. Do not mention an AI tool or add `Co-Authored-By` lines.
+Commit messages must use imperative mood, omit trailing punctuation, and contain no `Co-Authored-By` or AI attribution. For every committed change, use the historical Markdown format that makes the commit useful to a future agent reading `git log`:
+
+```markdown
+<scope>: <imperative summary>
+
+## Summary
+
+What changed and what result it provides.
+
+## Why this matters
+
+The problem, root cause, constraints, or design decision.
+
+## Verification
+
+- Exact parse, evaluation, build, test, or runtime checks
+
+## Deployment / Post-merge checklist
+
+Only when relevant: rebuilds, restarts, migrations, rollback steps, or
+subscriber/user follow-up.
+```
+
+`## Summary` and `## Verification` must be populated. Substantive changes must provide at least 350 body characters; add the relevant optional sections rather than compressing operational context into one paragraph. `scripts/nix-pr` validates this format before committing and again before submission.
 
 ## Host Access
 
