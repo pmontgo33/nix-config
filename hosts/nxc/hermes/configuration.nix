@@ -352,6 +352,13 @@ in
         mode = "smart";
       };
 
+      quick_commands = {
+        "all-usage" = {
+          type = "exec";
+          command = "/var/lib/hermes/.hermes/scripts/provider-quota/provider-quota.sh";
+        };
+      };
+
       toolsets = [ "hermes-cli" "files" "web" "computer" "memory" ];
 
       # Voice requests get Home Assistant plus one narrow health write action.
