@@ -605,6 +605,7 @@ in
       # misleading Python/import failure.
       ExecStartPre = [
         "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/publish_tasknotes_calendar.py"
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/generate_tasknotes_calendar.py"
         "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/normalize_tasknotes_calendar.py"
         "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/validate_ics.py"
       ];
@@ -616,7 +617,11 @@ in
   systemd.paths.tasknotes-calendar-publish = {
     wantedBy = [ "multi-user.target" ];
     pathConfig = {
-      PathChanged = "/var/lib/hermes/vault/MontyVault/tasknotes-calendar.ics";
+      PathChanged = [
+        "/var/lib/hermes/vault/MontyVault/TaskNotes"
+        "/var/lib/hermes/vault/MontyVault/TaskNotes/Tasks"
+        "/var/lib/hermes/vault/MontyVault/TaskNotes/Archive"
+      ];
       Unit = "tasknotes-calendar-publish.service";
     };
   };
