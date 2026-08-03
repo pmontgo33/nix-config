@@ -353,7 +353,7 @@ in
       };
 
       quick_commands = {
-        "all-usage" = {
+        "myusage" = {
           type = "exec";
           command = "/var/lib/hermes/.hermes/scripts/provider-quota/provider-quota.sh";
         };
