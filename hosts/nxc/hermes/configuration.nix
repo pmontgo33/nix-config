@@ -127,6 +127,8 @@ in
     tmux
     pkgs.jq
     pkgs.tesseract
+    pkgs.rsync
+    pkgs.util-linux
     hermesPython
   ];
 
@@ -629,9 +631,43 @@ in
     };
   };
 
+  systemd.services.calendar-sports-generate = {
+    description = "Generate and publish Philadelphia sports calendars";
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    environment = {
+      HOME = "/var/lib/hermes";
+      HERMES_HOME = "/var/lib/hermes/.hermes";
+    };
+    serviceConfig = {
+      Type = "oneshot";
+      User = "hermes";
+      Group = "users";
+      WorkingDirectory = "/var/lib/hermes";
+      ExecStartPre = [
+        "${pkgs.coreutils}/bin/test -x /var/lib/hermes/.hermes/scripts/philly-sports-cal/deploy.sh"
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/philly-sports-cal/generate.py"
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/philly-sports-cal/validate.py"
+      ];
+      ExecStart = "/var/lib/hermes/.hermes/scripts/philly-sports-cal/deploy.sh";
+      TimeoutStartSec = 1800;
+    };
+  };
+
+  systemd.timers.calendar-sports-generate = {
+    # Deliberately enabled during cutover, after the legacy cron is paused.
+    wantedBy = [ ];
+    timerConfig = {
+      OnCalendar = "*-*-* 11:00:00 America/New_York";
+      Persistent = true;
+      Unit = "calendar-sports-generate.service";
+    };
+  };
+
   users.users.hermes = {
     linger = true;
   };
+
   users.users.root.linger = true;
 
   systemd.services.rocket-githook = {
