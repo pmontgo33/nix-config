@@ -655,8 +655,7 @@ in
   };
 
   systemd.timers.calendar-sports-generate = {
-    # Deliberately enabled during cutover, after the legacy cron is paused.
-    wantedBy = [ ];
+    wantedBy = [ "timers.target" ];
     timerConfig = {
       OnCalendar = "*-*-* 11:00:00 America/New_York";
       Persistent = true;
