@@ -383,7 +383,8 @@ in
         # resolver in hermes_constants.resolve_per_model_reasoning_effort).
         # Session-scoped /reasoning --session always wins for that session.
         reasoning_overrides = {
-          "gpt-5.6-luna" = "xhigh";
+          "deepseek-v4-flash" = "high";
+          "gpt-5.6-luna" = "high";
         };
         # Surface-aware verify-before-finish: ON for CLI/TUI/desktop/programmatic
         # surfaces where the verification narrative is useful, OFF for messaging
