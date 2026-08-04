@@ -156,6 +156,44 @@ class HermesRelayPluginImportTests(unittest.TestCase):
                     endpoint["relay"]["transport_hint"], expected_transport
                 )
 
+    def test_generated_relay_urls_target_websocket_endpoint(self) -> None:
+        """Generated Relay URLs must address the server's /ws route."""
+        package_name = _load_directory_plugin()
+        pair_module = importlib.import_module(f"{package_name}.pair")
+
+        self.assertEqual(
+            pair_module._relay_lan_base_url("100.81.254.49", 8767),
+            "ws://100.81.254.49:8767/ws",
+        )
+        self.assertEqual(
+            pair_module._lan_endpoint(
+                "192.168.86.126",
+                8642,
+                False,
+                "192.168.86.126",
+                8767,
+                False,
+            )["relay"]["url"],
+            "ws://192.168.86.126:8767/ws",
+        )
+        self.assertEqual(
+            pair_module._tailscale_endpoint(
+                {"tailscale_ip": "100.81.254.49"},
+                api_port=8642,
+                relay_port=8767,
+                api_tls=False,
+                relay_tls=False,
+                priority=0,
+            )["relay"]["url"],
+            "ws://100.81.254.49:8767/ws",
+        )
+        self.assertEqual(
+            pair_module._public_endpoint(
+                "https://relay.example", 8767, 0
+            )["relay"]["url"],
+            "wss://relay.example:8767/ws",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
