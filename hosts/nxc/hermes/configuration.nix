@@ -224,8 +224,10 @@ in
       # runtime deps (aiohttp, segno, ...) are picked up by the
       # hermes-relay systemd service via its own python interpreter
       # (see extra-services.hermes-relay below). The wheel's
-      # `plugin/hermes_relay_bootstrap/` (legacy `.pth` compat hook) and
-      # `plugin/voice_lab/` (standalone CLI) are intentionally excluded.
+      # `plugin/hermes_relay_bootstrap/` (legacy `.pth` compat hook) is
+      # intentionally excluded. Keep `plugin/voice_lab/`: relay imports
+      # its expressions, metrics, and provider base modules on CLI startup,
+      # even when optional voice provider keys are unset.
       (pkgs.runCommand "hermes-relay-hermes-plugin" { } ''
         cp -r ${./plugins/hermes-relay} $out
       '')
