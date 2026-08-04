@@ -91,6 +91,19 @@ in
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
+  extra-services.hermes-relay.enable = true;
+  # When extraPlugins changes (e.g. adding/removing Hermes-Relay),
+  # restart both hermes-agent and hermes-dashboard so the loader picks
+  # up the new plugin tree. Without this, plugin enable requires a
+  # manual `systemctl restart hermes-agent hermes-dashboard` after
+  # deploy. nix-hermes-agent's own module does not declare these
+  # triggers, so we add them here. Cited by Luna xhigh review r3.
+  systemd.services.hermes-agent.restartTriggers =
+    [ config.services.hermes-agent.package ]
+    ++ config.services.hermes-agent.extraPlugins;
+  systemd.services.hermes-dashboard.restartTriggers =
+    [ config.services.hermes-agent.package ]
+    ++ config.services.hermes-agent.extraPlugins;
   extra-services.obsidian-headless = {
     enable = true;
     # Run the sync daemon as the same Unix user that writes vault files
@@ -203,6 +216,18 @@ in
     extraPlugins = [
       (pkgs.runCommand "health-log-hermes-plugin" { } ''
         cp -r ${./plugins/health-log} $out
+      '')
+      # Hermes-Relay plugin (v1.5.0): QR pairing, `hermes pair` and
+      # `hermes relay` CLI sub-commands, android_*/desktop_*/relay_* tools,
+      # and dashboard relay routes. The plugin loader imports this directory
+      # directly (no separate Python package needed at discovery time);
+      # runtime deps (aiohttp, segno, ...) are picked up by the
+      # hermes-relay systemd service via its own python interpreter
+      # (see extra-services.hermes-relay below). The wheel's
+      # `plugin/hermes_relay_bootstrap/` (legacy `.pth` compat hook) and
+      # `plugin/voice_lab/` (standalone CLI) are intentionally excluded.
+      (pkgs.runCommand "hermes-relay-hermes-plugin" { } ''
+        cp -r ${./plugins/hermes-relay} $out
       '')
     ];
     extraPythonPackages = [
@@ -366,7 +391,7 @@ in
       # Voice requests get Home Assistant plus one narrow health write action.
       # They never receive generic file, shell, browser, or Google tools.
       platform_toolsets.api_server = [ "homeassistant" "health_log" ];
-      plugins.enabled = [ "health-log" ];
+      plugins.enabled = [ "health-log" "hermes-relay" ];
 
       # The v0.19 migration is blocked in Nix-managed mode. Declare its schema
       # marker here; the disposable migration lab validated this is sufficient.

@@ -760,7 +760,12 @@
     nixosConfigurations.hermes = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
-        { nixpkgs.overlays = [ nix-hermes-agent.overlays.default ]; }
+        { nixpkgs.overlays = [
+          nix-hermes-agent.overlays.default
+          (final: prev: {
+            hermes-relay = final.callPackage ./packages/hermes-relay.nix { };
+          })
+        ]; }
         ./hosts/nxc/hermes
         sops-nix.nixosModules.sops
 
