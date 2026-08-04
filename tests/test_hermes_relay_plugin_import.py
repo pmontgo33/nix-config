@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import json
 import os
 import sys
 import types
@@ -108,6 +109,52 @@ class HermesRelayPluginImportTests(unittest.TestCase):
             for name in _OPTIONAL_VOICE_ENV:
                 os.environ.pop(name, None)
             os.environ.update(saved)
+
+    def test_pairing_code_is_present_on_every_endpoint(self) -> None:
+        """Each v3 endpoint must carry the code it will use to authenticate."""
+        package_name = _load_directory_plugin()
+        pair_module = importlib.import_module(f"{package_name}.pair")
+        relay = pair_module.build_relay_pairing_block(
+            relay_url="wss://hermes.example:443",
+            code="ABC123",
+            ttl_seconds=2592000,
+            transport_hint="wss",
+        )
+        endpoints = [
+            {
+                "role": "lan",
+                "priority": 0,
+                "api": {"host": "192.168.86.126", "port": 8642, "tls": False},
+                "relay": {"url": "ws://192.168.86.126:8767"},
+            },
+            {
+                "role": "tailscale",
+                "priority": 1,
+                "api": {"host": "100.81.254.49", "port": 8642, "tls": False},
+                "relay": {"url": "wss://hermes.example:443", "transport_hint": "wss"},
+            },
+        ]
+        payload = json.loads(
+            pair_module.build_pairing_qr_payload(
+                host="192.168.86.126",
+                port=8642,
+                key="api-key",
+                tls=False,
+                relay=relay,
+                endpoints=endpoints,
+                sign=False,
+            )
+        )
+
+        self.assertEqual(payload["relay"]["code"], "ABC123")
+        self.assertEqual(len(payload["endpoints"]), 2)
+        for endpoint, expected_transport in zip(payload["endpoints"], ("ws", "wss")):
+            with self.subTest(role=endpoint["role"]):
+                self.assertEqual(endpoint["relay"]["code"], "ABC123")
+                self.assertEqual(endpoint["relay"]["ttl_seconds"], 2592000)
+                self.assertEqual(
+                    endpoint["relay"]["transport_hint"], expected_transport
+                )
 
 
 if __name__ == "__main__":

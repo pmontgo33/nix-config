@@ -183,6 +183,60 @@ def _relay_has_v2_fields(relay: Optional[dict]) -> bool:
     )
 
 
+def _propagate_relay_pairing(
+    relay: Optional[dict],
+    endpoints: Optional[list[dict]],
+) -> Optional[list[dict]]:
+    """Copy host-owned Relay auth metadata into every endpoint candidate.
+
+    Android selects one endpoint before opening the Relay WebSocket. A v3
+    payload therefore needs the same pairing code on each candidate, not only
+    in the backward-compatible top-level ``relay`` block.
+    """
+    if not relay or not endpoints or not relay.get("code"):
+        return endpoints
+
+    relay_fields = {
+        key: relay[key]
+        for key in ("code", "ttl_seconds", "grants", "transport_hint")
+        if key in relay
+    }
+    propagated: list[dict] = []
+    for endpoint in endpoints:
+        if not isinstance(endpoint, dict):
+            # Preserve the server's documented opaque/pass-through behavior
+            # for malformed endpoint records; the signed payload remains
+            # inspectable instead of failing during metadata propagation.
+            propagated.append(endpoint)
+            continue
+
+        candidate = dict(endpoint)
+        raw_endpoint_relay = candidate.get("relay")
+        if not isinstance(raw_endpoint_relay, dict):
+            propagated.append(candidate)
+            continue
+
+        endpoint_relay = dict(raw_endpoint_relay)
+        endpoint_relay.update(
+            {
+                key: value
+                for key, value in relay_fields.items()
+                if key != "transport_hint"
+            }
+        )
+        if "transport_hint" not in endpoint_relay:
+            endpoint_url = str(endpoint_relay.get("url") or "").lower()
+            if endpoint_url.startswith("wss://"):
+                endpoint_relay["transport_hint"] = "wss"
+            elif endpoint_url.startswith("ws://"):
+                endpoint_relay["transport_hint"] = "ws"
+            else:
+                endpoint_relay["transport_hint"] = relay_fields.get("transport_hint")
+        candidate["relay"] = endpoint_relay
+        propagated.append(candidate)
+    return propagated
+
+
 def build_payload(
     host: str,
     port: int,
@@ -202,11 +256,12 @@ def build_payload(
 
     If ``endpoints`` is provided and non-empty it's embedded as a top-level
     ``"endpoints"`` array and the version bumps to ``3`` (ADR 24 —
-    multi-endpoint pairing payload). List order is preserved verbatim
-    through canonicalization + signing so strict priority semantics
-    survive the HMAC. Callers are responsible for sorting by
-    ``priority`` before passing the list in; ``build_endpoint_candidates``
-    does this for the CLI path.
+    multi-endpoint pairing payload). List order is preserved through
+    canonicalization + signing. When ``relay`` includes a pairing code,
+    host-owned Relay auth metadata is copied into every endpoint's nested
+    ``relay`` object so the selected endpoint can authenticate independently.
+    Callers are responsible for sorting by ``priority`` before passing the
+    list in; ``build_endpoint_candidates`` does this for the CLI path.
 
     The top-level ``host`` / ``port`` / ``key`` / ``tls`` / ``relay``
     fields are always emitted and should mirror the priority-0 candidate
@@ -220,7 +275,8 @@ def build_payload(
     If ``sign`` is true the payload is signed with the host-local QR
     secret and the base64 HMAC is added as a top-level ``sig`` field.
     """
-    if endpoints:
+    payload_endpoints = _propagate_relay_pairing(relay, endpoints)
+    if payload_endpoints:
         version = 3
     elif _relay_has_v2_fields(relay):
         version = 2
@@ -235,8 +291,8 @@ def build_payload(
     }
     if relay is not None:
         payload["relay"] = relay
-    if endpoints:
-        payload["endpoints"] = endpoints
+    if payload_endpoints:
+        payload["endpoints"] = payload_endpoints
     if dashboard_url:
         payload["dashboard_url"] = dashboard_url
 
