@@ -399,7 +399,7 @@ def _lan_endpoint(
         "priority": priority,
         "api": {"host": lan_host, "port": api_port, "tls": api_tls},
         "relay": {
-            "url": f"{relay_scheme}://{relay_lan_host}:{relay_port}",
+            "url": f"{relay_scheme}://{relay_lan_host}:{relay_port}/ws",
             "transport_hint": relay_scheme,
         },
     }
@@ -496,7 +496,7 @@ def _tailscale_endpoint(
         "priority": priority,
         "api": {"host": host, "port": api_port, "tls": api_tls_effective},
         "relay": {
-            "url": f"{relay_scheme}://{url_host}:{relay_port}",
+            "url": f"{relay_scheme}://{url_host}:{relay_port}/ws",
             "transport_hint": relay_scheme,
         },
     }
@@ -640,7 +640,7 @@ def _public_endpoint(
         # port. TLS-terminating reverse proxies that forward WSS on
         # :443 are typical; the operator can override via --public-url
         # with an explicit path if the proxy rewrites.
-        relay_url = f"{relay_scheme}://{host}:{relay_port}"
+        relay_url = f"{relay_scheme}://{host}:{relay_port}/ws"
     return {
         "role": "public",
         "priority": priority,
@@ -948,7 +948,7 @@ def _relay_lan_base_url(relay_host: str, relay_port: int, tls: bool = False) -> 
     """
     lan_host = _resolve_lan_ip(relay_host)
     scheme = "wss" if tls else "ws"
-    return f"{scheme}://{lan_host}:{relay_port}"
+    return f"{scheme}://{lan_host}:{relay_port}/ws"
 
 
 def register_relay_code(
