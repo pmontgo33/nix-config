@@ -261,10 +261,12 @@ in
         edge.voice = "en-GB-RyanNeural";
       };
 
-      # Keep active topic sessions intact. Context compression remains the
-      # capacity guard; use /reset explicitly for a deliberate clean slate.
+      # Reset gateway sessions after 48h of inactivity so topic conversations
+      # do not accumulate unbounded context across long gaps. Manual /reset
+      # still works; context compression remains the capacity guard.
       session_reset = {
-        mode = "none";
+        mode = "idle";
+        idle_minutes = 2880;
       };
 
       # Fallbacks are ordered availability routes: two OpenCode Go models
