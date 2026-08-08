@@ -173,6 +173,9 @@ in
               doCheck = false;
             });
             scipy = super.scipy.overridePythonAttrs (_: { doCheck = false; });
+            sqlite-vec = super.sqlite-vec.overridePythonAttrs (_: {
+              propagatedBuildInputs = [ _self.numpy ];
+            });
           };
       };
     })
