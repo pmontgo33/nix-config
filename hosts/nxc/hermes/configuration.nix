@@ -46,9 +46,13 @@ let
     ];
     doCheck = false;
   };
-  # Mnemosyne is not in the pinned nixpkgs set, but its heavy embedding
-  # dependency chain is. Keep both missing wheels pinned here and let Nix
-  # provide fastembed/onnxruntime/sqlite-vec/tokenizers transitively.
+  # Mnemosyne is not in the pinned nixpkgs set. Build both wheels from source.
+  # We deliberately do NOT propagate fastembed/huggingface-hub: the current
+  # MnemosyneMemoryProvider does not invoke embeddings at runtime (vector_type
+  # is reserved for future use). Pulling in fastembed transitively forces
+  # datasets/huggingface-hub/mypy builds that fail under gcc-15 because
+  # mypyc's bundled stddef parser chokes on nullptr_t. We provide only
+  # sqlite-vec (for the SQLite extension) and PyYAML (declared dependency).
   mnemosyneMemory = python312.pkgs.buildPythonPackage rec {
     pname = "mnemosyne-memory";
     version = "3.15.1";
@@ -58,7 +62,6 @@ let
     };
     format = "wheel";
     propagatedBuildInputs = with python312.pkgs; [
-      fastembed
       sqlite-vec
       pyyaml
     ];
