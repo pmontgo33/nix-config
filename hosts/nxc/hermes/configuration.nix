@@ -14,10 +14,25 @@ let
       });
       pymupdf = super.pymupdf.overridePythonAttrs (_: { doCheck = false; });
       pdfplumber = super.pdfplumber.overridePythonAttrs (_: { doCheck = false; });
-      # mypy's mypyc C extension cannot be built in 8GB (OOM); skip its test
-      # phase. mypy itself builds fine on the hermes host (6.7GB free, 8 cores)
-      # with --max-jobs 1 and is also available from the binary cache.
-      mypy = super.mypy.overridePythonAttrs (_: { doCheck = false; });
+      # Use the official CPython 3.12 manylinux wheel. Building mypy 1.20.1
+      # from source invokes mypyc and OOMs even with a serialized build on this
+      # host; the wheel already contains the compiled extension.
+      mypy = super.mypy.overridePythonAttrs (_: {
+        version = "1.20.1";
+        src = pkgs.fetchurl {
+          url = "https://files.pythonhosted.org/packages/b2/c6/75e969781c2359b2f9c15b061f28ec6d67c8b61865ceda176e85c8e7f2de/mypy-1.20.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+          hash = "sha256-7zRhsa1c1EblQAFukLWYRlft2jn5gvTMRcoxe2KPWjc";
+        };
+        format = "wheel";
+        pyproject = null;
+        propagatedBuildInputs = with _self; [
+          typing-extensions
+          mypy-extensions
+          pathspec
+          librt
+        ];
+        doCheck = false;
+      });
       pypdfium2 = super.pypdfium2.overridePythonAttrs (_: { doCheck = false; doInstallCheck = false; });
       apscheduler = super.apscheduler.overridePythonAttrs (_: { doCheck = false; });
       black = super.black.overridePythonAttrs (_: { doCheck = false; });
@@ -129,11 +144,31 @@ in
     (final: prev: {
       python312 = prev.python312.override {
         packageOverrides = _self: super:
-          builtins.mapAttrs (_name: val:
+          (builtins.mapAttrs (_name: val:
             if builtins.isAttrs val && val ? overrideAttrs
             then val.overrideAttrs (_: { doCheck = false; doInstallCheck = false; })
             else val
-          ) super;
+          ) super) // {
+            # Hermes-Relay uses the global python312Packages set rather than
+            # the local Hermes environment above. Keep its mypy dependency on
+            # the same prebuilt wheel so mypyc is never compiled twice.
+            mypy = super.mypy.overridePythonAttrs (_: {
+              version = "1.20.1";
+              src = pkgs.fetchurl {
+                url = "https://files.pythonhosted.org/packages/b2/c6/75e969781c2359b2f9c15b061f28ec6d67c8b61865ceda176e85c8e7f2de/mypy-1.20.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+                hash = "sha256-7zRhsa1c1EblQAFukLWYRlft2jn5gvTMRcoxe2KPWjc";
+              };
+              format = "wheel";
+              pyproject = null;
+              propagatedBuildInputs = with _self; [
+                typing-extensions
+                mypy-extensions
+                pathspec
+                librt
+              ];
+              doCheck = false;
+            });
+          };
       };
     })
   ];
