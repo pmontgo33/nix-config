@@ -20,6 +20,11 @@ let
       # pytest-check-hook propagates that through most builds.
       mypy = super.mypy.overridePythonAttrs (_: { doCheck = false; });
       pypdfium2 = super.pypdfium2.overridePythonAttrs (_: { doCheck = false; doInstallCheck = false; });
+      # charset-normalizer and typeguard pull mypy via pytest-check-hook;
+      # mypyc cannot be built in 8GB (OOM) so disable checks to skip the
+      # entire test phase including mypy.
+      charset-normalizer = super.charset-normalizer.overridePythonAttrs (_: { doCheck = false; });
+      typeguard = super.typeguard.overridePythonAttrs (_: { doCheck = false; });
       apscheduler = super.apscheduler.overridePythonAttrs (_: { doCheck = false; });
       black = super.black.overridePythonAttrs (_: { doCheck = false; });
       httpx = super.httpx.overridePythonAttrs (_: { doCheck = false; });
