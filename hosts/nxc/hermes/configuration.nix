@@ -14,6 +14,9 @@ let
       });
       pymupdf = super.pymupdf.overridePythonAttrs (_: { doCheck = false; });
       pdfplumber = super.pdfplumber.overridePythonAttrs (_: { doCheck = false; });
+      # SciPy's upstream suite launches six xdist workers and exhausts the
+      # 8GB build host; runtime artifacts are unaffected by skipping checks.
+      scipy = super.scipy.overridePythonAttrs (_: { doCheck = false; });
       # Use the official CPython 3.12 manylinux wheel. Building mypy 1.20.1
       # from source invokes mypyc and OOMs even with a serialized build on this
       # host; the wheel already contains the compiled extension.
@@ -168,6 +171,7 @@ in
               ];
               doCheck = false;
             });
+            scipy = super.scipy.overridePythonAttrs (_: { doCheck = false; });
           };
       };
     })
