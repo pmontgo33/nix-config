@@ -14,23 +14,11 @@ let
       });
       pymupdf = super.pymupdf.overridePythonAttrs (_: { doCheck = false; });
       pdfplumber = super.pdfplumber.overridePythonAttrs (_: { doCheck = false; });
-      # Disable test suites for the rest of the Python graph: mypy's mypyc
-      # cannot parse gcc-15's stddef.h (nullptr_t syntax error), which fails
-      # every transitive package that pulls mypy as a check dep. Nix's
-      # pytest-check-hook propagates that through most builds.
+      # mypy's mypyc C extension cannot be built in 8GB (OOM); skip its test
+      # phase. mypy itself builds fine on the hermes host (6.7GB free, 8 cores)
+      # with --max-jobs 1 and is also available from the binary cache.
       mypy = super.mypy.overridePythonAttrs (_: { doCheck = false; });
       pypdfium2 = super.pypdfium2.overridePythonAttrs (_: { doCheck = false; doInstallCheck = false; });
-      # charset-normalizer and typeguard pull mypy via pytest-check-hook;
-      # mypyc cannot be built in 8GB (OOM). Remove mypy from nativeBuildInputs
-      # entirely; the test-only use is irrelevant since we doCheck = false.
-      charset-normalizer = super.charset-normalizer.overridePythonAttrs (old: {
-        doCheck = false;
-        nativeBuildInputs = builtins.filter (d: (d.pname or "") != "mypy") (old.nativeBuildInputs or []);
-      });
-      typeguard = super.typeguard.overridePythonAttrs (old: {
-        doCheck = false;
-        nativeBuildInputs = builtins.filter (d: (d.pname or "") != "mypy") (old.nativeBuildInputs or []);
-      });
       apscheduler = super.apscheduler.overridePythonAttrs (_: { doCheck = false; });
       black = super.black.overridePythonAttrs (_: { doCheck = false; });
       httpx = super.httpx.overridePythonAttrs (_: { doCheck = false; });
