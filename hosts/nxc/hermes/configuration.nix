@@ -21,10 +21,16 @@ let
       mypy = super.mypy.overridePythonAttrs (_: { doCheck = false; });
       pypdfium2 = super.pypdfium2.overridePythonAttrs (_: { doCheck = false; doInstallCheck = false; });
       # charset-normalizer and typeguard pull mypy via pytest-check-hook;
-      # mypyc cannot be built in 8GB (OOM) so disable checks to skip the
-      # entire test phase including mypy.
-      charset-normalizer = super.charset-normalizer.overridePythonAttrs (_: { doCheck = false; });
-      typeguard = super.typeguard.overridePythonAttrs (_: { doCheck = false; });
+      # mypyc cannot be built in 8GB (OOM). Remove mypy from nativeBuildInputs
+      # entirely; the test-only use is irrelevant since we doCheck = false.
+      charset-normalizer = super.charset-normalizer.overridePythonAttrs (old: {
+        doCheck = false;
+        nativeBuildInputs = builtins.filter (d: (d.pname or "") != "mypy") (old.nativeBuildInputs or []);
+      });
+      typeguard = super.typeguard.overridePythonAttrs (old: {
+        doCheck = false;
+        nativeBuildInputs = builtins.filter (d: (d.pname or "") != "mypy") (old.nativeBuildInputs or []);
+      });
       apscheduler = super.apscheduler.overridePythonAttrs (_: { doCheck = false; });
       black = super.black.overridePythonAttrs (_: { doCheck = false; });
       httpx = super.httpx.overridePythonAttrs (_: { doCheck = false; });
