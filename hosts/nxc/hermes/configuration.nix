@@ -14,6 +14,22 @@ let
       });
       pymupdf = super.pymupdf.overridePythonAttrs (_: { doCheck = false; });
       pdfplumber = super.pdfplumber.overridePythonAttrs (_: { doCheck = false; });
+      # Disable test suites for the rest of the Python graph: mypy's mypyc
+      # cannot parse gcc-15's stddef.h (nullptr_t syntax error), which fails
+      # every transitive package that pulls mypy as a check dep. Nix's
+      # pytest-check-hook propagates that through most builds.
+      mypy = super.mypy.overridePythonAttrs (_: { doCheck = false; });
+      pypdfium2 = super.pypdfium2.overridePythonAttrs (_: { doCheck = false; doInstallCheck = false; });
+      apscheduler = super.apscheduler.overridePythonAttrs (_: { doCheck = false; });
+      black = super.black.overridePythonAttrs (_: { doCheck = false; });
+      httpx = super.httpx.overridePythonAttrs (_: { doCheck = false; });
+      httpbin = super.httpbin.overridePythonAttrs (_: { doCheck = false; });
+      flasgger = super.flasgger.overridePythonAttrs (_: { doCheck = false; });
+      starlette = super.starlette.overridePythonAttrs (_: { doCheck = false; });
+      fastapi = super.fastapi.overridePythonAttrs (_: { doCheck = false; });
+      fastapi-cli = super.fastapi-cli.overridePythonAttrs (_: { doCheck = false; });
+      ipython = super.ipython.overridePythonAttrs (_: { doCheck = false; });
+      baize = super.baize.overridePythonAttrs (_: { doCheck = false; });
     };
   };
   hermesPython = lib.getOutput "out" (python312.withPackages (ps: [
