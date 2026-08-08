@@ -86,7 +86,7 @@ let
   # datasets/huggingface-hub/mypy builds that fail under gcc-15 because
   # mypyc's bundled stddef parser chokes on nullptr_t. We provide only
   # sqlite-vec (for the SQLite extension) and PyYAML (declared dependency).
-  mnemosyneMemory = python312.pkgs.buildPythonPackage rec {
+  mnemosyneMemory = pkgs.python312Packages.buildPythonPackage rec {
     pname = "mnemosyne-memory";
     version = "3.15.1";
     src = pkgs.fetchurl {
@@ -94,13 +94,13 @@ let
       hash = "sha256-vHmmJ30hlbulkSMpKSTo/1QhNXxY7lQ6IwVLjdl9dIQ=";
     };
     format = "wheel";
-    propagatedBuildInputs = with python312.pkgs; [
+    propagatedBuildInputs = with pkgs.python312Packages; [
       sqlite-vec
       pyyaml
     ];
     doCheck = false;
   };
-  mnemosyneHermes = python312.pkgs.buildPythonPackage rec {
+  mnemosyneHermes = pkgs.python312Packages.buildPythonPackage rec {
     pname = "mnemosyne-hermes";
     version = "0.5.0";
     src = pkgs.fetchurl {
@@ -108,7 +108,7 @@ let
       hash = "sha256-z6vtLygWxr+ypkBJjLMzjo3r1p4XiqCrYZV2iJljaL8=";
     };
     format = "wheel";
-    propagatedBuildInputs = with python312.pkgs; [
+    propagatedBuildInputs = with pkgs.python312Packages; [
       mnemosyneMemory
       pyyaml
     ];
