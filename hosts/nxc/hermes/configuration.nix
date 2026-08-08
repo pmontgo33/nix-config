@@ -96,6 +96,7 @@ let
     format = "wheel";
     propagatedBuildInputs = with pkgs.python312Packages; [
       sqlite-vec
+      numpy
       pyyaml
     ];
     doCheck = false;
