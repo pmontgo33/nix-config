@@ -850,6 +850,19 @@ in
     linger = true;
   };
 
+  # NixOS's switch-to-configuration reloads lingering user units after
+  # activation. On a headless LXC, logind can have created the linger marker
+  # without starting user@UID.service yet, leaving /run/user/UID/bus
+  # unavailable and making an otherwise successful switch exit non-zero.
+  # Start the declaratively-lingering Hermes manager before that reload. This
+  # is idempotent when the manager is already active.
+  system.activationScripts.hermes-user-manager = lib.stringAfter [ "users" ] ''
+    if [ -e /var/lib/systemd/linger/hermes ]; then
+      hermes_uid="$(${pkgs.coreutils}/bin/id -u hermes)"
+      ${pkgs.systemd}/bin/systemctl start "user@''${hermes_uid}.service"
+    fi
+  '';
+
   users.users.root.linger = true;
 
   systemd.services.rocket-githook = {
