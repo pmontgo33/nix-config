@@ -227,6 +227,9 @@ in
     # activation. Restart when the memory provider/settings change so a
     # provider cutover is effective without a manual systemctl command.
     ++ [ (builtins.toJSON config.services.hermes-agent.settings.memory) ];
+  # Memory databases contain private user context. Keep files created by the
+  # service private even though the parent state directory is group-accessible.
+  systemd.services.hermes-agent.serviceConfig.UMask = lib.mkForce "0077";
   systemd.services.hermes-dashboard.restartTriggers =
     [ config.services.hermes-agent.package ]
     ++ config.services.hermes-agent.extraPlugins;
@@ -765,6 +768,13 @@ in
     "d /var/lib/hermes/.hermes/mnemosyne 0750 hermes users -"
     "d /var/lib/hermes/.hermes/mnemosyne/data 0750 hermes users -"
     "d /var/lib/hermes/.hermes/mnemosyne/data/shared 0750 hermes users -"
+    # Tighten existing SQLite files as well as files created under UMask=0077.
+    "z /var/lib/hermes/.hermes/mnemosyne/data/mnemosyne.db 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/mnemosyne.db-wal 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/mnemosyne.db-shm 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db-wal 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db-shm 0600 hermes users -"
   ];
 
   systemd.services.tasknotes-calendar-publish = {
