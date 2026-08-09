@@ -9,7 +9,23 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
-  hermesBasePython = hermesBasePkgs.python312Packages;
+  hermesBasePython = hermesBasePkgs.python312.pkgs;
+  fastembed = hermesBasePython.fastembed.overridePythonAttrs (old: {
+    # Hermes's full sealed environment already supplies the rest of
+    # FastEmbed's runtime dependencies. Add only packages absent there to
+    # avoid collisions in nix-hermes-agent's extraPythonPackages guard.
+    dependencies = builtins.filter
+      (dep: builtins.elem (lib.getName dep) [
+        "loguru"
+        "mmh3"
+        "py-rust-stemmers"
+        "pystemmer"
+        "snowballstemmer"
+      ])
+      old.dependencies;
+    dontCheckRuntimeDeps = true;
+    pythonImportsCheck = [];
+  });
   sqliteVec = hermesBasePython.sqlite-vec.overridePythonAttrs (_: {
     # nixpkgs 26.05 omits NumPy from sqlite-vec's runtime-check inputs;
     # Mnemosyne propagates NumPy explicitly below.
@@ -90,12 +106,9 @@ let
     doCheck = false;
   };
   # Mnemosyne is not in the pinned nixpkgs set. Build both wheels from source.
-  # We deliberately do NOT propagate fastembed/huggingface-hub: the current
-  # MnemosyneMemoryProvider does not invoke embeddings at runtime (vector_type
-  # is reserved for future use). Pulling in fastembed transitively forces
-  # datasets/huggingface-hub/mypy builds that fail under gcc-15 because
-  # mypyc's bundled stddef parser chokes on nullptr_t. We provide only
-  # sqlite-vec (for the SQLite extension) and PyYAML (declared dependency).
+  # Include the embeddings extra because mnemosyne-hermes declares it as a
+  # runtime dependency. The host now has enough RAM and swap for this closure;
+  # retain the prebuilt mypy wheel and serialized build settings as safeguards.
   mnemosyneMemory = hermesBasePython.buildPythonPackage rec {
     pname = "mnemosyne-memory";
     version = "3.15.1";
@@ -106,10 +119,10 @@ let
     format = "wheel";
     propagatedBuildInputs = [
       sqliteVec
-      hermesBasePython.numpy
-      hermesBasePython.pyyaml
+      fastembed
     ];
     doCheck = false;
+    dontCheckRuntimeDeps = true;
   };
   mnemosyneHermes = hermesBasePython.buildPythonPackage rec {
     pname = "mnemosyne-hermes";
@@ -121,9 +134,9 @@ let
     format = "wheel";
     propagatedBuildInputs = [
       mnemosyneMemory
-      hermesBasePython.pyyaml
     ];
     doCheck = false;
+    dontCheckRuntimeDeps = true;
   };
   mnemosyneHermesPlugin = pkgs.runCommand "mnemosyne-hermes-plugin" { } ''
     mkdir -p $out
@@ -348,8 +361,6 @@ in
       mnemosyneHermesPlugin
     ];
     extraPythonPackages = [
-      pkgs.python312Packages."google-api-python-client"
-      pkgs.python312Packages.google-auth-oauthlib
       mnemosyneMemory
       mnemosyneHermes
     ];

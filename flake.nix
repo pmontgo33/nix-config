@@ -37,6 +37,7 @@
 
     nix-hermes-agent = {
       url = "github:NousResearch/hermes-agent/v2026.8.3";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
