@@ -5,11 +5,74 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
+  hermesBasePkgs = import inputs.nixpkgs {
+    system = pkgs.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+  hermesBasePython = hermesBasePkgs.python312.pkgs;
+  fastembed = hermesBasePython.fastembed.overridePythonAttrs (old: {
+    # Hermes's full sealed environment already supplies the rest of
+    # FastEmbed's runtime dependencies. Add only packages absent there to
+    # avoid collisions in nix-hermes-agent's extraPythonPackages guard.
+    dependencies = builtins.filter
+      (dep: builtins.elem (lib.getName dep) [
+        "loguru"
+        "mmh3"
+        "py-rust-stemmers"
+        "pystemmer"
+        "snowballstemmer"
+      ])
+      old.dependencies;
+    dontCheckRuntimeDeps = true;
+    pythonImportsCheck = [];
+  });
+  sqliteVec = hermesBasePython.sqlite-vec.overridePythonAttrs (_: {
+    # nixpkgs 26.05 omits NumPy from sqlite-vec's runtime-check inputs;
+    # Mnemosyne propagates NumPy explicitly below.
+    dontCheckRuntimeDeps = true;
+  });
   python312 = pkgs.python312.override {
     packageOverrides = _self: super: {
       sse-starlette = super.sse-starlette.overridePythonAttrs (_: { dontCheckRuntimeDeps = true; });
+      aiohttp = super.aiohttp.overridePythonAttrs (_: {
+        doCheck = false;
+        doInstallCheck = false;
+      });
       pymupdf = super.pymupdf.overridePythonAttrs (_: { doCheck = false; });
       pdfplumber = super.pdfplumber.overridePythonAttrs (_: { doCheck = false; });
+      # SciPy's upstream suite launches six xdist workers and exhausts the
+      # 8GB build host; runtime artifacts are unaffected by skipping checks.
+      scipy = super.scipy.overridePythonAttrs (_: { doCheck = false; });
+      # Use the official CPython 3.12 manylinux wheel. Building mypy 1.20.1
+      # from source invokes mypyc and OOMs even with a serialized build on this
+      # host; the wheel already contains the compiled extension.
+      mypy = super.mypy.overridePythonAttrs (_: {
+        version = "1.20.1";
+        src = pkgs.fetchurl {
+          url = "https://files.pythonhosted.org/packages/b2/c6/75e969781c2359b2f9c15b061f28ec6d67c8b61865ceda176e85c8e7f2de/mypy-1.20.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+          hash = "sha256-7zRhsa1c1EblQAFukLWYRlft2jn5gvTMRcoxe2KPWjc";
+        };
+        format = "wheel";
+        pyproject = null;
+        propagatedBuildInputs = with _self; [
+          typing-extensions
+          mypy-extensions
+          pathspec
+          librt
+        ];
+        doCheck = false;
+      });
+      pypdfium2 = super.pypdfium2.overridePythonAttrs (_: { doCheck = false; doInstallCheck = false; });
+      apscheduler = super.apscheduler.overridePythonAttrs (_: { doCheck = false; });
+      black = super.black.overridePythonAttrs (_: { doCheck = false; });
+      httpx = super.httpx.overridePythonAttrs (_: { doCheck = false; });
+      httpbin = super.httpbin.overridePythonAttrs (_: { doCheck = false; });
+      flasgger = super.flasgger.overridePythonAttrs (_: { doCheck = false; });
+      starlette = super.starlette.overridePythonAttrs (_: { doCheck = false; });
+      fastapi = super.fastapi.overridePythonAttrs (_: { doCheck = false; });
+      fastapi-cli = super.fastapi-cli.overridePythonAttrs (_: { doCheck = false; });
+      ipython = super.ipython.overridePythonAttrs (_: { doCheck = false; });
+      baize = super.baize.overridePythonAttrs (_: { doCheck = false; });
     };
   };
   hermesPython = lib.getOutput "out" (python312.withPackages (ps: [
@@ -42,6 +105,44 @@ let
     ];
     doCheck = false;
   };
+  # Mnemosyne is not in the pinned nixpkgs set. Build both wheels from source.
+  # Include the embeddings extra because mnemosyne-hermes declares it as a
+  # runtime dependency. The host now has enough RAM and swap for this closure;
+  # retain the prebuilt mypy wheel and serialized build settings as safeguards.
+  mnemosyneMemory = hermesBasePython.buildPythonPackage rec {
+    pname = "mnemosyne-memory";
+    version = "3.15.1";
+    src = pkgs.fetchurl {
+      url = "https://files.pythonhosted.org/packages/48/1b/d1ee3346df25396f9aea6aff2518823a815142b2a92638d06c9cd7c5015c/mnemosyne_memory-3.15.1-py3-none-any.whl";
+      hash = "sha256-vHmmJ30hlbulkSMpKSTo/1QhNXxY7lQ6IwVLjdl9dIQ=";
+    };
+    format = "wheel";
+    propagatedBuildInputs = [
+      sqliteVec
+      fastembed
+    ];
+    doCheck = false;
+    dontCheckRuntimeDeps = true;
+  };
+  mnemosyneHermes = hermesBasePython.buildPythonPackage rec {
+    pname = "mnemosyne-hermes";
+    version = "0.5.0";
+    src = pkgs.fetchurl {
+      url = "https://files.pythonhosted.org/packages/5d/64/12c46a5dcc02ad23c7c37d0a6b55a8dfc3cfbdc6d64c3cdeaa2b52e23e99/mnemosyne_hermes-0.5.0-py3-none-any.whl";
+      hash = "sha256-z6vtLygWxr+ypkBJjLMzjo3r1p4XiqCrYZV2iJljaL8=";
+    };
+    format = "wheel";
+    propagatedBuildInputs = [
+      mnemosyneMemory
+    ];
+    doCheck = false;
+    dontCheckRuntimeDeps = true;
+  };
+  mnemosyneHermesPlugin = pkgs.runCommand "mnemosyne-hermes-plugin" { } ''
+    mkdir -p $out
+    cp -r ${mnemosyneHermes}/lib/python3.12/site-packages/mnemosyne_hermes/* $out/
+    chmod -R a+rX $out
+  '';
   forgejo-credential-helper = pkgs.writeShellScript "forgejo-credential-helper" ''
     host=""
     protocol=""
@@ -70,11 +171,32 @@ in
     (final: prev: {
       python312 = prev.python312.override {
         packageOverrides = _self: super:
-          builtins.mapAttrs (_name: val:
+          (builtins.mapAttrs (_name: val:
             if builtins.isAttrs val && val ? overrideAttrs
             then val.overrideAttrs (_: { doCheck = false; doInstallCheck = false; })
             else val
-          ) super;
+          ) super) // {
+            # Hermes-Relay uses the global python312Packages set rather than
+            # the local Hermes environment above. Keep its mypy dependency on
+            # the same prebuilt wheel so mypyc is never compiled twice.
+            mypy = super.mypy.overridePythonAttrs (_: {
+              version = "1.20.1";
+              src = pkgs.fetchurl {
+                url = "https://files.pythonhosted.org/packages/b2/c6/75e969781c2359b2f9c15b061f28ec6d67c8b61865ceda176e85c8e7f2de/mypy-1.20.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+                hash = "sha256-7zRhsa1c1EblQAFukLWYRlft2jn5gvTMRcoxe2KPWjc";
+              };
+              format = "wheel";
+              pyproject = null;
+              propagatedBuildInputs = with _self; [
+                typing-extensions
+                mypy-extensions
+                pathspec
+                librt
+              ];
+              doCheck = false;
+            });
+            scipy = super.scipy.overridePythonAttrs (_: { doCheck = false; });
+          };
       };
     })
   ];
@@ -193,6 +315,9 @@ in
       SEARXNG_BASE_URL = "http://192.168.86.137:8080";
       TELEGRAM_ALLOWED_USERS = "748642877";
       TELEGRAM_HOME_CHANNEL = "748642877";
+      # Keep Mnemosyne data under the Hermes state directory, not ~/.mnemosyne
+      # or the disposable plugin virtualenv.
+      MNEMOSYNE_HOME = "/var/lib/hermes/.hermes/mnemosyne";
 
       # WhatsApp self-chat is enabled declaratively. The personal allowlist
       # remains in the SOPS-backed openclaw-env as WHATSAPP_ALLOWED_USERS.
@@ -231,10 +356,13 @@ in
       (pkgs.runCommand "hermes-relay-hermes-plugin" { } ''
         cp -r ${./plugins/hermes-relay} $out
       '')
+      # Mnemosyne plugin and its pinned Python runtime are packaged above;
+      # this replaces the mutable wrapper generated by the installer.
+      mnemosyneHermesPlugin
     ];
     extraPythonPackages = [
-      pkgs.python312Packages."google-api-python-client"
-      pkgs.python312Packages.google-auth-oauthlib
+      mnemosyneMemory
+      mnemosyneHermes
     ];
 
     settings = {
@@ -439,15 +567,33 @@ in
       };
 
       memory = {
+        # Keep built-in files enabled while the curated migration is staged.
+        # They are disabled in the cutover commit only after Mnemosyne smoke
+        # tests pass and the imported rows are verified.
         memory_enabled = true;
         user_profile_enabled = true;
-        # Explicit false clears stale deep-merged runtime state left by the
-        # earlier approval-gate rollout; omission alone does not remove it.
         write_approval = false;
-        # Holographic — bundled first-party memory provider (SQLite + FTS5 +
-        # HRR compositional retrieval). Pure local, no network, no embeddings.
-        # Coexists additively with built-in MEMORY.md/USER.md.
+
+        # Staged provider: Phase 7 changes this to "mnemosyne" after the
+        # direct SDK/tool smoke test and migration counts pass.
         provider = "holographic";
+
+        # Mnemosyne provider settings are declared here because this host is
+        # NixOS-managed; hermes config set is intentionally blocked. The
+        # provider remains inactive until the cutover provider flip above.
+        mnemosyne = {
+          auto_sleep = false;
+          sleep_threshold = 50;
+          vector_type = "int8";
+          # Keep the imported default bank active first. Profile-isolated banks
+          # require a separate migration and are enabled only after proving the
+          # gateway resolves the intended profile bank.
+          profile_isolation = false;
+          shared_surface_path = "/var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db";
+          shared_surface_read = false;
+          skip_contexts = [ "cron" "flush" "subagent" "background" "skill_loop" ];
+          sync_roles = [ "user" "assistant" ];
+        };
       };
 
       skills.write_approval = false;
@@ -614,6 +760,9 @@ in
 
   systemd.tmpfiles.rules = [
     "d /var/lib/hermes/.cache 0700 hermes users -"
+    "d /var/lib/hermes/.hermes/mnemosyne 0750 hermes users -"
+    "d /var/lib/hermes/.hermes/mnemosyne/data 0750 hermes users -"
+    "d /var/lib/hermes/.hermes/mnemosyne/data/shared 0750 hermes users -"
   ];
 
   systemd.services.tasknotes-calendar-publish = {
