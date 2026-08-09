@@ -5,6 +5,16 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
+  hermesBasePkgs = import inputs.nixpkgs {
+    system = pkgs.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+  hermesBasePython = hermesBasePkgs.python312Packages;
+  sqliteVec = hermesBasePython.sqlite-vec.overridePythonAttrs (_: {
+    # nixpkgs 26.05 omits NumPy from sqlite-vec's runtime-check inputs;
+    # Mnemosyne propagates NumPy explicitly below.
+    dontCheckRuntimeDeps = true;
+  });
   python312 = pkgs.python312.override {
     packageOverrides = _self: super: {
       sse-starlette = super.sse-starlette.overridePythonAttrs (_: { dontCheckRuntimeDeps = true; });
@@ -86,7 +96,7 @@ let
   # datasets/huggingface-hub/mypy builds that fail under gcc-15 because
   # mypyc's bundled stddef parser chokes on nullptr_t. We provide only
   # sqlite-vec (for the SQLite extension) and PyYAML (declared dependency).
-  mnemosyneMemory = pkgs.python312Packages.buildPythonPackage rec {
+  mnemosyneMemory = hermesBasePython.buildPythonPackage rec {
     pname = "mnemosyne-memory";
     version = "3.15.1";
     src = pkgs.fetchurl {
@@ -94,14 +104,14 @@ let
       hash = "sha256-vHmmJ30hlbulkSMpKSTo/1QhNXxY7lQ6IwVLjdl9dIQ=";
     };
     format = "wheel";
-    propagatedBuildInputs = with pkgs.python312Packages; [
-      sqlite-vec
-      numpy
-      pyyaml
+    propagatedBuildInputs = [
+      sqliteVec
+      hermesBasePython.numpy
+      hermesBasePython.pyyaml
     ];
     doCheck = false;
   };
-  mnemosyneHermes = pkgs.python312Packages.buildPythonPackage rec {
+  mnemosyneHermes = hermesBasePython.buildPythonPackage rec {
     pname = "mnemosyne-hermes";
     version = "0.5.0";
     src = pkgs.fetchurl {
@@ -109,9 +119,9 @@ let
       hash = "sha256-z6vtLygWxr+ypkBJjLMzjo3r1p4XiqCrYZV2iJljaL8=";
     };
     format = "wheel";
-    propagatedBuildInputs = with pkgs.python312Packages; [
+    propagatedBuildInputs = [
       mnemosyneMemory
-      pyyaml
+      hermesBasePython.pyyaml
     ];
     doCheck = false;
   };
@@ -173,9 +183,6 @@ in
               doCheck = false;
             });
             scipy = super.scipy.overridePythonAttrs (_: { doCheck = false; });
-            sqlite-vec = super.sqlite-vec.overridePythonAttrs (_: {
-              propagatedBuildInputs = [ _self.numpy ];
-            });
           };
       };
     })
