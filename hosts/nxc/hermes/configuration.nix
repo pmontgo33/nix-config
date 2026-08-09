@@ -222,7 +222,11 @@ in
   # triggers, so we add them here. Cited by Luna xhigh review r3.
   systemd.services.hermes-agent.restartTriggers =
     [ config.services.hermes-agent.package ]
-    ++ config.services.hermes-agent.extraPlugins;
+    ++ config.services.hermes-agent.extraPlugins
+    # The Hermes module merges settings into mutable config.yaml during
+    # activation. Restart when the memory provider/settings change so a
+    # provider cutover is effective without a manual systemctl command.
+    ++ [ (builtins.toJSON config.services.hermes-agent.settings.memory) ];
   systemd.services.hermes-dashboard.restartTriggers =
     [ config.services.hermes-agent.package ]
     ++ config.services.hermes-agent.extraPlugins;
@@ -567,16 +571,14 @@ in
       };
 
       memory = {
-        # Keep built-in files enabled while the curated migration is staged.
-        # They are disabled in the cutover commit only after Mnemosyne smoke
-        # tests pass and the imported rows are verified.
-        memory_enabled = true;
-        user_profile_enabled = true;
+        # Mnemosyne migration and direct SDK/tool smoke tests passed before
+        # this provider flip. Keep the imported database and Holographic
+        # rollback artifacts for rollback/forensics.
+        memory_enabled = false;
+        user_profile_enabled = false;
         write_approval = false;
 
-        # Staged provider: Phase 7 changes this to "mnemosyne" after the
-        # direct SDK/tool smoke test and migration counts pass.
-        provider = "holographic";
+        provider = "mnemosyne";
 
         # Mnemosyne provider settings are declared here because this host is
         # NixOS-managed; hermes config set is intentionally blocked. The
