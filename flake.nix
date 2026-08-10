@@ -4,8 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # Isolated Immich pin; avoid upgrading every consumer of nixpkgs-unstable.
-    nixpkgs-immich.url = "github:NixOS/nixpkgs/f13ff45afd1bb73e640eaa08a7066dbed07e3238";
     # Pinned to last known-good nixos-25.11 rev for elegoo-slicer AppImage compatibility
     # (glib 2.86 broke wx's g_dbus_proxy_call_sync; this rev has the last working glib)
     nixpkgs-elegoo-compat.url = "github:NixOS/nixpkgs/10e7ad5bbcb421fe07e3a4ad53a634b0cd57ffac";
@@ -43,7 +41,7 @@
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, nixpkgs-immich, nixpkgs-2511, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-hermes-agent, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, nixpkgs-2511, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-hermes-agent, ... }: {
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
