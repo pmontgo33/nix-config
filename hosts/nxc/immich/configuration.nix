@@ -60,21 +60,14 @@
     };
   };
 
-  # Match the Proxmox host's render device group inside the unprivileged LXC.
-  users.groups.render.gid = pkgs.lib.mkForce 104;
-  users.users.immich.extraGroups = [ "video" "render" ];
-
-  # Enable hardware acceleration support
-  hardware.graphics = {
+  # Use the shared Intel GPU module. Keep the existing `render` group during
+  # this first migration because the mutable guest already has it at GID 104.
+  hardware.intelGpu = {
     enable = true;
-    extraPackages = with pkgs; [
-      intel-media-driver
-      intel-vaapi-driver
-      libva-vdpau-driver
-      libvdpau-va-gl
-      # Intel compute/runtime support for OpenVINO GPU inference.
-      intel-compute-runtime
-    ];
+    users = [ "immich" ];
+    accessGroup = "render";
+    legacyAccessGroup = true;
+    openvino = true;
   };
 
   # Immich Kiosk - slideshow display service
