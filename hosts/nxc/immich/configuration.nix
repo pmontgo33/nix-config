@@ -72,6 +72,8 @@
       intel-vaapi-driver
       libva-vdpau-driver
       libvdpau-va-gl
+      # Intel compute/runtime support for OpenVINO GPU inference.
+      intel-compute-runtime
     ];
   };
 
