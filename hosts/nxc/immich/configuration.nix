@@ -60,7 +60,8 @@
     };
   };
 
-  # Add immich user to video and render groups for hardware acceleration
+  # Match the Proxmox host's render device group inside the unprivileged LXC.
+  users.groups.render.gid = pkgs.lib.mkForce 104;
   users.users.immich.extraGroups = [ "video" "render" ];
 
   # Enable hardware acceleration support
