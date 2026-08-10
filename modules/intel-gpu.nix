@@ -45,10 +45,10 @@ in
       description = "Host numeric GID for /dev/dri/card* devices.";
     };
 
-    openvino = lib.mkOption {
+    computeRuntime = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Install Intel Compute Runtime for OpenVINO GPU inference.";
+      description = "Install Intel Compute Runtime for Intel compute workloads.";
     };
 
     videoProcessing = lib.mkOption {
@@ -94,7 +94,7 @@ in
         libva-vdpau-driver
         libvdpau-va-gl
       ]
-      ++ lib.optional cfg.openvino intel-compute-runtime
+      ++ lib.optional cfg.computeRuntime intel-compute-runtime
       ++ lib.optional cfg.videoProcessing vpl-gpu-rt;
     };
 
