@@ -24,16 +24,20 @@
     openFirewall = true;
   };
 
-  hardware.graphics = {
+  hardware.intelGpu = {
     enable = true;
-    extraPackages = with pkgs; [
-      intel-media-driver
-      intel-compute-runtime
-      mesa.drivers
-      vulkan-loader
-      # intel-level-zero-gpu
-    ];
+    users = [ "ollama" ];
+    videoAccess = true;
+    computeRuntime = true;
   };
+
+  # Ollama's Vulkan backend remains host-specific; the shared module owns the
+  # common Intel graphics and render/video access layer.
+  hardware.graphics.extraPackages = with pkgs; [
+    mesa.drivers
+    vulkan-loader
+    # intel-level-zero-gpu
+  ];
 
   environment.sessionVariables = {
     VK_ICD_FILENAMES = "${pkgs.mesa.drivers}/share/vulkan/icd.d/intel_icd.x86_64.json";
@@ -47,13 +51,8 @@
   users.users.ollama = {
     isNormalUser = true;
     group = "ollama";
-    extraGroups = [ "video" "render" ];
   };
   users.groups.ollama = {};
-  users.groups.renderaccess = {
-    gid = 104;
-    members = [ "ollama" ];
-  };
 
   # Open WebUI (native)
   services.open-webui = {

@@ -67,7 +67,7 @@
     users = [ "immich" ];
     accessGroup = "render";
     legacyAccessGroup = true;
-    openvino = true;
+    computeRuntime = true;
   };
 
   # Immich Kiosk - slideshow display service

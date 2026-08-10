@@ -52,8 +52,8 @@
         "--shm-size=256m"
         "--device=/dev/dri/renderD128:/dev/dri/renderD128"
         "--device=/dev/dri/card0:/dev/dri/card0"
-        "--group-add=104"  # renderaccess
-        "--group-add=44"   # videoaccess
+        "--group-add=${toString config.hardware.intelGpu.renderGid}"
+        "--group-add=${toString config.hardware.intelGpu.videoGid}"
         "--cap-add=CAP_PERFMON"  # Performance monitoring capability
         "--tmpfs=/tmp/cache:size=1G"  # Tmpfs for cache (reduces disk wear)
       ];
@@ -177,26 +177,15 @@
     '';
   };
 
-  # GPU access for LXC - match host device GIDs
-  users.groups.renderaccess = {
-    gid = 104;
-    members = [ "frigate" ];
-  };
-  users.groups.videoaccess = {
-    gid = 44;
-    members = [ "frigate" ];
+  hardware.intelGpu = {
+    enable = true;
+    users = [ "frigate" ];
+    videoAccess = true;
+    videoProcessing = true;
   };
 
-  # Enable hardware graphics support
-  hardware.graphics = {
-    enable = true;
-    extraPackages = with pkgs; [
-      intel-media-driver
-      intel-vaapi-driver
-      libva-vdpau-driver
-      vpl-gpu-rt
-    ];
-  };
+  # Keep the container's explicit device and group flags; the shared module
+  # supplies the same host-specific numeric values declaratively.
 
   # Bind mount NFS recordings and exports to Frigate directories
   fileSystems."/var/lib/frigate/recordings" = {

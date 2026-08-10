@@ -43,14 +43,13 @@
     openFirewall = true;
   };
 
-  users.users.jellyfin.extraGroups = [ "video" "render" ];
-  users.groups.renderaccess = {
-    gid = 104;
-    members = [ "jellyfin" ];
+  hardware.intelGpu = {
+    enable = true;
+    users = [ "jellyfin" ];
+    videoAccess = true;
+    computeRuntime = true;
+    videoProcessing = true;
   };
-  # services.udev.extraRules = ''
-  #   KERNEL=="renderD*", GROUP="render", MODE="0660"
-  # '';
 
   nixpkgs.config.packageOverrides = pkgs: {  
     intel-vaapi-driver = pkgs.intel-vaapi-driver.override { enableHybridCodec = true; };
@@ -58,22 +57,6 @@
   # Set the VAAPI driver to use the newer iHD driver
   systemd.services.jellyfin.environment.LIBVA_DRIVER_NAME = "iHD";
   environment.sessionVariables = { LIBVA_DRIVER_NAME = "iHD"; };
-  
-  # Enable hardware graphics support
-  hardware.graphics = {
-    enable = true;
-
-    extraPackages = with pkgs; [
-      intel-media-driver             # VAAPI driver for Broadwell and newer (iHD)
-      intel-vaapi-driver             # Legacy VAAPI driver for older CPUs (i965)
-      libva-vdpau-driver             # Additional VAAPI support
-      intel-compute-runtime          # OpenCL runtime for newer CPUs (13th gen+, but works on 12th)
-      vpl-gpu-rt                     # Video Processing Library for 11th gen and newer
-    ];
-  };
-
-  # Enable all firmware (important for GuC firmware on newer Intel CPUs)
-  hardware.enableAllFirmware = true;
   
   networking.firewall.allowedTCPPorts = [ 8096 ];
 
