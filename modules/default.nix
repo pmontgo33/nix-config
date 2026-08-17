@@ -17,5 +17,6 @@
     ./simplex-relay.nix
     ./hermes-relay.nix
     ./intel-gpu.nix
+    ./pihole
   ];
 }
