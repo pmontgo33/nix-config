@@ -46,7 +46,19 @@ in
     webListenAddress = lib.mkOption {
       type = lib.types.str;
       default = "127.0.0.1";
-      description = "Address for the unauthenticated experimental Web/API listener.";
+      description = "Address for the Pi-hole Web/API listener.";
+    };
+
+    apiPasswordEnvironmentFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        Runtime EnvironmentFile containing FTLCONF_webserver_api_password.
+        The file should be rendered by sops-nix and must never be committed
+        in plaintext. Required when Web/API is bound beyond loopback. The
+        corresponding sops template must restart pihole-ftl.service when it
+        changes.
+      '';
     };
 
     openFirewallDNS = lib.mkOption {
@@ -81,8 +93,10 @@ in
         message = "services.pihole-native.upstreams must be set explicitly for each Pi-hole host.";
       }
       {
-        assertion = cfg.webListenAddress == "127.0.0.1";
-        message = "services.pihole-native.webListenAddress must remain loopback until API authentication is wired through SOPS.";
+        assertion =
+          cfg.webListenAddress == "127.0.0.1"
+          || (cfg.apiPasswordEnvironmentFile != null && cfg.apiPasswordEnvironmentFile != "");
+        message = "services.pihole-native.apiPasswordEnvironmentFile is required when Web/API is bound beyond loopback.";
       }
     ];
 
@@ -105,6 +119,11 @@ in
         };
       };
     };
+
+    systemd.services.pihole-ftl.serviceConfig.EnvironmentFile =
+      lib.optional
+        (cfg.apiPasswordEnvironmentFile != null && cfg.apiPasswordEnvironmentFile != "")
+        cfg.apiPasswordEnvironmentFile;
 
     services.pihole-web = {
       enable = true;
