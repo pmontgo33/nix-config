@@ -387,7 +387,9 @@ in
           terra = "openai-codex/gpt-5.6-terra";
           sol = "openai-codex/gpt-5.6-sol";
           mm = "minimax/MiniMax-M3";
-          flash = "opencode-go/deepseek-v4-flash";
+          # `mimo` replaces the retired `flash` alias (deepseek-v4-flash).
+          # Higher opencode-go weekly quota than flash; same provider.
+          mimo = "opencode-go/mimo-v2.5";
         };
       };
 
@@ -409,7 +411,9 @@ in
       # subscription quota unless both routes fail.
       fallback_providers = [
         { provider = "opencode-go"; model = "minimax-m3"; }
-        { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+        # mimo-v2.5 (formerly deepseek-v4-flash) — higher opencode-go weekly
+        # quota for the same Flash-class role.
+        { provider = "opencode-go"; model = "mimo-v2.5"; }
         { provider = "openai-codex"; model = "gpt-5.6-luna"; }
       ];
 
@@ -425,12 +429,14 @@ in
       #     proven safety net; opt in via `/model max --provider moa`.
       #   - tool: tool-calling specialist — Codex Terra aggregator with
       #     opencode-go Tencent Hy3 (tool-use specialist), minimax
-      #     MiniMax-M3 (diverse generalist), and opencode-go deepseek-v4-
-      #     flash (cheap diverse tiebreaker).
+      #     MiniMax-M3 (diverse generalist), and opencode-go qwen3.7-plus
+      #     (cheap diverse tiebreaker — formerly deepseek-v4-flash).
       #   - coder: code-tuned aggregator (Codex Terra) with coding-
       #     oriented references. For implementation tasks and code review.
       #   - lite: cheap/fast aggregator (minimax MiniMax-M3) for
-      #     short-turn routing and simple queries. Lowest cost.
+      #     short-turn routing and simple queries. Two opencode-go
+      #     references (mimo-v2.5 + qwen3.7-plus — both high weekly
+      #     quota, different training lineages). Lowest cost.
       # Use via `/model <preset> --provider moa` or one-shot
       # `/moa <prompt>`. Set per-preset `enabled = false` to fall back
       # to the aggregator acting alone.
@@ -468,7 +474,9 @@ in
           reference_models = [
             { provider = "opencode-go"; model = "tencent/hy3"; }
             { provider = "minimax"; model = "MiniMax-M3"; }
-            { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+            # qwen3.7-plus replaces deepseek-v4-flash as the cheap diverse
+            # tiebreaker — higher opencode-go weekly quota.
+            { provider = "opencode-go"; model = "qwen3.7-plus"; }
           ];
           aggregator = {
             provider = "openai-codex";
@@ -494,8 +502,11 @@ in
         };
         presets.lite = {
           reference_models = [
-            { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+            # mimo-v2.5 (formerly deepseek-v4-flash) + qwen3.7-plus — both
+            # cheap, both with high opencode-go weekly quota, different
+            # training lineages for productive disagreement at the lite tier.
             { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "opencode-go"; model = "qwen3.7-plus"; }
           ];
           aggregator = {
             provider = "minimax";
@@ -549,7 +560,6 @@ in
         # resolver in hermes_constants.resolve_per_model_reasoning_effort).
         # Session-scoped /reasoning --session always wins for that session.
         reasoning_overrides = {
-          "deepseek-v4-flash" = "high";
           "gpt-5.6-luna" = "high";
         };
         # Surface-aware verify-before-finish: ON for CLI/TUI/desktop/programmatic
@@ -674,15 +684,16 @@ in
         };
 
         # Voice Assistant endpoint. HA's OpenClaw Assistant sends model
-        # `bernie-voice`, which is routed to DeepSeek V4 Flash without changing
-        # Bernie's MiniMax-M3 default for Telegram and other gateway clients.
+        # `bernie-voice`, which is routed to mimo-v2.5 (formerly DeepSeek V4
+        # Flash) without changing Bernie's MiniMax-M3 default for Telegram and
+        # other gateway clients. mimo-v2.5 has higher opencode-go weekly quota.
         api_server = {
           enabled = true;
           extra = {
             model_name = "hermes-agent";
             model_routes.bernie-voice = {
               provider = "opencode-go";
-              model = "deepseek-v4-flash";
+              model = "mimo-v2.5";
             };
           };
         };
