@@ -10,7 +10,12 @@
   services.pihole-native = {
     enable = true;
     interface = "eth0";
-    upstreams = [ "192.168.86.1#5353" ];
+    # Disposable smoke-test upstreams only. Final Pi-hole targets use OPNsense :53
+    # after AdGuard is retired and Unbound is moved off the mDNS port.
+    upstreams = [
+      "1.1.1.1"
+      "9.9.9.9"
+    ];
     webListenAddress = "127.0.0.1";
     webPort = 8080;
     openFirewallDNS = true;
