@@ -1,4 +1,4 @@
-{ modulesPath, ... }:
+{ modulesPath, pkgs, ... }:
 
 {
   imports = [
@@ -15,6 +15,13 @@
     webPort = 8080;
     openFirewallDNS = true;
   };
+
+  services.pihole-ftl.lists = [
+    {
+      url = "file://${pkgs.stevenblack-blocklist}/hosts";
+      description = "Native NixOS Pi-hole smoke-test adlist";
+    }
+  ];
 
   services.openssh.enable = true;
 
