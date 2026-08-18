@@ -1,0 +1,39 @@
+{
+  "pihole": {
+    "a": {
+      "config": {
+        "dns": {
+          "dnssec": true,
+          "listeningMode": "all"
+        }
+      },
+      "groups": [
+        {"id": 1, "name": "default"}
+      ],
+      "lists": [],
+      "domains": [],
+      "clients": [],
+      "version": {"version": "v6.0", "branch": "master", "hash": "fixture"}
+    },
+    "b": {
+      "config": {
+        "dns": {
+          "dnssec": true,
+          "listeningMode": "all"
+        }
+      },
+      "groups": [
+        {"id": 1, "name": "default"}
+      ],
+      "lists": [],
+      "domains": [],
+      "clients": [],
+      "version": {"version": "v6.0", "branch": "master", "hash": "fixture"}
+    }
+  },
+  "opnsense": {
+    "service": {"status": "running"},
+    "hostOverrides": {"rows": [], "current": 1, "rowCount": 0, "total": 0},
+    "hostAliases": {"rows": [], "current": 1, "rowCount": 0, "total": 0}
+  }
+}
