@@ -7,7 +7,8 @@
       "dhcpv6": "opnsense",
       "routerAdvertisements": "opnsense",
       "rdnss": "opnsense",
-      "dnsDuringPhase1": "adguard"
+      "dnsDuringPhase1": "adguard",
+      "localDns": "opnsense-unbound"
     },
     "networkProfiles": {
       "lan": {

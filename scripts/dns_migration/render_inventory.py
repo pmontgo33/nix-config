@@ -25,13 +25,19 @@ FORBIDDEN_KEYS = {
     "mac", "macaddress", "clientid", "clientidentifier", "password", "secret",
     "token", "apikey", "accesstoken",
 }
-TOP_LEVEL_KEYS = {"schemaVersion", "identitySource", "ownership", "networkProfiles", "devices"}
-OWNERSHIP_KEYS = {"dhcpv4", "dhcpv6", "routerAdvertisements", "rdnss", "dnsDuringPhase1"}
+TOP_LEVEL_KEYS = {"schemaVersion", "identitySource", "ownership", "networkProfiles", "devices", "localDns"}
+OWNERSHIP_KEYS = {"dhcpv4", "dhcpv6", "routerAdvertisements", "rdnss", "dnsDuringPhase1", "localDns"}
 PROFILE_KEYS = {"interface", "subnet", "gateway", "dhcpRange", "dnsDuringPhase1"}
 RANGE_KEYS = {"from", "to"}
 DEVICE_KEYS = {"network", "placement", "services"}
 NETWORK_KEYS = {"hostname", "address", "identityRef", "interface", "piholeGroup"}
 SERVICE_KEYS = {"hostname", "protocol", "upstreamPort", "proxy"}
+LOCAL_DNS_KEYS = {"zones"}
+LOCAL_DNS_ZONE_KEYS = {"hostOverrides", "aliases"}
+HOST_OVERRIDE_KEYS = {"hostname", "rr", "server", "ttl", "addptr", "enabled", "description"}
+HOST_ALIAS_KEYS = {"hostname", "target", "targetRr", "enabled", "description"}
+DNS_ZONE_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
+DNS_HOST_RE = re.compile(r"^[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?$")
 
 
 class InventoryError(ValueError):
@@ -118,6 +124,144 @@ def _ipv4(value: Any, path: str) -> ipaddress.IPv4Address:
     return ipaddress.IPv4Address(str(address))
 
 
+def _dns_zone(value: Any, path: str) -> str:
+    _require(isinstance(value, str), f"{path} must be a string")
+    _require(not value.endswith(".."), f"invalid DNS zone at {path}")
+    normalized = value[:-1] if value.endswith(".") else value
+    normalized = normalized.lower()
+    _require(bool(DNS_ZONE_RE.fullmatch(normalized)), f"invalid DNS zone at {path}")
+    _require(len(normalized) <= 253, f"DNS zone is too long at {path}")
+    return normalized
+
+
+def _dns_hostname(value: Any, path: str) -> str:
+    _require(isinstance(value, str), f"{path} must be a string")
+    _require(not value.endswith(".."), f"invalid DNS hostname at {path}")
+    normalized = value[:-1] if value.endswith(".") else value
+    normalized = normalized.lower()
+    _require(bool(DNS_HOST_RE.fullmatch(normalized)), f"invalid DNS hostname at {path}")
+    return normalized
+
+
+def _bool(value: Any, path: str) -> bool:
+    _require(isinstance(value, bool), f"{path} must be a boolean")
+    return value
+
+
+def _description(value: Any, path: str) -> str:
+    _require(isinstance(value, str), f"{path} must be a string")
+    _require(len(value) <= 255, f"{path} is too long")
+    return value
+
+
+def _ttl(value: Any, path: str) -> int:
+    _require(isinstance(value, int) and not isinstance(value, bool), f"{path} must be an integer")
+    _require(0 <= value <= 2147483647, f"{path} is outside the supported range")
+    return value
+
+
+def _validate_local_dns(inventory: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    local_dns = inventory.get("localDns", {"zones": {}})
+    _require(isinstance(local_dns, dict), "localDns must be an object")
+    _ensure_keys(local_dns, LOCAL_DNS_KEYS, "inventory.localDns")
+    zones = local_dns.get("zones")
+    _require(isinstance(zones, dict), "inventory.localDns.zones must be an object")
+
+    overrides: list[dict[str, Any]] = []
+    aliases: list[dict[str, Any]] = []
+    override_refs: dict[str, dict[str, Any]] = {}
+    alias_refs: set[str] = set()
+    ptr_addresses: set[str] = set()
+    seen_zones: set[str] = set()
+
+    for zone_name, zone_value in sorted(zones.items()):
+        zone = _dns_zone(zone_name, f"inventory.localDns.zones.{zone_name}")
+        _require(zone not in seen_zones, f"duplicate normalized local DNS zone: {zone}")
+        seen_zones.add(zone)
+        _require(isinstance(zone_value, dict), f"local DNS zone {zone} must be an object")
+        _ensure_keys(zone_value, LOCAL_DNS_ZONE_KEYS, f"inventory.localDns.zones.{zone}")
+        host_values = zone_value.get("hostOverrides", [])
+        alias_values = zone_value.get("aliases", [])
+        _require(isinstance(host_values, list), f"hostOverrides must be a list at {zone}")
+        _require(isinstance(alias_values, list), f"aliases must be a list at {zone}")
+
+        for index, host_value in enumerate(host_values):
+            path = f"inventory.localDns.zones.{zone}.hostOverrides[{index}]"
+            _require(isinstance(host_value, dict), f"{path} must be an object")
+            _ensure_keys(host_value, HOST_OVERRIDE_KEYS, path)
+            hostname = _dns_hostname(host_value.get("hostname"), f"{path}.hostname")
+            rr = host_value.get("rr")
+            _require(isinstance(rr, str) and rr in {"A", "AAAA"}, f"{path}.rr must be A or AAAA")
+            server = host_value.get("server")
+            _require(isinstance(server, str), f"{path}.server must be an IP address")
+            try:
+                address = ipaddress.ip_address(server)
+            except ValueError as exc:
+                raise InventoryError(f"{path}.server must be an IP address") from exc
+            _require(address.version == (4 if rr == "A" else 6), f"{path}.server does not match {rr}")
+            ttl = _ttl(host_value.get("ttl"), f"{path}.ttl")
+            addptr = _bool(host_value.get("addptr"), f"{path}.addptr")
+            enabled = _bool(host_value.get("enabled"), f"{path}.enabled")
+            if enabled and addptr:
+                address_text = str(address)
+                _require(address_text not in ptr_addresses, f"duplicate enabled PTR owner: {address_text}")
+                ptr_addresses.add(address_text)
+            description = _description(host_value.get("description"), f"{path}.description")
+            record_ref = f"{zone}/{hostname}/{rr}"
+            _require(record_ref not in override_refs, f"duplicate local DNS host override: {record_ref}")
+            override = {
+                "recordRef": record_ref,
+                "hostname": hostname,
+                "domain": zone,
+                "rr": rr,
+                "server": str(address),
+                "ttl": ttl,
+                "addptr": addptr,
+                "enabled": enabled,
+                "description": description,
+            }
+            override_refs[record_ref] = override
+            overrides.append(override)
+
+        for index, alias_value in enumerate(alias_values):
+            path = f"inventory.localDns.zones.{zone}.aliases[{index}]"
+            _require(isinstance(alias_value, dict), f"{path} must be an object")
+            _ensure_keys(alias_value, HOST_ALIAS_KEYS, path)
+            hostname = _dns_hostname(alias_value.get("hostname"), f"{path}.hostname")
+            target = _dns_hostname(alias_value.get("target"), f"{path}.target")
+            target_rr = alias_value.get("targetRr")
+            if target_rr is not None:
+                _require(isinstance(target_rr, str) and target_rr in {"A", "AAAA"}, f"{path}.targetRr must be A or AAAA")
+            enabled = _bool(alias_value.get("enabled"), f"{path}.enabled")
+            description = _description(alias_value.get("description"), f"{path}.description")
+            alias_ref = f"{zone}/{hostname}"
+            _require(
+                not any(record["domain"] == zone and record["hostname"] == hostname for record in overrides),
+                f"local DNS alias conflicts with host override: {alias_ref}",
+            )
+            _require(alias_ref not in alias_refs, f"duplicate local DNS alias: {alias_ref}")
+            matching = [
+                record for record in overrides
+                if record["domain"] == zone and record["hostname"] == target
+                and (target_rr is None or record["rr"] == target_rr)
+            ]
+            _require(bool(matching), f"local DNS alias target does not exist: {zone}/{target}")
+            _require(len(matching) == 1, f"local DNS alias target is ambiguous: {zone}/{target}")
+            if enabled:
+                _require(matching[0]["enabled"], f"enabled local DNS alias target is disabled: {zone}/{target}")
+            aliases.append({
+                "aliasRef": alias_ref,
+                "hostname": hostname,
+                "domain": zone,
+                "targetRef": matching[0]["recordRef"],
+                "enabled": enabled,
+                "description": description,
+            })
+            alias_refs.add(alias_ref)
+
+    return sorted(overrides, key=lambda item: item["recordRef"]), sorted(aliases, key=lambda item: item["aliasRef"])
+
+
 def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
     _scan_for_forbidden(inventory)
     _ensure_keys(inventory, TOP_LEVEL_KEYS, "inventory")
@@ -133,7 +277,8 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
         "routerAdvertisements": "opnsense",
         "rdnss": "opnsense",
         "dnsDuringPhase1": "adguard",
-    }, "Gate 1A ownership must keep DHCPv6/RA/RDNSS on OPNsense and DNS on AdGuard")
+        "localDns": "opnsense-unbound",
+    }, "Gate 1A ownership must keep DHCPv6/RA/RDNSS/local DNS on OPNsense and DNS on AdGuard")
 
     profiles = inventory.get("networkProfiles")
     devices = inventory.get("devices")
@@ -252,6 +397,7 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
             _require(not any(x["hostname"] == service_hostname for x in services), f"duplicate service hostname: {service_hostname}")
             services.append({"device": device_name, "service": service_name, **service})
 
+    local_dns_overrides, local_dns_aliases = _validate_local_dns(inventory)
     return {
         "schemaVersion": 1,
         "ownership": ownership,
@@ -260,6 +406,8 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
         "services": services,
         "deviceAddresses": device_addresses,
         "poolWarnings": pool_warnings,
+        "unboundHostOverrides": local_dns_overrides,
+        "unboundHostAliases": local_dns_aliases,
     }
 
 
@@ -301,6 +449,8 @@ def render(inventory: dict[str, Any]) -> dict[str, Any]:
         ],
         "poolWarnings": checked["poolWarnings"],
         "unresolvedIdentityRefs": sorted(item["identityRef"] for item in reservations),
+        "unboundHostOverrides": checked["unboundHostOverrides"],
+        "unboundHostAliases": checked["unboundHostAliases"],
     }
 
 
