@@ -14,6 +14,7 @@
       routerAdvertisements = "opnsense";
       rdnss = "opnsense";
       dnsDuringPhase1 = "adguard";
+      localDns = "opnsense-unbound";
     };
 
     networkProfiles = {
@@ -211,6 +212,10 @@
           piholeGroup = "normal";
         };
       };
+    };
+
+    localDns = {
+      zones = { };
     };
   };
 }

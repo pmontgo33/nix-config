@@ -20,6 +20,7 @@ EXPECTED_OWNERSHIP = {
     "routerAdvertisements": "opnsense",
     "rdnss": "opnsense",
     "dnsDuringPhase1": "adguard",
+    "localDns": "opnsense-unbound",
 }
 
 

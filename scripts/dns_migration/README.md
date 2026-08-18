@@ -24,10 +24,57 @@ scripts/dns_migration/render_dnsmasq_plan.py \
   --output /tmp/pihole-gate-1a/dnsmasq-plan.json
 ```
 
-The dnsmasq plan has `apply: false`, keeps DHCPv6/RA under OPNsense ownership,
-and marks reservations pending until an encrypted runtime identity map resolves
+The dnsmasq plan has `apply: false`, keeps DHCPv6/RA/RDNSS under OPNsense ownership,
+keeps local DNS under OPNsense Unbound ownership, and marks reservations pending until an encrypted runtime identity map resolves
 each `identityRef`. No MAC address or client identifier belongs in this source
 inventory.
+
+## Local Unbound inventory
+
+Local DNS records are declared under `inventory.localDns`, but are rendered as
+an OPNsense Unbound projection. The renderer remains offline and review-only.
+It does not call the OPNsense API.
+
+```nix
+localDns = {
+  zones = {
+    "home.arpa" = {
+      hostOverrides = [
+        {
+          hostname = "router";
+          rr = "A";
+          server = "192.0.2.1";
+          ttl = 300;
+          addptr = false;
+          enabled = true;
+          description = "Example host";
+        }
+      ];
+      aliases = [
+        {
+          hostname = "gateway";
+          target = "router";
+          enabled = true;
+          description = "Example alias";
+        }
+      ];
+    };
+  };
+};
+```
+
+The first supported scope is:
+
+- A and AAAA host overrides;
+- CNAME-style aliases targeting one host override;
+- TTL, PTR flag, enabled state, and descriptions;
+- deterministic `recordRef`, `aliasRef`, and `targetRef` values.
+
+The future OPNsense adapter must resolve the canonical target reference to the
+OPNsense host-override UUID before applying an alias. It must use the verified
+HTTPS API hostname, read back the resulting state, and keep the API write
+identity separate from the read-only review identity. No mutation is part of
+this renderer.
 
 ## OPNsense apply boundary
 

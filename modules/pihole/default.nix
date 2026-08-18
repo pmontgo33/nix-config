@@ -227,6 +227,76 @@ in
       description = "Pi-hole FTL statistics privacy level.";
     };
 
+    dnssec = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Whether Pi-hole FTL validates DNS replies with DNSSEC.";
+    };
+
+    queryLogging = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Whether Pi-hole FTL logs DNS queries and replies.";
+    };
+
+    blockingMode = lib.mkOption {
+      type = lib.types.enum [ "NULL" "IP_NODATA_AAAA" "IP" "NX" "NODATA" ];
+      default = "NULL";
+      description = "Response mode for blocked DNS queries.";
+    };
+
+    resolver = {
+      resolveIPv4 = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether FTL resolves IPv4 client addresses to hostnames.";
+      };
+
+      resolveIPv6 = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether FTL resolves IPv6 client addresses to hostnames.";
+      };
+
+      networkNames = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether FTL uses network-table names for client attribution.";
+      };
+
+      refreshNames = lib.mkOption {
+        type = lib.types.enum [ "IPV4_ONLY" "ALL" "UNKNOWN" "NONE" ];
+        default = "IPV4_ONLY";
+        description = "How FTL refreshes client and upstream hostnames.";
+      };
+    };
+
+    database = {
+      maxDBdays = lib.mkOption {
+        type = lib.types.ints.between 0 3650;
+        default = 91;
+        description = "Number of days FTL retains query history locally.";
+      };
+
+      DBinterval = lib.mkOption {
+        type = lib.types.ints.between 0 86400;
+        default = 60;
+        description = "Seconds between FTL query-history database writes.";
+      };
+
+      useWAL = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether FTL uses SQLite write-ahead logging.";
+      };
+
+      networkExpire = lib.mkOption {
+        type = lib.types.ints.between 1 3650;
+        default = 91;
+        description = "Number of days FTL retains network-table addresses locally.";
+      };
+    };
+
     stateDirectory = lib.mkOption {
       type = lib.types.str;
       default = "/var/lib/pihole";
@@ -248,6 +318,22 @@ in
       }
       {
         assertion =
+          cfg.privacyLevel == 0
+          && cfg.dnssec == false
+          && cfg.queryLogging == true
+          && cfg.blockingMode == "NULL"
+          && cfg.resolver.resolveIPv4 == true
+          && cfg.resolver.resolveIPv6 == true
+          && cfg.resolver.networkNames == true
+          && cfg.resolver.refreshNames == "IPV4_ONLY"
+          && cfg.database.maxDBdays == 91
+          && cfg.database.DBinterval == 60
+          && cfg.database.useWAL == true
+          && cfg.database.networkExpire == 91;
+        message = "Pi-hole shared FTL baseline settings are fixed and must be identical on both instances.";
+      }
+      {
+        assertion =
           cfg.webListenAddress == "127.0.0.1"
           || (cfg.apiPasswordEnvironmentFile != null && cfg.apiPasswordEnvironmentFile != "");
         message = "services.pihole-native.apiPasswordEnvironmentFile is required when Web/API is bound beyond loopback.";
@@ -263,7 +349,36 @@ in
       logDirectory = cfg.logDirectory;
       settings = {
         dns = {
-          inherit (cfg) interface listeningMode upstreams;
+          inherit (cfg) interface listeningMode upstreams dnssec queryLogging;
+          replyWhenBusy = "ALLOW";
+          bogusPriv = true;
+          blocking = {
+            active = true;
+            mode = cfg.blockingMode;
+            edns = "TEXT";
+          };
+          specialDomains = {
+            mozillaCanary = true;
+            iCloudPrivateRelay = true;
+            designatedResolver = true;
+          };
+        };
+        dhcp.active = false;
+        ntp = {
+          ipv4.active = false;
+          ipv6.active = false;
+          sync.active = false;
+        };
+        resolver = {
+          inherit (cfg.resolver) resolveIPv4 resolveIPv6 networkNames refreshNames;
+        };
+        database = {
+          DBimport = true;
+          inherit (cfg.database) maxDBdays DBinterval useWAL;
+          network = {
+            parseARPcache = true;
+            expire = cfg.database.networkExpire;
+          };
         };
         webserver.api = {
           # Required by the native list setup service. Keep this ephemeral

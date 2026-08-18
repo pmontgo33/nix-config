@@ -22,8 +22,11 @@ class InventoryRenderingTests(unittest.TestCase):
         self.assertEqual(len(first["networkReservations"]), 16)
         self.assertEqual(len(first["services"]), 0)
         self.assertEqual(len(first["unresolvedIdentityRefs"]), 16)
+        self.assertEqual(first["unboundHostOverrides"], [])
+        self.assertEqual(first["unboundHostAliases"], [])
         self.assertEqual(first["ownership"]["dhcpv6"], "opnsense")
         self.assertEqual(first["ownership"]["routerAdvertisements"], "opnsense")
+        self.assertEqual(first["ownership"]["localDns"], "opnsense-unbound")
 
     def test_fixture_renders_service_and_caddy_route(self):
         inventory = render_inventory.load_source(None, self.fixture_path)
@@ -34,6 +37,305 @@ class InventoryRenderingTests(unittest.TestCase):
         self.assertEqual(rendered["caddyRoutes"][0]["upstream"], "192.168.86.10:8080")
         self.assertIsNone(rendered["piholeClients"][0]["identifier"])
         self.assertEqual(rendered["piholeClients"][0]["status"], "pending-encrypted-identity-resolution")
+
+    def test_local_dns_renders_opnsense_unbound_host_overrides_and_aliases(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "home.example": {
+                    "hostOverrides": [
+                        {
+                            "hostname": "router",
+                            "rr": "A",
+                            "server": "192.168.86.1",
+                            "ttl": 300,
+                            "addptr": False,
+                            "enabled": True,
+                            "description": "Local gateway",
+                        }
+                    ],
+                    "aliases": [
+                        {
+                            "hostname": "gateway",
+                            "target": "router",
+                            "enabled": True,
+                            "description": "Gateway alias",
+                        }
+                    ],
+                }
+            }
+        }
+        rendered = render_inventory.render(inventory)
+        self.assertEqual(rendered["unboundHostOverrides"], [
+            {
+                "recordRef": "home.example/router/A",
+                "hostname": "router",
+                "domain": "home.example",
+                "rr": "A",
+                "server": "192.168.86.1",
+                "ttl": 300,
+                "addptr": False,
+                "enabled": True,
+                "description": "Local gateway",
+            }
+        ])
+        self.assertEqual(rendered["unboundHostAliases"], [
+            {
+                "aliasRef": "home.example/gateway",
+                "hostname": "gateway",
+                "domain": "home.example",
+                "targetRef": "home.example/router/A",
+                "enabled": True,
+                "description": "Gateway alias",
+            }
+        ])
+
+    def test_local_dns_rejects_alias_target_and_duplicate_records(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "home.example": {
+                    "hostOverrides": [
+                        {
+                            "hostname": "router",
+                            "rr": "A",
+                            "server": "192.168.86.1",
+                            "ttl": 300,
+                            "addptr": False,
+                            "enabled": True,
+                            "description": "",
+                        },
+                        {
+                            "hostname": "router",
+                            "rr": "A",
+                            "server": "192.168.86.2",
+                            "ttl": 300,
+                            "addptr": False,
+                            "enabled": True,
+                            "description": "",
+                        }
+                    ],
+                    "aliases": [
+                        {
+                            "hostname": "gateway",
+                            "target": "missing",
+                            "enabled": True,
+                            "description": "",
+                        }
+                    ],
+                }
+            }
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_rejects_alias_override_name_collision(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "home.example": {
+                    "hostOverrides": [{
+                        "hostname": "router",
+                        "rr": "A",
+                        "server": "192.168.86.1",
+                        "ttl": 300,
+                        "addptr": False,
+                        "enabled": True,
+                        "description": "router",
+                    }],
+                    "aliases": [{
+                        "hostname": "router",
+                        "target": "router",
+                        "enabled": True,
+                        "description": "collision",
+                    }],
+                }
+            }
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_rejects_oversized_description(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "home.example": {
+                    "hostOverrides": [{
+                        "hostname": "router",
+                        "rr": "A",
+                        "server": "192.168.86.1",
+                        "ttl": 300,
+                        "addptr": False,
+                        "enabled": True,
+                        "description": "x" * 256,
+                    }],
+                    "aliases": [],
+                }
+            }
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_rejects_malformed_record_types_without_traceback(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "home.example": {
+                    "hostOverrides": [{
+                        "hostname": "router",
+                        "rr": ["A"],
+                        "server": "192.168.86.1",
+                        "ttl": 300,
+                        "addptr": False,
+                        "enabled": True,
+                        "description": "router",
+                    }],
+                    "aliases": [{
+                        "hostname": "gateway",
+                        "target": "router",
+                        "targetRr": {"A": True},
+                        "enabled": True,
+                        "description": "alias",
+                    }],
+                }
+            }
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_rejects_malformed_alias_target_type(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "home.example": {
+                    "hostOverrides": [{
+                        "hostname": "router",
+                        "rr": "A",
+                        "server": "192.168.86.1",
+                        "ttl": 300,
+                        "addptr": False,
+                        "enabled": True,
+                        "description": "router",
+                    }],
+                    "aliases": [{
+                        "hostname": "gateway",
+                        "target": "router",
+                        "targetRr": {"A": True},
+                        "enabled": True,
+                        "description": "alias",
+                    }],
+                }
+            }
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_accepts_single_label_zone(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "lan": {
+                    "hostOverrides": [{
+                        "hostname": "router",
+                        "rr": "A",
+                        "server": "192.168.86.1",
+                        "ttl": 300,
+                        "addptr": False,
+                        "enabled": True,
+                        "description": "router",
+                    }],
+                    "aliases": [],
+                }
+            }
+        }
+        self.assertEqual(render_inventory.render(inventory)["unboundHostOverrides"][0]["domain"], "lan")
+
+    def test_local_dns_rejects_enabled_alias_to_disabled_target(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "home.example": {
+                    "hostOverrides": [{
+                        "hostname": "router",
+                        "rr": "A",
+                        "server": "192.168.86.1",
+                        "ttl": 300,
+                        "addptr": False,
+                        "enabled": False,
+                        "description": "router",
+                    }],
+                    "aliases": [{
+                        "hostname": "gateway",
+                        "target": "router",
+                        "enabled": True,
+                        "description": "alias",
+                    }],
+                }
+            }
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_rejects_duplicate_enabled_ptr_ownership(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "home.example": {
+                    "hostOverrides": [
+                        {
+                            "hostname": "one",
+                            "rr": "A",
+                            "server": "192.168.86.1",
+                            "ttl": 300,
+                            "addptr": True,
+                            "enabled": True,
+                            "description": "one",
+                        },
+                        {
+                            "hostname": "two",
+                            "rr": "A",
+                            "server": "192.168.86.1",
+                            "ttl": 300,
+                            "addptr": True,
+                            "enabled": True,
+                            "description": "two",
+                        },
+                    ],
+                    "aliases": [],
+                }
+            }
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_rejects_canonical_zone_collisions_and_bad_trailing_dots(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {
+            "zones": {
+                "Home.Example": {"hostOverrides": [], "aliases": []},
+                "home.example": {"hostOverrides": [], "aliases": []},
+            }
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["localDns"] = {"zones": {"home.example..": {"hostOverrides": [], "aliases": []}}}
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_rejects_overlong_zone(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        long_zone = ".".join(["a" * 63] * 5)
+        inventory["localDns"] = {"zones": {long_zone: {"hostOverrides": [], "aliases": []}}}
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_local_dns_ownership_is_required(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        del inventory["ownership"]["localDns"]
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
 
     def test_forbidden_client_identifier_is_rejected_case_insensitively(self):
         inventory = render_inventory.load_source(None, self.fixture_path)
