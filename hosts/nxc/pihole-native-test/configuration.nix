@@ -1,9 +1,25 @@
-{ modulesPath, pkgs, ... }:
+{ config, modulesPath, pkgs, ... }:
 
 {
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
   ];
+
+  sops.secrets."pihole-api-password" = {
+    mode = "0400";
+    owner = "root";
+    group = "root";
+  };
+
+  sops.templates."pihole-api-env" = {
+    content = ''
+      FTLCONF_webserver_api_password=${config.sops.placeholder."pihole-api-password"}
+    '';
+    mode = "0400";
+    owner = "root";
+    group = "root";
+    restartUnits = [ "pihole-ftl.service" ];
+  };
 
   networking.hostName = "pihole-native-test";
 
@@ -17,6 +33,7 @@
       "9.9.9.9"
     ];
     webListenAddress = "127.0.0.1";
+    apiPasswordEnvironmentFile = config.sops.templates."pihole-api-env".path;
     webPort = 8080;
     openFirewallDNS = true;
   };
