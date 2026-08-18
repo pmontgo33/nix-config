@@ -1,7 +1,161 @@
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.services.pihole-native;
+  ftl = config.services.pihole-ftl;
+  listPayloads = map (
+    list:
+    builtins.toJSON {
+      type = list.type;
+      enabled = list.enabled;
+      address = list.url;
+      comment = list.description;
+    }
+  ) ftl.lists;
+  setupScript = ''
+    # This intentionally mirrors the pinned NixOS 26.05 native setup behavior
+    # while making list registration idempotent. Re-review this override when
+    # the nixpkgs Pi-hole module or package input changes.
+    set +u
+    set -eo pipefail
+    pihole="${lib.getExe ftl.piholePackage}"
+    jq="${lib.getExe pkgs.jq}"
+    curl="${lib.getExe pkgs.curl}"
+    mktemp="${lib.getExe' pkgs.coreutils "mktemp"}"
+    mv="${lib.getExe' pkgs.coreutils "mv"}"
+    rm="${lib.getExe' pkgs.coreutils "rm"}"
+    macvendor_url=${lib.escapeShellArg ftl.macvendorURL}
+    any_failed=0
+
+    macvendor_tmp=$($mktemp "${ftl.stateDirectory}/macvendor.db.XXXXXX")
+    trap '$rm -f "$macvendor_tmp"' EXIT
+    if $curl --fail --retry 3 --retry-delay 5 "$macvendor_url" \
+      -o "$macvendor_tmp"; then
+      $mv -f "$macvendor_tmp" "${ftl.stateDirectory}/macvendor.db"
+    else
+      echo "Failed to download the Pi-hole MAC database"
+      any_failed=1
+      if [ ! -s "${ftl.stateDirectory}/macvendor.db" ]; then
+        echo "No existing Pi-hole MAC database is available"
+      fi
+    fi
+
+    if [ ! -f "${ftl.stateDirectory}/gravity.db" ]; then
+      $pihole -g
+      main_pid=$(systemctl show --property MainPID --value ${config.systemd.services.pihole-ftl.name})
+      if [ -z "$main_pid" ]; then
+        echo "Unable to determine the Pi-hole FTL process ID"
+        exit 1
+      fi
+      case "$main_pid" in
+        0|*[!0-9]*)
+          echo "Unable to determine the Pi-hole FTL process ID"
+          exit 1
+          ;;
+        *)
+          ${lib.getExe' pkgs.procps "kill"} -s SIGRTMIN "$main_pid"
+          ;;
+      esac
+    fi
+
+    . ${ftl.piholePackage}/share/pihole/advanced/Scripts/api.sh
+    . ${ftl.piholePackage}/share/pihole/advanced/Scripts/utils.sh
+
+    api_ready=false
+    for _ in 1 2 3; do
+      if (TestAPIAvailability); then
+        api_ready=true
+        break
+      fi
+      echo "Retrying API shortly..."
+      ${lib.getExe' pkgs.coreutils "sleep"} .5s
+    done
+    if [ "$api_ready" != true ]; then
+      echo "Pi-hole API did not become available"
+      exit 1
+    fi
+
+    LoginAPI
+
+    ensureList() {
+      local payload="$1" type address desired_enabled desired_comment list_data existing result error id post_response post_status
+      type=$($jq -r '.type' <<< "$payload")
+      address=$($jq -r '.address' <<< "$payload")
+      desired_enabled=$($jq -r '.enabled' <<< "$payload")
+      desired_comment=$($jq -r '.comment' <<< "$payload")
+      if list_data=$(GetFTLData "lists?type=$type"); then
+        :
+      else
+        echo "Unable to read Pi-hole lists for type $type"
+        any_failed=1
+        return 0
+      fi
+      if ! $jq -e 'type == "object" and (.error == null) and (.lists | type == "array")' >/dev/null <<< "$list_data"; then
+        echo "Unable to read Pi-hole lists for type $type"
+        any_failed=1
+        return 0
+      fi
+
+      if existing=$($jq -r --arg address "$address" \
+        --arg enabled "$desired_enabled" --arg comment "$desired_comment" \
+        '.lists[]? | select(.address == $address and (.enabled|tostring) == $enabled and (.comment // "") == $comment) | .id' <<< "$list_data"); then
+        if [ -n "$existing" ]; then
+          echo "List already present for type $type (ID $existing)"
+          return 0
+        fi
+      fi
+
+      if existing=$($jq -r --arg address "$address" '.lists[]? | select(.address == $address) | .id' <<< "$list_data"); then
+        if [ -n "$existing" ]; then
+          echo "List policy drift detected for type $type (ID $existing)"
+          any_failed=1
+          return 0
+        fi
+      fi
+
+      echo "Adding list of type $type"
+      if post_response=$(PostFTLData "lists?type=$type" "$payload" status); then
+        :
+      else
+        echo "Pi-hole API request failed while adding a list of type $type"
+        any_failed=1
+        return 0
+      fi
+      post_status=''${post_response: -3}
+      result=''${post_response%???}
+      case "$post_status" in
+        2??) ;;
+        *)
+          echo "Pi-hole API returned HTTP $post_status while adding a list of type $type"
+          any_failed=1
+          return 0
+          ;;
+      esac
+      if ! $jq -e 'type == "object"' >/dev/null <<< "$result"; then
+        echo "Pi-hole API returned an invalid response for type $type"
+        any_failed=1
+        return 0
+      fi
+      error=$($jq '.error' <<< "$result")
+      if [[ "$error" != "null" ]]; then
+        echo "Pi-hole API rejected a list of type $type"
+        any_failed=1
+        return 0
+      fi
+
+      id=$($jq -r '.lists[]?.id // .list.id // empty' <<< "$result")
+      if [ -z "$id" ]; then
+        echo "Pi-hole API returned no list ID for type $type"
+        any_failed=1
+        return 0
+      fi
+      echo "Added list ID $id"
+    }
+
+    ${lib.concatMapStringsSep "\n" (payload: "ensureList ${lib.escapeShellArg payload}") listPayloads}
+    $pihole -g
+    exit $any_failed
+  '';
 in
 {
   options.services.pihole-native = {
@@ -124,6 +278,8 @@ in
       lib.optional
         (cfg.apiPasswordEnvironmentFile != null && cfg.apiPasswordEnvironmentFile != "")
         cfg.apiPasswordEnvironmentFile;
+
+    systemd.services.pihole-ftl-setup.script = lib.mkForce setupScript;
 
     services.pihole-web = {
       enable = true;
