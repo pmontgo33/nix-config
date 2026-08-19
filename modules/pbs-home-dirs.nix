@@ -2,8 +2,8 @@
 
 with lib; let
   cfg = config.extra-services.pbs-home-dirs;
-  pbsRepository = "192.168.86.102:8007:pbs";
-  pbsHost = "192.168.86.102";
+  pbsRepository = "192.168.86.123:8007:pbs";
+  pbsHost = "192.168.86.123";
 
   # Read shared exclusion list
   exclusionsFile = ../scripts/backup-exclusions.txt;
@@ -91,7 +91,7 @@ in {
         PBS_FINGERPRINT="$(cat ${config.sops.secrets.pbs-fingerprint.path})"
 
         # Test different formats
-        for repo in "root@pam@192.168.86.102:pbs" "root@192.168.86.102:pbs" "192.168.86.102:pbs"; do
+        for repo in "root@pam@192.168.86.123:pbs" "root@192.168.86.123:pbs" "192.168.86.123:pbs"; do
           echo "Testing: $repo"
 
           # Set environment variables for this specific test

@@ -27,6 +27,40 @@ class InventoryRenderingTests(unittest.TestCase):
         self.assertEqual(first["ownership"]["dhcpv6"], "opnsense")
         self.assertEqual(first["ownership"]["routerAdvertisements"], "opnsense")
         self.assertEqual(first["ownership"]["localDns"], "opnsense-unbound")
+        self.assertEqual(first["staticGuests"], [
+            {
+                "guest": "pihole1",
+                "hostname": "pihole1",
+                "address": "192.168.86.101",
+                "interface": "lan",
+                "placement": {"fallbackNodes": ["stark"], "preferredNode": "loki"},
+            },
+            {
+                "guest": "pihole2",
+                "hostname": "pihole2",
+                "address": "192.168.86.102",
+                "interface": "lan",
+                "placement": {"fallbackNodes": ["stark"], "preferredNode": "starlord"},
+            },
+        ])
+
+    def test_static_guest_rejects_dynamic_pool_address(self):
+        inventory = render_inventory.load_source(self.inventory_path, None)
+        inventory["staticGuests"]["bad-guest"] = {
+            "network": {"hostname": "bad-guest", "address": "192.168.86.210", "interface": "lan"},
+            "placement": {"preferredNode": "loki", "fallbackNodes": ["stark"]},
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_static_guest_rejects_duplicate_fallback_nodes(self):
+        inventory = render_inventory.load_source(self.inventory_path, None)
+        inventory["staticGuests"]["bad-guest"] = {
+            "network": {"hostname": "bad-guest", "address": "192.168.86.103", "interface": "lan"},
+            "placement": {"preferredNode": "loki", "fallbackNodes": ["stark", "stark"]},
+        }
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
 
     def test_fixture_renders_service_and_caddy_route(self):
         inventory = render_inventory.load_source(None, self.fixture_path)
