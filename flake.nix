@@ -259,8 +259,7 @@
     nixosConfigurations.pihole1 = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; outputs = self; piholeHostName = "pihole1"; };
       modules = [
-        ./hosts/nxc/common
-        ./hosts/nxc/pihole/configuration.nix
+        ./hosts/nxc/pihole
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
@@ -278,8 +277,7 @@
     nixosConfigurations.pihole2 = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; outputs = self; piholeHostName = "pihole2"; };
       modules = [
-        ./hosts/nxc/common
-        ./hosts/nxc/pihole/configuration.nix
+        ./hosts/nxc/pihole
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
