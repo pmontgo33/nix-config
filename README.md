@@ -13,24 +13,26 @@ Personal NixOS homelab configuration managing 37 flake configurations across Pro
 
 ## Structure
 
-- `flake.nix` — entry point; inputs include home-manager, disko, sops-nix, plasma-manager, and Hermes Agent
-- `hosts/` — per-host configurations
-  - `nxc/` — Proxmox LXC containers (Jellyfin, Nextcloud, Forgejo, Paperless-NGX, Ollama, etc.); new containers are provisioned with [nxc-scripts](https://github.com/pmontgo33/nxc-scripts)
-  - `nixbooks/` — laptop configurations (ali-book, emma-book, cora-book)
-  - individual servers such as bifrost, tesseract, and yondu
-  - `rescue/`, `dev/` — installation image and development configurations
-  - `common/` and `nxc/common/` — shared host modules
-- `modules/` — reusable NixOS modules (auto-upgrade, Tailscale, Caddy proxy, mount helpers, host check-in)
-- `users/` — home-manager user configurations (patrick, lina)
-- `ansible/` — bootstrap playbooks for non-NixOS infrastructure
-- `secrets/` — sops-nix encrypted secrets
-- `packages/` — custom package definitions
-- `scripts/` — operational tooling, including the guarded `nix-pr` workflow
-- `tests/` — unit tests for repository tooling
-- `AGENT.md` — repository-specific guidance for automation agents
-- `justfile` — task runner for common workflows
+- [`flake.nix`](flake.nix) — entry point; inputs include home-manager, disko, sops-nix, plasma-manager, and Hermes Agent
+- [`flake.lock`](flake.lock) — pinned input revisions; commits to PRs that bump inputs should call out the source/timestamp of the new commit
+- `hosts/`
+  - [`nxc/`](hosts/nxc) — Proxmox LXC containers (Jellyfin, Nextcloud, Forgejo, Paperless-NGX, Ollama, etc.); new containers are provisioned with [nxc-scripts](https://github.com/pmontgo33/nxc-scripts)
+    - `nxc/common/` — shared modules for LXC containers
+  - [`nixbooks/`](hosts/nixbooks) — laptop configurations (ali-book, emma-book, cora-book)
+  - individual servers such as [bifrost](hosts/bifrost), [tesseract](hosts/tesseract), and [yondu](hosts/yondu)
+  - [`rescue/`](hosts/rescue), [`dev/`](hosts/dev) — installation image and development configurations
+  - [`common/`](hosts/common) — shared host modules
+- [`modules/`](modules) — reusable NixOS modules (auto-upgrade, Tailscale, Caddy proxy, mount helpers, host check-in)
+- [`users/`](users) — home-manager user configurations (patrick, lina)
+- [`ansible/`](ansible) — bootstrap playbooks for non-NixOS infrastructure
+- [`secrets/`](secrets) — sops-nix encrypted secrets
+- [`packages/`](packages) — custom package definitions
+- [`scripts/`](scripts) — operational tooling, including the guarded `nix-pr` workflow
+- [`tests/`](tests) — unit tests for repository tooling
+- [`AGENT.md`](AGENT.md) — repository-specific guidance for automation agents
+- [`justfile`](justfile) — task runner for common workflows
 
-See [host-states.md](host-states.md) for the latest recorded operational snapshot. The flake remains authoritative for configured hosts.
+See [`host-states.md`](host-states.md) for the latest recorded operational snapshot. The flake remains authoritative for configured hosts.
 
 ## Common Commands
 
@@ -62,7 +64,7 @@ scripts/nix-pr submit --dry-run
 scripts/nix-pr submit
 ```
 
-Use `scripts/nix-pr status` as the first troubleshooting command. Use `--host NAME` for a shared Nix change when the affected host cannot be inferred from its path, or `--all-hosts` when every flake configuration must be built. Production Nix and systemd changes require a saved second-model review passed through `--second-review-file`; documentation-only changes do not.
+Use `scripts/nix-pr status` as the first troubleshooting command. Use `--host NAME` for a shared Nix change when the affected host cannot be inferred from its path, or `--all-hosts` when every flake configuration must be built. Production Nix and systemd changes require a saved independent review from **gpt-5.6-luna at xhigh reasoning**, passed through `--second-review-file`; documentation-only changes do not. Set xhigh explicitly with the standalone Codex CLI: `codex exec -m gpt-5.6-luna -c model_reasoning_effort=xhigh` — the Hermes config default for Luna is `high`, not `xhigh`. If Luna is unavailable, stop rather than silently substituting another model. The wrapper verifies the review artifact and records its digest; model selection belongs to the workflow guidance, not the wrapper.
 
 Validation receipts are stored outside the repository under the user's XDG state directory. Run the test suite with:
 

@@ -5,11 +5,74 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
+  hermesBasePkgs = import inputs.nixpkgs {
+    system = pkgs.stdenv.hostPlatform.system;
+    config.allowUnfree = true;
+  };
+  hermesBasePython = hermesBasePkgs.python312.pkgs;
+  fastembed = hermesBasePython.fastembed.overridePythonAttrs (old: {
+    # Hermes's full sealed environment already supplies the rest of
+    # FastEmbed's runtime dependencies. Add only packages absent there to
+    # avoid collisions in nix-hermes-agent's extraPythonPackages guard.
+    dependencies = builtins.filter
+      (dep: builtins.elem (lib.getName dep) [
+        "loguru"
+        "mmh3"
+        "py-rust-stemmers"
+        "pystemmer"
+        "snowballstemmer"
+      ])
+      old.dependencies;
+    dontCheckRuntimeDeps = true;
+    pythonImportsCheck = [];
+  });
+  sqliteVec = hermesBasePython.sqlite-vec.overridePythonAttrs (_: {
+    # nixpkgs 26.05 omits NumPy from sqlite-vec's runtime-check inputs;
+    # Mnemosyne propagates NumPy explicitly below.
+    dontCheckRuntimeDeps = true;
+  });
   python312 = pkgs.python312.override {
     packageOverrides = _self: super: {
       sse-starlette = super.sse-starlette.overridePythonAttrs (_: { dontCheckRuntimeDeps = true; });
+      aiohttp = super.aiohttp.overridePythonAttrs (_: {
+        doCheck = false;
+        doInstallCheck = false;
+      });
       pymupdf = super.pymupdf.overridePythonAttrs (_: { doCheck = false; });
       pdfplumber = super.pdfplumber.overridePythonAttrs (_: { doCheck = false; });
+      # SciPy's upstream suite launches six xdist workers and exhausts the
+      # 8GB build host; runtime artifacts are unaffected by skipping checks.
+      scipy = super.scipy.overridePythonAttrs (_: { doCheck = false; });
+      # Use the official CPython 3.12 manylinux wheel. Building mypy 1.20.1
+      # from source invokes mypyc and OOMs even with a serialized build on this
+      # host; the wheel already contains the compiled extension.
+      mypy = super.mypy.overridePythonAttrs (_: {
+        version = "1.20.1";
+        src = pkgs.fetchurl {
+          url = "https://files.pythonhosted.org/packages/b2/c6/75e969781c2359b2f9c15b061f28ec6d67c8b61865ceda176e85c8e7f2de/mypy-1.20.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+          hash = "sha256-7zRhsa1c1EblQAFukLWYRlft2jn5gvTMRcoxe2KPWjc";
+        };
+        format = "wheel";
+        pyproject = null;
+        propagatedBuildInputs = with _self; [
+          typing-extensions
+          mypy-extensions
+          pathspec
+          librt
+        ];
+        doCheck = false;
+      });
+      pypdfium2 = super.pypdfium2.overridePythonAttrs (_: { doCheck = false; doInstallCheck = false; });
+      apscheduler = super.apscheduler.overridePythonAttrs (_: { doCheck = false; });
+      black = super.black.overridePythonAttrs (_: { doCheck = false; });
+      httpx = super.httpx.overridePythonAttrs (_: { doCheck = false; });
+      httpbin = super.httpbin.overridePythonAttrs (_: { doCheck = false; });
+      flasgger = super.flasgger.overridePythonAttrs (_: { doCheck = false; });
+      starlette = super.starlette.overridePythonAttrs (_: { doCheck = false; });
+      fastapi = super.fastapi.overridePythonAttrs (_: { doCheck = false; });
+      fastapi-cli = super.fastapi-cli.overridePythonAttrs (_: { doCheck = false; });
+      ipython = super.ipython.overridePythonAttrs (_: { doCheck = false; });
+      baize = super.baize.overridePythonAttrs (_: { doCheck = false; });
     };
   };
   hermesPython = lib.getOutput "out" (python312.withPackages (ps: [
@@ -42,6 +105,44 @@ let
     ];
     doCheck = false;
   };
+  # Mnemosyne is not in the pinned nixpkgs set. Build both wheels from source.
+  # Include the embeddings extra because mnemosyne-hermes declares it as a
+  # runtime dependency. The host now has enough RAM and swap for this closure;
+  # retain the prebuilt mypy wheel and serialized build settings as safeguards.
+  mnemosyneMemory = hermesBasePython.buildPythonPackage rec {
+    pname = "mnemosyne-memory";
+    version = "3.15.1";
+    src = pkgs.fetchurl {
+      url = "https://files.pythonhosted.org/packages/48/1b/d1ee3346df25396f9aea6aff2518823a815142b2a92638d06c9cd7c5015c/mnemosyne_memory-3.15.1-py3-none-any.whl";
+      hash = "sha256-vHmmJ30hlbulkSMpKSTo/1QhNXxY7lQ6IwVLjdl9dIQ=";
+    };
+    format = "wheel";
+    propagatedBuildInputs = [
+      sqliteVec
+      fastembed
+    ];
+    doCheck = false;
+    dontCheckRuntimeDeps = true;
+  };
+  mnemosyneHermes = hermesBasePython.buildPythonPackage rec {
+    pname = "mnemosyne-hermes";
+    version = "0.5.0";
+    src = pkgs.fetchurl {
+      url = "https://files.pythonhosted.org/packages/5d/64/12c46a5dcc02ad23c7c37d0a6b55a8dfc3cfbdc6d64c3cdeaa2b52e23e99/mnemosyne_hermes-0.5.0-py3-none-any.whl";
+      hash = "sha256-z6vtLygWxr+ypkBJjLMzjo3r1p4XiqCrYZV2iJljaL8=";
+    };
+    format = "wheel";
+    propagatedBuildInputs = [
+      mnemosyneMemory
+    ];
+    doCheck = false;
+    dontCheckRuntimeDeps = true;
+  };
+  mnemosyneHermesPlugin = pkgs.runCommand "mnemosyne-hermes-plugin" { } ''
+    mkdir -p $out
+    cp -r ${mnemosyneHermes}/lib/python3.12/site-packages/mnemosyne_hermes/* $out/
+    chmod -R a+rX $out
+  '';
   forgejo-credential-helper = pkgs.writeShellScript "forgejo-credential-helper" ''
     host=""
     protocol=""
@@ -70,11 +171,32 @@ in
     (final: prev: {
       python312 = prev.python312.override {
         packageOverrides = _self: super:
-          builtins.mapAttrs (_name: val:
+          (builtins.mapAttrs (_name: val:
             if builtins.isAttrs val && val ? overrideAttrs
             then val.overrideAttrs (_: { doCheck = false; doInstallCheck = false; })
             else val
-          ) super;
+          ) super) // {
+            # Hermes-Relay uses the global python312Packages set rather than
+            # the local Hermes environment above. Keep its mypy dependency on
+            # the same prebuilt wheel so mypyc is never compiled twice.
+            mypy = super.mypy.overridePythonAttrs (_: {
+              version = "1.20.1";
+              src = pkgs.fetchurl {
+                url = "https://files.pythonhosted.org/packages/b2/c6/75e969781c2359b2f9c15b061f28ec6d67c8b61865ceda176e85c8e7f2de/mypy-1.20.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+                hash = "sha256-7zRhsa1c1EblQAFukLWYRlft2jn5gvTMRcoxe2KPWjc";
+              };
+              format = "wheel";
+              pyproject = null;
+              propagatedBuildInputs = with _self; [
+                typing-extensions
+                mypy-extensions
+                pathspec
+                librt
+              ];
+              doCheck = false;
+            });
+            scipy = super.scipy.overridePythonAttrs (_: { doCheck = false; });
+          };
       };
     })
   ];
@@ -91,6 +213,26 @@ in
     lxc = true;
   };
   extra-services.host-checkin.enable = true;
+  extra-services.hermes-relay.enable = true;
+  # When extraPlugins changes (e.g. adding/removing Hermes-Relay),
+  # restart both hermes-agent and hermes-dashboard so the loader picks
+  # up the new plugin tree. Without this, plugin enable requires a
+  # manual `systemctl restart hermes-agent hermes-dashboard` after
+  # deploy. nix-hermes-agent's own module does not declare these
+  # triggers, so we add them here. Cited by Luna xhigh review r3.
+  systemd.services.hermes-agent.restartTriggers =
+    [ config.services.hermes-agent.package ]
+    ++ config.services.hermes-agent.extraPlugins
+    # The Hermes module merges settings into mutable config.yaml during
+    # activation. Restart when the memory provider/settings change so a
+    # provider cutover is effective without a manual systemctl command.
+    ++ [ (builtins.toJSON config.services.hermes-agent.settings.memory) ];
+  # Memory databases contain private user context. Keep files created by the
+  # service private even though the parent state directory is group-accessible.
+  systemd.services.hermes-agent.serviceConfig.UMask = lib.mkForce "0077";
+  systemd.services.hermes-dashboard.restartTriggers =
+    [ config.services.hermes-agent.package ]
+    ++ config.services.hermes-agent.extraPlugins;
   extra-services.obsidian-headless = {
     enable = true;
     # Run the sync daemon as the same Unix user that writes vault files
@@ -127,6 +269,8 @@ in
     tmux
     pkgs.jq
     pkgs.tesseract
+    pkgs.rsync
+    pkgs.util-linux
     hermesPython
   ];
 
@@ -178,6 +322,9 @@ in
       SEARXNG_BASE_URL = "http://192.168.86.137:8080";
       TELEGRAM_ALLOWED_USERS = "748642877";
       TELEGRAM_HOME_CHANNEL = "748642877";
+      # Keep Mnemosyne data under the Hermes state directory, not ~/.mnemosyne
+      # or the disposable plugin virtualenv.
+      MNEMOSYNE_HOME = "/var/lib/hermes/.hermes/mnemosyne";
 
       # WhatsApp self-chat is enabled declaratively. The personal allowlist
       # remains in the SOPS-backed openclaw-env as WHATSAPP_ALLOWED_USERS.
@@ -202,10 +349,27 @@ in
       (pkgs.runCommand "health-log-hermes-plugin" { } ''
         cp -r ${./plugins/health-log} $out
       '')
+      # Hermes-Relay plugin (v1.5.0): QR pairing, `hermes pair` and
+      # `hermes relay` CLI sub-commands, android_*/desktop_*/relay_* tools,
+      # and dashboard relay routes. The plugin loader imports this directory
+      # directly (no separate Python package needed at discovery time);
+      # runtime deps (aiohttp, segno, ...) are picked up by the
+      # hermes-relay systemd service via its own python interpreter
+      # (see extra-services.hermes-relay below). The wheel's
+      # `plugin/hermes_relay_bootstrap/` (legacy `.pth` compat hook) is
+      # intentionally excluded. Keep `plugin/voice_lab/`: relay imports
+      # its expressions, metrics, and provider base modules on CLI startup,
+      # even when optional voice provider keys are unset.
+      (pkgs.runCommand "hermes-relay-hermes-plugin" { } ''
+        cp -r ${./plugins/hermes-relay} $out
+      '')
+      # Mnemosyne plugin and its pinned Python runtime are packaged above;
+      # this replaces the mutable wrapper generated by the installer.
+      mnemosyneHermesPlugin
     ];
     extraPythonPackages = [
-      pkgs.python312Packages."google-api-python-client"
-      pkgs.python312Packages.google-auth-oauthlib
+      mnemosyneMemory
+      mnemosyneHermes
     ];
 
     settings = {
@@ -223,7 +387,9 @@ in
           terra = "openai-codex/gpt-5.6-terra";
           sol = "openai-codex/gpt-5.6-sol";
           mm = "minimax/MiniMax-M3";
-          flash = "opencode-go/deepseek-v4-flash";
+          # `mimo` replaces the retired `flash` alias (deepseek-v4-flash).
+          # Higher opencode-go weekly quota than flash; same provider.
+          mimo = "opencode-go/mimo-v2.5";
         };
       };
 
@@ -232,10 +398,12 @@ in
         edge.voice = "en-GB-RyanNeural";
       };
 
-      # Keep active topic sessions intact. Context compression remains the
-      # capacity guard; use /reset explicitly for a deliberate clean slate.
+      # Reset gateway sessions after 48h of inactivity so topic conversations
+      # do not accumulate unbounded context across long gaps. Manual /reset
+      # still works; context compression remains the capacity guard.
       session_reset = {
-        mode = "none";
+        mode = "idle";
+        idle_minutes = 2880;
       };
 
       # Fallbacks are ordered availability routes: two OpenCode Go models
@@ -243,7 +411,9 @@ in
       # subscription quota unless both routes fail.
       fallback_providers = [
         { provider = "opencode-go"; model = "minimax-m3"; }
-        { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+        # mimo-v2.5 (formerly deepseek-v4-flash) — higher opencode-go weekly
+        # quota for the same Flash-class role.
+        { provider = "opencode-go"; model = "mimo-v2.5"; }
         { provider = "openai-codex"; model = "gpt-5.6-luna"; }
       ];
 
@@ -259,12 +429,14 @@ in
       #     proven safety net; opt in via `/model max --provider moa`.
       #   - tool: tool-calling specialist — Codex Terra aggregator with
       #     opencode-go Tencent Hy3 (tool-use specialist), minimax
-      #     MiniMax-M3 (diverse generalist), and opencode-go deepseek-v4-
-      #     flash (cheap diverse tiebreaker).
+      #     MiniMax-M3 (diverse generalist), and opencode-go qwen3.7-plus
+      #     (cheap diverse tiebreaker — formerly deepseek-v4-flash).
       #   - coder: code-tuned aggregator (Codex Terra) with coding-
       #     oriented references. For implementation tasks and code review.
       #   - lite: cheap/fast aggregator (minimax MiniMax-M3) for
-      #     short-turn routing and simple queries. Lowest cost.
+      #     short-turn routing and simple queries. Two opencode-go
+      #     references (mimo-v2.5 + qwen3.7-plus — both high weekly
+      #     quota, different training lineages). Lowest cost.
       # Use via `/model <preset> --provider moa` or one-shot
       # `/moa <prompt>`. Set per-preset `enabled = false` to fall back
       # to the aggregator acting alone.
@@ -302,7 +474,9 @@ in
           reference_models = [
             { provider = "opencode-go"; model = "tencent/hy3"; }
             { provider = "minimax"; model = "MiniMax-M3"; }
-            { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+            # qwen3.7-plus replaces deepseek-v4-flash as the cheap diverse
+            # tiebreaker — higher opencode-go weekly quota.
+            { provider = "opencode-go"; model = "qwen3.7-plus"; }
           ];
           aggregator = {
             provider = "openai-codex";
@@ -328,8 +502,11 @@ in
         };
         presets.lite = {
           reference_models = [
-            { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+            # mimo-v2.5 (formerly deepseek-v4-flash) + qwen3.7-plus — both
+            # cheap, both with high opencode-go weekly quota, different
+            # training lineages for productive disagreement at the lite tier.
             { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "opencode-go"; model = "qwen3.7-plus"; }
           ];
           aggregator = {
             provider = "minimax";
@@ -352,12 +529,19 @@ in
         mode = "smart";
       };
 
+      quick_commands = {
+        "myusage" = {
+          type = "exec";
+          command = "/var/lib/hermes/.hermes/scripts/provider-quota/provider-quota.sh";
+        };
+      };
+
       toolsets = [ "hermes-cli" "files" "web" "computer" "memory" ];
 
       # Voice requests get Home Assistant plus one narrow health write action.
       # They never receive generic file, shell, browser, or Google tools.
       platform_toolsets.api_server = [ "homeassistant" "health_log" ];
-      plugins.enabled = [ "health-log" ];
+      plugins.enabled = [ "health-log" "hermes-relay" ];
 
       # The v0.19 migration is blocked in Nix-managed mode. Declare its schema
       # marker here; the disposable migration lab validated this is sufficient.
@@ -376,7 +560,7 @@ in
         # resolver in hermes_constants.resolve_per_model_reasoning_effort).
         # Session-scoped /reasoning --session always wins for that session.
         reasoning_overrides = {
-          "gpt-5.6-luna" = "xhigh";
+          "gpt-5.6-luna" = "high";
         };
         # Surface-aware verify-before-finish: ON for CLI/TUI/desktop/programmatic
         # surfaces where the verification narrative is useful, OFF for messaging
@@ -400,15 +584,31 @@ in
       };
 
       memory = {
-        memory_enabled = true;
-        user_profile_enabled = true;
-        # Explicit false clears stale deep-merged runtime state left by the
-        # earlier approval-gate rollout; omission alone does not remove it.
+        # Mnemosyne migration and direct SDK/tool smoke tests passed before
+        # this provider flip. Keep the imported database and Holographic
+        # rollback artifacts for rollback/forensics.
+        memory_enabled = false;
+        user_profile_enabled = false;
         write_approval = false;
-        # Holographic — bundled first-party memory provider (SQLite + FTS5 +
-        # HRR compositional retrieval). Pure local, no network, no embeddings.
-        # Coexists additively with built-in MEMORY.md/USER.md.
-        provider = "holographic";
+
+        provider = "mnemosyne";
+
+        # Mnemosyne provider settings are declared here because this host is
+        # NixOS-managed; hermes config set is intentionally blocked. The
+        # provider remains inactive until the cutover provider flip above.
+        mnemosyne = {
+          auto_sleep = false;
+          sleep_threshold = 50;
+          vector_type = "int8";
+          # Keep the imported default bank active first. Profile-isolated banks
+          # require a separate migration and are enabled only after proving the
+          # gateway resolves the intended profile bank.
+          profile_isolation = false;
+          shared_surface_path = "/var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db";
+          shared_surface_read = false;
+          skip_contexts = [ "cron" "flush" "subagent" "background" "skill_loop" ];
+          sync_roles = [ "user" "assistant" ];
+        };
       };
 
       skills.write_approval = false;
@@ -484,15 +684,16 @@ in
         };
 
         # Voice Assistant endpoint. HA's OpenClaw Assistant sends model
-        # `bernie-voice`, which is routed to DeepSeek V4 Flash without changing
-        # Bernie's MiniMax-M3 default for Telegram and other gateway clients.
+        # `bernie-voice`, which is routed to mimo-v2.5 (formerly DeepSeek V4
+        # Flash) without changing Bernie's MiniMax-M3 default for Telegram and
+        # other gateway clients. mimo-v2.5 has higher opencode-go weekly quota.
         api_server = {
           enabled = true;
           extra = {
             model_name = "hermes-agent";
             model_routes.bernie-voice = {
               provider = "opencode-go";
-              model = "deepseek-v4-flash";
+              model = "mimo-v2.5";
             };
           };
         };
@@ -575,6 +776,16 @@ in
 
   systemd.tmpfiles.rules = [
     "d /var/lib/hermes/.cache 0700 hermes users -"
+    "d /var/lib/hermes/.hermes/mnemosyne 0750 hermes users -"
+    "d /var/lib/hermes/.hermes/mnemosyne/data 0750 hermes users -"
+    "d /var/lib/hermes/.hermes/mnemosyne/data/shared 0750 hermes users -"
+    # Tighten existing SQLite files as well as files created under UMask=0077.
+    "z /var/lib/hermes/.hermes/mnemosyne/data/mnemosyne.db 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/mnemosyne.db-wal 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/mnemosyne.db-shm 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db-wal 0600 hermes users -"
+    "z /var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db-shm 0600 hermes users -"
   ];
 
   systemd.services.tasknotes-calendar-publish = {
@@ -595,6 +806,7 @@ in
       # misleading Python/import failure.
       ExecStartPre = [
         "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/publish_tasknotes_calendar.py"
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/generate_tasknotes_calendar.py"
         "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/normalize_tasknotes_calendar.py"
         "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/calendars/validate_ics.py"
       ];
@@ -606,7 +818,11 @@ in
   systemd.paths.tasknotes-calendar-publish = {
     wantedBy = [ "multi-user.target" ];
     pathConfig = {
-      PathChanged = "/var/lib/hermes/vault/MontyVault/tasknotes-calendar.ics";
+      PathChanged = [
+        "/var/lib/hermes/vault/MontyVault/TaskNotes"
+        "/var/lib/hermes/vault/MontyVault/TaskNotes/Tasks"
+        "/var/lib/hermes/vault/MontyVault/TaskNotes/Archive"
+      ];
       Unit = "tasknotes-calendar-publish.service";
     };
   };
@@ -621,9 +837,55 @@ in
     };
   };
 
+  systemd.services.calendar-sports-generate = {
+    description = "Generate and publish Philadelphia sports calendars";
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    environment = {
+      HOME = "/var/lib/hermes";
+      HERMES_HOME = "/var/lib/hermes/.hermes";
+    };
+    serviceConfig = {
+      Type = "oneshot";
+      User = "hermes";
+      Group = "users";
+      WorkingDirectory = "/var/lib/hermes";
+      ExecStartPre = [
+        "${pkgs.coreutils}/bin/test -x /var/lib/hermes/.hermes/scripts/philly-sports-cal/deploy.sh"
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/philly-sports-cal/generate.py"
+        "${pkgs.coreutils}/bin/test -r /var/lib/hermes/.hermes/scripts/philly-sports-cal/validate.py"
+      ];
+      ExecStart = "/var/lib/hermes/.hermes/scripts/philly-sports-cal/deploy.sh";
+      TimeoutStartSec = 1800;
+    };
+  };
+
+  systemd.timers.calendar-sports-generate = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "*-*-* 11:00:00 America/New_York";
+      Persistent = true;
+      Unit = "calendar-sports-generate.service";
+    };
+  };
+
   users.users.hermes = {
     linger = true;
   };
+
+  # NixOS's switch-to-configuration reloads lingering user units after
+  # activation. On a headless LXC, logind can have created the linger marker
+  # without starting user@UID.service yet, leaving /run/user/UID/bus
+  # unavailable and making an otherwise successful switch exit non-zero.
+  # Start the declaratively-lingering Hermes manager before that reload. This
+  # is idempotent when the manager is already active.
+  system.activationScripts.hermes-user-manager = lib.stringAfter [ "users" ] ''
+    if [ -e /var/lib/systemd/linger/hermes ]; then
+      hermes_uid="$(${pkgs.coreutils}/bin/id -u hermes)"
+      ${pkgs.systemd}/bin/systemctl start "user@''${hermes_uid}.service"
+    fi
+  '';
+
   users.users.root.linger = true;
 
   systemd.services.rocket-githook = {

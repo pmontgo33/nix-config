@@ -1,0 +1,2548 @@
+"""
+hermes-relay plugin — registers android_* tools into hermes-agent registry.
+
+Tools registered:
+  - android_ping              check bridge connectivity
+  - android_read_screen       get accessibility tree of current screen
+  - android_find_nodes        filtered search for nodes by text/class/clickable
+  - android_tap               tap at coordinates or by node id
+  - android_tap_text          tap element by visible text
+  - android_long_press        long-press at coordinates or by node id
+  - android_type              type text into focused field
+  - android_swipe             swipe gesture
+  - android_drag              precise point-to-point drag (duration-controlled)
+  - android_open_app          launch app by package name
+  - android_press_key         press hardware/software key (back, home, recents)
+  - android_screenshot        capture screenshot as a relay MEDIA marker
+  - android_scroll            scroll in direction
+  - android_wait              wait for element to appear
+  - android_get_apps          list installed apps
+  - android_current_app       get foreground app package name
+  - android_describe_node     full property bag for a node by id (A4)
+  - android_setup             configure bridge URL and pairing code
+  - android_macro             batched workflow orchestrator (dispatches to other android_* tools)
+  - android_clipboard_read    read system clipboard as plain text
+  - android_clipboard_write   write plain text to system clipboard
+  - android_media             control system-wide media playback (play/pause/next/previous/toggle)
+  - android_screen_hash       cheap SHA-256 fingerprint of current screen (A5)
+  - android_diff_screen       compare current screen to a prior hash (A5)
+  - android_send_intent       launch arbitrary Activity via raw Intent (B4)
+  - android_broadcast         send arbitrary broadcast Intent (B4)
+  - android_events            poll the phone's AccessibilityEvent ring buffer (B1)
+  - android_event_stream      toggle AccessibilityEvent capture on the phone (B1)
+  - android_location          last-known GPS location (C1, sideload only)
+  - android_search_contacts   search contacts by name (C2, sideload only)
+  - android_call              dial a phone number (C3)
+  - android_send_sms          send an SMS via SmsManager (C4, sideload only)
+  - android_return_to_hermes  bring Hermes Relay back to foreground
+  - android_share_media       share text/files/attachments via Android share UI
+  - android_send_mms          open MMS compose/share handoff with attachments
+"""
+
+import json
+import mimetypes
+import os
+import time
+import requests
+from contextvars import ContextVar
+from pathlib import Path
+from typing import Any, Callable, Mapping, Optional
+from urllib.parse import urlencode
+
+# === v0.4.1 JIT permission-denied surfacing ================================
+# Local import — keep package-relative so the tool layer can be invoked from
+# both `plugin.tools.android_tool` (hermes-agent registry) and direct script
+# execution (`python -m plugin.tools.android_tool` for ad-hoc CLI testing).
+try:
+    from .resolve_result import (
+        Found,
+        NotFound,
+        PermissionDenied,
+        from_bridge_response,
+    )
+except ImportError:  # pragma: no cover - direct-script fallback
+    # sys.path[0] is this file's directory when run as a plain script, so the
+    # sibling module resolves top-level. Never an absolute `plugin.` import:
+    # under the native hermes-agent plugin loader the package is
+    # `hermes_plugins.hermes_relay` and no top-level `plugin` exists (#165).
+    from resolve_result import (  # type: ignore[no-redef]
+        Found,
+        NotFound,
+        PermissionDenied,
+        from_bridge_response,
+    )
+# === END v0.4.1 ============================================================
+
+# ── Config ────────────────────────────────────────────────────────────────────
+#
+# Architecture: Phone connects OUT to Hermes server via WebSocket (NAT-friendly).
+# The unified Hermes-Relay server runs on localhost:8767 and multiplexes the
+# bridge channel alongside chat, terminal, media, and voice. The legacy
+# standalone bridge relay on port 8766 was retired in Phase 3 Wave 1.
+#
+#   Tools ──HTTP──> Unified Relay (localhost:8767) ──WSS bridge channel──> Phone
+#
+# For local/USB dev, tools can also talk directly to the phone's HTTP server
+# by setting ANDROID_BRIDGE_URL to the phone's IP.
+
+def _bridge_url() -> str:
+    """URL of the relay (default) or direct phone connection."""
+    return os.getenv("ANDROID_BRIDGE_URL", "http://localhost:8767")
+
+def _bridge_token() -> Optional[str]:
+    return os.getenv("ANDROID_BRIDGE_TOKEN")
+
+def _relay_port() -> int:
+    # Unified relay default. Override via ANDROID_RELAY_PORT or RELAY_PORT.
+    return int(os.getenv("ANDROID_RELAY_PORT", os.getenv("RELAY_PORT", "8767")))
+
+def _timeout() -> float:
+    return float(os.getenv("ANDROID_BRIDGE_TIMEOUT", "30"))
+
+_CURRENT_DEVICE_SELECTOR: ContextVar[Optional[str]] = ContextVar(
+    "android_device_selector",
+    default=None,
+)
+
+_DEVICE_SELECTOR_DESCRIPTION = (
+    "Optional Android device selector for multi-device relays. Accepts a "
+    "device_id or alias such as phone, pixel, fold, boox, note, notemax, "
+    "or tablet. Omit to use the relay's active/default device."
+)
+
+_DEVICE_SELECTOR_PROPERTY = {
+    "type": "string",
+    "description": _DEVICE_SELECTOR_DESCRIPTION,
+}
+
+def _auth_headers() -> dict:
+    """Build auth headers with pairing code if configured."""
+    token = _bridge_token()
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
+
+
+def _normalize_device_selector(device: Optional[str]) -> Optional[str]:
+    if device is None:
+        return None
+    stripped = str(device).strip()
+    return stripped or None
+
+
+def _selected_device(device: Optional[str] = None) -> Optional[str]:
+    return _normalize_device_selector(device) or _CURRENT_DEVICE_SELECTOR.get()
+
+
+def _path_with_device(path: str, device: Optional[str] = None) -> str:
+    selector = _selected_device(device)
+    if not selector:
+        return path
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}{urlencode({'device': selector})}"
+
+def _check_requirements() -> bool:
+    """Returns True if the relay is running and a phone is connected.
+
+    The relay's ``/ping`` route is forwarded to the phone and only returns a
+    basic ``{"pong": true}`` payload, so it cannot be used to decide whether
+    the bridge session is available. The structured source of truth is the
+    loopback ``/bridge/status`` route. A tiny ``/ping`` fallback remains for
+    direct-phone development shims that predate the unified relay.
+    """
+    try:
+        r = requests.get(
+            f"{_bridge_url()}/bridge/status",
+            headers=_auth_headers(),
+            timeout=2,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            bridge = data.get("bridge") if isinstance(data, dict) else None
+            if isinstance(bridge, dict):
+                supported = bridge.get("device_control_supported")
+                if supported is False:
+                    return False
+            return bool(data.get("phone_connected", False))
+    except Exception:
+        pass
+
+    try:
+        r = requests.get(f"{_bridge_url()}/ping", headers=_auth_headers(), timeout=2)
+        if r.status_code == 200:
+            data = r.json()
+            return bool(
+                data.get("phone_connected", False)
+                or data.get("accessibilityService", False)
+                or data.get("pong", False)
+            )
+        return False
+    except Exception:
+        return False
+
+def _post(path: str, payload: dict, *, device: Optional[str] = None) -> dict:
+    body = dict(payload or {})
+    selector = _selected_device(device)
+    if selector and "device" not in body:
+        body["device"] = selector
+    r = requests.post(f"{_bridge_url()}{path}", json=body,
+                      headers=_auth_headers(), timeout=_timeout())
+    r.raise_for_status()
+    return r.json()
+
+def _get(path: str, *, device: Optional[str] = None) -> dict:
+    r = requests.get(f"{_bridge_url()}{_path_with_device(path, device)}",
+                     headers=_auth_headers(), timeout=_timeout())
+    r.raise_for_status()
+    return r.json()
+
+
+def _dispatch_android_tool(func: Callable[..., str], args: Optional[dict] = None) -> str:
+    """Call an android_* function with optional per-call device scoping.
+
+    Public tool schemas can include a ``device`` selector without forcing every
+    function signature to duplicate that parameter. The selector is stored in a
+    ContextVar for this call only; nested android_macro steps inherit it unless
+    a step supplies its own ``device``.
+    """
+    call_args = dict(args or {})
+    selector = _normalize_device_selector(call_args.pop("device", None))
+    token = None
+    if selector:
+        token = _CURRENT_DEVICE_SELECTOR.set(selector)
+    try:
+        return func(**call_args)
+    finally:
+        if token is not None:
+            _CURRENT_DEVICE_SELECTOR.reset(token)
+
+# ── Tool implementations ───────────────────────────────────────────────────────
+
+def android_ping() -> str:
+    try:
+        data = _get("/ping")
+        return json.dumps({"status": "ok", "bridge": data})
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
+def android_read_screen(include_bounds: bool = False) -> str:
+    """
+    Returns the accessibility tree of the current screen as JSON.
+    Each node has: nodeId, text, contentDescription, className,
+                   clickable, focusable, bounds (if include_bounds=True)
+    """
+    try:
+        data = _get(f"/screen?include_bounds={str(include_bounds).lower()}")
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_find_nodes(text: Optional[str] = None,
+                       class_name: Optional[str] = None,
+                       clickable: Optional[bool] = None,
+                       limit: int = 20) -> str:
+    """
+    Targeted filtered search across the current accessibility tree.
+    Avoids dumping the entire screen when you only need "does X exist?"
+    or "find the Send button".
+
+    Filters (all optional, all ANDed together):
+      text       - case-insensitive substring match against node text OR
+                   contentDescription
+      class_name - exact match against the node's class name, e.g.
+                   "android.widget.Button"
+      clickable  - filter by whether the node is clickable (True/False)
+
+    Returns up to ``limit`` matches (default 20, capped server-side at
+    the accessibility walk budget of 512 nodes). Each match is a
+    ScreenNode in the same shape ``android_read_screen`` emits, including
+    a stable ``nodeId`` of the form ``"w<window>:<index>"`` you can feed
+    back into ``android_tap(node_id=...)``.
+    """
+    try:
+        payload: dict = {"limit": int(limit)}
+        if text is not None:
+            payload["text"] = text
+        if class_name is not None:
+            payload["class_name"] = class_name
+        if clickable is not None:
+            payload["clickable"] = bool(clickable)
+        data = _post("/find_nodes", payload)
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_tap(x: Optional[int] = None, y: Optional[int] = None,
+                node_id: Optional[str] = None) -> str:
+    """
+    Tap at screen coordinates (x, y) or by accessibility node_id.
+    Prefer node_id when available — it's more reliable than coordinates.
+    """
+    try:
+        payload = {}
+        if node_id:
+            payload["nodeId"] = node_id
+        elif x is not None and y is not None:
+            payload["x"] = x
+            payload["y"] = y
+        else:
+            return json.dumps({"error": "Provide either (x, y) or node_id"})
+        data = _post("/tap", payload)
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_tap_text(text: str, exact: bool = False) -> str:
+    """
+    Tap the first element whose visible text matches `text`.
+    exact=False uses contains matching. exact=True requires full match.
+    Useful when you can see text on screen but don't have node IDs.
+    """
+    try:
+        data = _post("/tap_text", {"text": text, "exact": exact})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+# A1 long-press — new in v0.4 bridge feature expansion. Context menus,
+# text selection, widget rearranging, "hold to confirm" all require this.
+_MIN_LONG_PRESS_DURATION_MS = 100
+_MAX_LONG_PRESS_DURATION_MS = 3000
+
+
+def android_long_press(
+    x: Optional[int] = None,
+    y: Optional[int] = None,
+    node_id: Optional[str] = None,
+    duration: int = 500,
+) -> str:
+    """
+    Perform a long press at screen coordinates ``(x, y)`` or on an
+    accessibility ``node_id``. Exactly one of the two must be provided.
+
+    ``duration`` is the hold time in milliseconds. Defaults to 500 ms
+    (the platform default long-press threshold). Accepted range is
+    100–3000 ms; values outside that range are rejected by this tool
+    before hitting the bridge so the agent gets a fast, structured
+    error instead of a gesture dispatch failure.
+
+    Use cases:
+
+    * **Context menus** — long-press on a chat message, a gallery
+      image, a launcher icon, etc. to open its contextual actions.
+    * **Text selection** — long-press on any visible text to pop the
+      native selection handles, then chain ``/swipe`` or
+      ``/press_key`` as needed.
+    * **Widget rearranging** — launchers put icons into edit mode on
+      long-press before they accept drags.
+    * **Hold-to-confirm** — some apps (banking, delete-all,
+      destructive dialogs) require a held press as a safety
+      interlock.
+
+    Prefer ``node_id`` over ``(x, y)`` when you have it — node-id
+    dispatches use ``AccessibilityNodeInfo.ACTION_LONG_CLICK`` which
+    mirrors the platform's own long-press semantics exactly and is
+    more robust to screen reflows than absolute coordinates.
+    """
+    try:
+        has_coords = x is not None and y is not None
+        has_node = node_id is not None and str(node_id).strip() != ""
+        if not has_coords and not has_node:
+            return json.dumps(
+                {"error": "Provide either (x, y) or node_id"}
+            )
+        if has_coords and has_node:
+            return json.dumps(
+                {"error": "Provide either (x, y) or node_id, not both"}
+            )
+        if not isinstance(duration, int) or isinstance(duration, bool):
+            return json.dumps({"error": "duration must be an integer (ms)"})
+        if (
+            duration < _MIN_LONG_PRESS_DURATION_MS
+            or duration > _MAX_LONG_PRESS_DURATION_MS
+        ):
+            return json.dumps(
+                {
+                    "error": (
+                        "duration must be "
+                        f"{_MIN_LONG_PRESS_DURATION_MS}"
+                        f"..{_MAX_LONG_PRESS_DURATION_MS} ms "
+                        f"(got {duration})"
+                    )
+                }
+            )
+
+        payload: dict = {"duration": duration}
+        if has_node:
+            payload["node_id"] = node_id
+        else:
+            payload["x"] = x
+            payload["y"] = y
+        data = _post("/long_press", payload)
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_type(text: str, clear_first: bool = False) -> str:
+    """
+    Type text into the currently focused input field.
+    Set clear_first=True to clear existing content before typing.
+    """
+    try:
+        data = _post("/type", {"text": text, "clearFirst": clear_first})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_swipe(direction: str, distance: str = "medium") -> str:
+    """
+    Swipe in direction: up, down, left, right.
+    distance: short, medium, long
+    """
+    try:
+        data = _post("/swipe", {"direction": direction, "distance": distance})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+# Drag duration clamps — below ~100ms the system can treat it as a fling or
+# drop the gesture, above ~3000ms AccessibilityService's gesture dispatcher
+# starts rejecting strokes as "too long".
+_DRAG_MIN_DURATION_MS = 100
+_DRAG_MAX_DURATION_MS = 3000
+_DRAG_DEFAULT_DURATION_MS = 500
+
+
+def android_drag(start_x: int, start_y: int, end_x: int, end_y: int,
+                 duration: int = _DRAG_DEFAULT_DURATION_MS) -> str:
+    """
+    Drag from (start_x, start_y) to (end_x, end_y) over ``duration`` ms.
+
+    Use for rearranging home screen icons, pulling the notification shade
+    a precise distance, dragging map pins, or reordering list items —
+    anything a swipe can't express because you need a deliberate, slow
+    touch-down-hold-move-release sequence.
+
+    Coordinates are in pixels from the top-left of the screen. ``duration``
+    is clamped to the 100–3000 ms window; values outside that range are
+    silently coerced because the accessibility gesture dispatcher refuses
+    strokes outside it.
+    """
+    try:
+        # Validate coordinate types up-front — bad args should return a
+        # friendly error, not a 500 from the bridge.
+        for name, value in (("start_x", start_x), ("start_y", start_y),
+                            ("end_x", end_x), ("end_y", end_y)):
+            if not isinstance(value, int) or isinstance(value, bool):
+                return json.dumps({"error": f"{name} must be an int"})
+            if value < 0:
+                return json.dumps({"error": f"{name} must be non-negative"})
+
+        if not isinstance(duration, int) or isinstance(duration, bool):
+            return json.dumps({"error": "duration must be an int (ms)"})
+
+        clamped_duration = max(_DRAG_MIN_DURATION_MS,
+                               min(_DRAG_MAX_DURATION_MS, duration))
+
+        payload = {
+            "start_x": start_x,
+            "start_y": start_y,
+            "end_x": end_x,
+            "end_y": end_y,
+            "duration_ms": clamped_duration,
+        }
+        data = _post("/drag", payload)
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_open_app(package: str) -> str:
+    """
+    Launch an app by its package name.
+    Common packages:
+      com.ubercab        - Uber
+      com.whatsapp       - WhatsApp
+      com.spotify.music  - Spotify
+      com.google.android.apps.maps - Google Maps
+      com.android.chrome - Chrome
+      com.google.android.gm - Gmail
+    """
+    try:
+        data = _post("/open_app", {"package": package})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_press_key(key: str) -> str:
+    """
+    Press a key. Supported keys:
+      back, home, recents, power, volume_up, volume_down,
+      enter, delete, tab, escape, search, notifications
+    """
+    try:
+        data = _post("/press_key", {"key": key})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_screenshot(sensitive: bool = False) -> str:
+    """
+    Capture a screenshot of the Android screen.
+
+    Writes the JPEG to a temp file, then asks the local Hermes-Relay to
+    mint an opaque token via ``POST /media/register``. On success the
+    tool returns ``MEDIA:hermes-relay://<token>`` in its output, which
+    the phone parses and fetches via bearer-auth'd ``GET /media/<token>``
+    on the same relay.
+
+    Set ``sensitive=True`` when the captured screen may contain private or
+    NSFW content (e.g. a lock screen, a 2FA code, a banking app). The bit is
+    transported verbatim to the phone via the relay's ``X-Media-Sensitive``
+    header so the client can blur the image per the user's setting — the
+    relay performs no classification of its own. Defaults to ``False``.
+
+    Fallback: if the relay is not running (or rejects the registration),
+    the tool returns the old ``MEDIA:/tmp/<path>`` form and logs a warning.
+    The phone's parser renders a "relay offline" placeholder for that case.
+    """
+    try:
+        import base64
+        import logging
+        import tempfile
+
+        data = _get("/screenshot")
+        if "error" in data:
+            return json.dumps(data)
+
+        # Extract base64 image from the nested result
+        result = data.get("data", data)
+        img_b64 = result.get("image", "")
+        if not img_b64:
+            return json.dumps({"error": "No image data returned"})
+
+        # Save to temp file
+        img_bytes = base64.b64decode(img_b64)
+        tmp = tempfile.NamedTemporaryFile(suffix=".jpg", prefix="android_screenshot_", delete=False)
+        tmp.write(img_bytes)
+        tmp.close()
+
+        w = result.get("width", "?")
+        h = result.get("height", "?")
+
+        # Try to register with the local relay so the phone gets an opaque
+        # token instead of a literal path. Relay must be running on the
+        # same host (it's loopback-only). Any failure falls back to the
+        # bare path form — the phone shows a placeholder in that case.
+        try:
+            from ..relay.client import register_media
+            token = register_media(
+                tmp.name,
+                "image/jpeg",
+                file_name="screenshot.jpg",
+                sensitive=bool(sensitive),
+            )
+        except Exception:
+            logging.getLogger("hermes_relay.tools").warning(
+                "register_media raised; falling back to bare MEDIA: path",
+                exc_info=True,
+            )
+            token = None
+
+        if token:
+            return f"Screenshot captured ({w}x{h})\nMEDIA:hermes-relay://{token}"
+
+        logging.getLogger("hermes_relay.tools").warning(
+            "relay not reachable; falling back to bare MEDIA: path "
+            "(phone will show a placeholder)"
+        )
+        return f"Screenshot captured ({w}x{h})\nMEDIA:{tmp.name}"
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_scroll(direction: str, node_id: Optional[str] = None) -> str:
+    """
+    Scroll within a scrollable element or the whole screen.
+    direction: up, down, left, right
+    """
+    try:
+        payload = {"direction": direction}
+        if node_id:
+            payload["nodeId"] = node_id
+        data = _post("/scroll", payload)
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_wait(text: str = None, class_name: str = None,
+                 timeout_ms: int = 5000) -> str:
+    """
+    Wait for an element to appear on screen.
+    Polls every 500ms up to timeout_ms.
+    Returns the matching node if found, error if timeout.
+    """
+    try:
+        payload = {"timeoutMs": timeout_ms}
+        if text:
+            payload["text"] = text
+        if class_name:
+            payload["className"] = class_name
+        data = _post("/wait", payload)
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_get_apps() -> str:
+    """List all installed apps with their package names and labels."""
+    try:
+        data = _get("/apps")
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_current_app() -> str:
+    """Get the package name and activity of the current foreground app."""
+    try:
+        data = _get("/current_app")
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+_MEDIA_ACTIONS = ("play", "pause", "toggle", "next", "previous")
+
+
+def android_media(action: str) -> str:
+    """
+    Control system-wide media playback on the Android device.
+
+    Works against whatever media app is currently playing (Spotify,
+    YouTube Music, Pocket Casts, etc.) via the system's ACTION_MEDIA_BUTTON
+    broadcast — every compliant player handles it. No app-specific
+    integration required.
+
+    action: one of ``play``, ``pause``, ``toggle``, ``next``, ``previous``.
+    """
+    try:
+        if not isinstance(action, str) or not action.strip():
+            return json.dumps({"error": "action is required"})
+        normalized = action.strip().lower()
+        if normalized not in _MEDIA_ACTIONS:
+            return json.dumps({
+                "error": f"Unknown media action: {action}",
+                "valid_actions": list(_MEDIA_ACTIONS),
+            })
+        data = _post("/media", {"action": normalized})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_screen_hash() -> str:
+    """
+    Return a cheap SHA-256 fingerprint of the current Android screen.
+
+    Walks the accessibility tree across all visible windows and hashes a
+    stable per-node signature (className + text + contentDescription +
+    bounds + viewIdResourceName). The hash is deterministic across
+    unchanged screens so the agent can use it for "did anything change?"
+    polling ~100x cheaper than re-reading the full tree.
+
+    Returns JSON: ``{"hash": "<hex>", "node_count": N, "truncated": bool}``.
+
+    Known limitation: screens with live counters, scrolling tickers, or
+    animated progress % will churn the hash every frame. Use
+    ``android_read_screen`` for those edge cases.
+    """
+    try:
+        data = _get("/screen_hash")
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_diff_screen(previous_hash: str) -> str:
+    """
+    Compare the current screen to a prior hash and report whether it
+    changed.
+
+    Returns JSON: ``{"changed": bool, "hash": "<hex>", "node_count": N,
+    "truncated": bool}``. The new hash is always returned so the agent
+    can update its reference without a second call.
+
+    Typical usage::
+
+        before = json.loads(android_screen_hash())["hash"]
+        android_tap(...)
+        result = json.loads(android_diff_screen(before))
+        if result["changed"]:
+            # something on screen changed — maybe read_screen to decide what
+            ...
+    """
+    try:
+        data = _post("/diff_screen", {"previous_hash": previous_hash})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_describe_node(node_id: str) -> str:
+    """
+    Return the full property bag for a single accessibility node by ID.
+
+    Accepts a nodeId from `android_read_screen` (format: `w<windowIndex>:<seq>`)
+    and returns a richer view than the compact tree: bounds, className, text,
+    contentDescription, hintText, viewIdResourceName, childCount, plus every
+    state flag (clickable / longClickable / focusable / focused / editable /
+    scrollable / checkable / checked / enabled / selected / password).
+
+    `checked` is `null` when the node isn't checkable (so the agent can
+    distinguish "not a toggle" from "unchecked toggle"). `hintText` is API 26+
+    only; older devices return `null`.
+
+    Use this when `read_screen` gives you a node you want to reason about
+    more deeply before deciding to tap/scroll it — e.g. "is this toggle
+    currently checked?" or "what's the input's placeholder hint?".
+    """
+    try:
+        if not node_id:
+            return json.dumps({"error": "node_id is required"})
+        data = _post("/describe_node", {"nodeId": node_id})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_events(limit: int = 50, since: int = 0) -> str:
+    """
+    Poll the phone's AccessibilityEvent ring buffer.
+
+    Returns the most-recent events the phone has captured (up to 500
+    buffered). Capture must have been enabled first via
+    android_event_stream(enabled=True), otherwise the buffer is empty.
+
+    Privacy-sensitive — event streams can leak search queries, messages,
+    and passwords typed into input fields. Default is disabled. User
+    must explicitly enable via android_event_stream(true). Clears
+    automatically on disable.
+
+    Args:
+      limit: max entries to return (1-500, default 50). Clamped.
+      since: only return entries with timestamp > `since` (epoch ms).
+             Use this to poll incrementally without re-fetching history.
+
+    Returns JSON envelope:
+      {"status": "ok", "count": N, "entries": [{timestamp, event_type,
+       package_name, class_name, text, content_description, source}, ...]}
+    or an error envelope on relay/bridge failure.
+    """
+    # Clamp defensively — LLM may emit silly values.
+    if not isinstance(limit, int) or limit < 1:
+        limit = 50
+    if limit > 500:
+        limit = 500
+    if not isinstance(since, int) or since < 0:
+        since = 0
+
+    try:
+        # GET /events?limit=N&since=T
+        data = _get(f"/events?limit={limit}&since={since}")
+        entries = data.get("entries") or []
+        return json.dumps(
+            {
+                "status": "ok",
+                "count": len(entries),
+                "entries": entries,
+                "streaming": data.get("streaming"),
+            }
+        )
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
+def android_event_stream(enabled: bool = True) -> str:
+    """
+    Toggle AccessibilityEvent capture on the phone.
+
+    Privacy-sensitive — event streams can leak search queries, messages,
+    and passwords typed into input fields. Default is disabled. User
+    must explicitly enable via android_event_stream(true). Clears
+    automatically on disable.
+
+    Enabling starts appending filtered events (click, text changed,
+    window content changed, window state changed, scroll) into a
+    bounded ring buffer (500 entries max, throttled to 1 per type+
+    package per 100ms). Disabling stops capture AND clears the buffer
+    so no stale data persists into the next enable cycle.
+
+    Args:
+      enabled: True to start capture, False to stop + clear.
+
+    Returns JSON envelope:
+      {"status": "ok", "streaming": bool, "buffer_cleared": true}
+    or an error envelope on tool- or bridge-side failure.
+    """
+    # Strict type check — accept only real booleans so the LLM can't
+    # accidentally toggle streaming with a truthy string like "yes".
+    if not isinstance(enabled, bool):
+        return json.dumps(
+            {
+                "status": "error",
+                "message": (
+                    "android_event_stream requires a boolean `enabled` "
+                    f"argument, got {type(enabled).__name__}"
+                ),
+            }
+        )
+
+    try:
+        data = _post("/events/stream", {"enabled": enabled})
+        return json.dumps(
+            {
+                "status": "ok",
+                "streaming": data.get("streaming", enabled),
+                "buffer_cleared": data.get("buffer_cleared", True),
+            }
+        )
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
+# === v0.4.1 JIT permission-denied surfacing ================================
+#
+# Bridge tool wrappers below funnel their HTTP responses through this helper
+# so that a structured ``permission_denied`` error from the phone gets
+# upgraded into actionable LLM-facing copy instead of being passed through
+# as the raw bridge error string. The LLM then has a clear path to tell the
+# user what to do ("open Settings > Apps > Hermes Relay > Permissions") and
+# stop hallucinating about why a contact lookup or SMS dispatch failed.
+#
+# Returns a dict in one of three shapes:
+#   - permission_denied:  {"ok": False, "error": "...", "code": "permission_denied",
+#                          "permission": "android.permission.READ_CONTACTS"}
+#   - other error:        original response, unchanged
+#   - success:            original response, unchanged
+#
+# The phone-side ``BridgeCommandHandler`` already emits ``code`` /
+# ``permission`` (canonical, v0.4.1) AND ``error_code`` /
+# ``required_permission`` (legacy, pre-v0.4.1) on permission failures so the
+# parser is forwards/backwards compatible during the v0.4.x APK rollout.
+
+# Human-friendly settings-deep-link text per Android permission. Used to
+# build the ``error`` body of the JIT permission-denied response so the LLM
+# can read it and tell the user exactly which Settings screen to open.
+_PERMISSION_FRIENDLY_NAMES: dict[str, str] = {
+    "android.permission.READ_CONTACTS": "Contacts",
+    "android.permission.SEND_SMS": "SMS",
+    "android.permission.CALL_PHONE": "Phone (place calls)",
+    "android.permission.ACCESS_FINE_LOCATION": "Location",
+    "android.permission.ACCESS_COARSE_LOCATION": "Location",
+    "android.permission.RECORD_AUDIO": "Microphone",
+    "android.permission.CAMERA": "Camera",
+    "android.permission.POST_NOTIFICATIONS": "Notifications",
+}
+
+
+def _maybe_jit_permission_response(
+    response: Mapping[str, Any] | dict[str, Any],
+    *,
+    tool_name: str,
+) -> Optional[dict[str, Any]]:
+    """
+    If ``response`` is a permission-denied bridge envelope, return a
+    structured JIT error dict suitable for json.dumps + return-to-LLM.
+    Otherwise return None so the caller can pass through the original
+    response unchanged.
+
+    Idempotent: returning the dict here doesn't mutate the input. The
+    canonical wire keys (``code`` / ``permission``) are always present in
+    the output even if the phone only sent the legacy aliases.
+    """
+    parsed = from_bridge_response(response)
+    if not isinstance(parsed, PermissionDenied):
+        return None
+    permission = parsed.permission
+    friendly = _PERMISSION_FRIENDLY_NAMES.get(permission, permission)
+    # Build a deterministic, LLM-readable explanation. Keep it short and
+    # imperative — the LLM will paraphrase it for the user, so we want the
+    # actionable detail (Settings deep-link path + permission name) up front.
+    explanation = (
+        f"User has not granted {friendly} permission "
+        f"({permission}). They can enable it in Settings > Apps > "
+        f"Hermes Relay > Permissions. Tool: {tool_name}."
+    )
+    return {
+        "ok": False,
+        "error": explanation,
+        "code": "permission_denied",
+        "permission": permission,
+    }
+
+
+# ── Tier C tools (C1-C4) ───────────────────────────────────────────────────────
+#
+# All four tools below are SIDELOAD FLAVOR ONLY. The Android tool dispatch
+# layer on the googlePlay build returns 403 with a `"sideload-only"` error
+# because the `CALL_PHONE` / `SEND_SMS` / `READ_CONTACTS` / `ACCESS_FINE_LOCATION`
+# permissions are not declared in the googlePlay manifest overlay. The tools
+# are still *registered* here on both flavors because Python plugin code has
+# no compile-time flavor awareness — the guard lives on the phone side.
+
+
+def android_location() -> str:
+    """
+    Get the phone's last-known GPS location (C1).
+
+    **Sideload flavor only.** Returns an error on googlePlay builds because
+    ``ACCESS_FINE_LOCATION`` is not declared in the Play Store manifest.
+
+    Returns latitude / longitude / accuracy / altitude / provider /
+    timestamp / staleness_ms. If the last-known fix is older than 5 minutes
+    a ``warning`` field is included and the agent should ask the user to
+    open a maps app briefly to refresh the fix.
+
+    **v0.4.1 JIT permission-denied surfacing:** if the phone reports a
+    missing ``ACCESS_FINE_LOCATION`` grant, the response is upgraded to a
+    structured ``code: permission_denied`` envelope so the LLM can tell
+    the user exactly which Settings screen to open instead of relaying
+    an opaque error string.
+    """
+    try:
+        data = _get("/location")
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    jit = _maybe_jit_permission_response(data, tool_name="android_location")
+    return json.dumps(jit if jit is not None else data)
+
+
+def android_search_contacts(query: str, limit: int = 20) -> str:
+    """
+    Search the phone's contact database by name (C2).
+
+    **Sideload flavor only.** Returns an error on googlePlay builds because
+    ``READ_CONTACTS`` is not declared in the Play Store manifest.
+
+    Returns a list of matching contacts with their phone numbers. Each
+    entry has ``id``, ``name``, and a comma-separated ``phones`` string.
+    Useful for "text Sam saying X" flows where the agent needs to resolve
+    a name to a number before calling ``android_send_sms`` or ``android_call``.
+
+    **v0.4.1 JIT permission-denied surfacing:** see :func:`android_location`.
+    """
+    try:
+        data = _post("/search_contacts", {"query": query, "limit": limit})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    jit = _maybe_jit_permission_response(data, tool_name="android_search_contacts")
+    return json.dumps(jit if jit is not None else data)
+
+
+def android_call(number: str) -> str:
+    """
+    Dial a phone number (C3).
+
+    **Sideload flavor auto-dials via ACTION_CALL (requires CALL_PHONE).**
+    **googlePlay flavor falls back to opening the dialer via ACTION_DIAL**
+    — no permission needed, but the user has to tap Call manually.
+
+    The phone's safety-rails *always* show a destructive-verb confirmation
+    modal before the call is placed, regardless of flavor. The agent
+    should make the user's intent explicit before invoking this tool.
+
+    **v0.4.1 JIT permission-denied surfacing:** see :func:`android_location`.
+    """
+    try:
+        data = _post("/call", {"number": number})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    jit = _maybe_jit_permission_response(data, tool_name="android_call")
+    return json.dumps(jit if jit is not None else data)
+
+
+def android_send_sms(to: str, body: str) -> str:
+    """
+    Send an SMS directly via SmsManager (C4).
+
+    **Sideload flavor only.** Returns an error on googlePlay builds because
+    ``SEND_SMS`` requires a Play Store policy declaration + default-SMS-app
+    status that Hermes-Relay deliberately doesn't carry.
+
+    Replaces the older voice-to-bridge flow that tapped through the default
+    SMS app's UI (fragile against Samsung Messages / Google Messages / carrier
+    variants). This path uses ``SmsManager.sendTextMessage`` +
+    ``sendMultipartTextMessage`` for long messages, with a ``PendingIntent``
+    result callback so the phone reports real success/failure/timeout.
+
+    The phone's safety-rails *always* show a destructive-verb confirmation
+    modal before the SMS is sent. A 15 s send timeout ensures we don't hang
+    if the radio is off or the carrier never acks.
+
+    **v0.4.1 JIT permission-denied surfacing:** see :func:`android_location`.
+    """
+    try:
+        data = _post("/send_sms", {"to": to, "body": body})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    jit = _maybe_jit_permission_response(data, tool_name="android_send_sms")
+    return json.dumps(jit if jit is not None else data)
+
+
+def android_return_to_hermes() -> str:
+    """
+    Bring the Hermes Relay app back to the foreground after a bridge task
+    opened another app. This is the explicit tool counterpart to the phone's
+    auto-return safety net.
+    """
+    try:
+        data = _post("/return_to_hermes", {})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    return json.dumps(data)
+
+
+def _coerce_string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value if str(item).strip()]
+    return [str(value)]
+
+
+def _guess_content_type(path: str, content_type: Optional[str]) -> str:
+    if content_type and content_type.strip():
+        return content_type.strip()
+    guessed, _ = mimetypes.guess_type(path)
+    return guessed or "application/octet-stream"
+
+
+def _marker_from_token_or_media(value: str) -> str:
+    stripped = value.strip()
+    if stripped.startswith("MEDIA:"):
+        return stripped
+    if stripped.startswith("hermes-relay://"):
+        return f"MEDIA:{stripped}"
+    return f"MEDIA:hermes-relay://{stripped}"
+
+
+def _register_attachment_path(
+    path: str,
+    content_type: Optional[str],
+    file_name: Optional[str],
+) -> dict[str, str]:
+    source = Path(path).expanduser()
+    if not source.is_file():
+        raise ValueError(f"attachment path is not a file: {path}")
+    resolved_type = _guess_content_type(str(source), content_type)
+    resolved_name = file_name or source.name
+
+    from ..relay.client import register_media
+
+    token = register_media(
+        str(source),
+        resolved_type,
+        file_name=resolved_name,
+    )
+    if not token:
+        raise RuntimeError("relay rejected media registration or is unreachable")
+    return {
+        "media": f"MEDIA:hermes-relay://{token}",
+        "content_type": resolved_type,
+        "file_name": resolved_name,
+    }
+
+
+def _normalize_attachment_specs(
+    *,
+    path: Optional[str] = None,
+    paths: Optional[list[str]] = None,
+    media: Optional[str] = None,
+    media_token: Optional[str] = None,
+    media_tokens: Optional[list[str]] = None,
+    attachments: Optional[list[dict[str, Any]]] = None,
+    content_type: Optional[str] = None,
+    file_name: Optional[str] = None,
+) -> list[dict[str, str]]:
+    normalized: list[dict[str, str]] = []
+
+    for raw in attachments or []:
+        if not isinstance(raw, dict):
+            continue
+        raw_content_type = raw.get("content_type") or raw.get("mime_type") or content_type
+        raw_file_name = raw.get("file_name") or raw.get("filename") or file_name
+        raw_path = raw.get("path")
+        if isinstance(raw_path, str) and raw_path.strip():
+            normalized.append(
+                _register_attachment_path(raw_path, raw_content_type, raw_file_name)
+            )
+            continue
+        raw_media = raw.get("media") or raw.get("media_token") or raw.get("token")
+        if isinstance(raw_media, str) and raw_media.strip():
+            item = {"media": _marker_from_token_or_media(raw_media)}
+            if raw_content_type:
+                item["content_type"] = str(raw_content_type)
+            if raw_file_name:
+                item["file_name"] = str(raw_file_name)
+            normalized.append(item)
+
+    for item_path in _coerce_string_list(path) + _coerce_string_list(paths):
+        normalized.append(_register_attachment_path(item_path, content_type, file_name))
+
+    for marker in (
+        _coerce_string_list(media)
+        + _coerce_string_list(media_token)
+        + _coerce_string_list(media_tokens)
+    ):
+        item = {"media": _marker_from_token_or_media(marker)}
+        if content_type:
+            item["content_type"] = content_type
+        if file_name:
+            item["file_name"] = file_name
+        normalized.append(item)
+
+    return normalized
+
+
+def android_share_media(
+    path: Optional[str] = None,
+    paths: Optional[list[str]] = None,
+    media: Optional[str] = None,
+    media_token: Optional[str] = None,
+    media_tokens: Optional[list[str]] = None,
+    attachments: Optional[list[dict[str, Any]]] = None,
+    content_type: Optional[str] = None,
+    file_name: Optional[str] = None,
+    text: Optional[str] = None,
+    title: Optional[str] = None,
+    package: Optional[str] = None,
+) -> str:
+    """
+    Share one or more host files / relay media tokens through Android's
+    ACTION_SEND or ACTION_SEND_MULTIPLE flow. Host paths are first registered
+    with the relay so the phone fetches bytes through the normal paired
+    session and exposes them to the target app through its FileProvider.
+    """
+    try:
+        items = _normalize_attachment_specs(
+            path=path,
+            paths=paths,
+            media=media,
+            media_token=media_token,
+            media_tokens=media_tokens,
+            attachments=attachments,
+            content_type=content_type,
+            file_name=file_name,
+        )
+        if not items and not (text or "").strip():
+            return json.dumps({"error": "provide path/media attachment or text"})
+        payload: dict[str, Any] = {"attachments": items}
+        if text is not None:
+            payload["text"] = text
+        if title is not None:
+            payload["title"] = title
+        if package is not None:
+            payload["package"] = package
+        data = _post("/share_media", payload)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    jit = _maybe_jit_permission_response(data, tool_name="android_share_media")
+    return json.dumps(jit if jit is not None else data)
+
+
+def android_send_mms(
+    to: str,
+    body: str = "",
+    path: Optional[str] = None,
+    paths: Optional[list[str]] = None,
+    media: Optional[str] = None,
+    media_token: Optional[str] = None,
+    media_tokens: Optional[list[str]] = None,
+    attachments: Optional[list[dict[str, Any]]] = None,
+    content_type: Optional[str] = None,
+    file_name: Optional[str] = None,
+    package: Optional[str] = None,
+) -> str:
+    """
+    Open the user's messaging app with MMS attachments prepared. Android only
+    permits true background MMS send for the default SMS app, so Hermes Relay
+    performs a user-mediated compose handoff instead of pretending it can
+    silently confirm carrier delivery.
+    """
+    try:
+        if not (to or "").strip():
+            return json.dumps({"error": "missing 'to' phone number"})
+        items = _normalize_attachment_specs(
+            path=path,
+            paths=paths,
+            media=media,
+            media_token=media_token,
+            media_tokens=media_tokens,
+            attachments=attachments,
+            content_type=content_type,
+            file_name=file_name,
+        )
+        if not items and not (body or "").strip():
+            return json.dumps({"error": "provide an attachment or body"})
+        payload: dict[str, Any] = {
+            "to": to,
+            "body": body,
+            "attachments": items,
+        }
+        if package is not None:
+            payload["package"] = package
+        data = _post("/send_mms", payload)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    jit = _maybe_jit_permission_response(data, tool_name="android_send_mms")
+    return json.dumps(jit if jit is not None else data)
+
+
+def _get_public_ip() -> str:
+    """Detect this server's public IP address."""
+    for service in ["https://api.ipify.org", "https://ifconfig.me/ip", "https://icanhazip.com"]:
+        try:
+            r = requests.get(service, timeout=3)
+            if r.status_code == 200:
+                return r.text.strip()
+        except Exception:
+            continue
+    # Fallback: hostname
+    import socket
+    try:
+        return socket.gethostbyname(socket.gethostname())
+    except Exception:
+        return "<your-server-ip>"
+
+
+def android_setup(bridge_session_token: str) -> str:
+    """
+    FALLBACK helper — tell the android_* tools about an existing session token.
+
+    This is NOT the canonical pairing flow. For first-time setup, use
+    ``hermes-pair`` (shell) or ``/hermes-relay-pair`` (slash command) — both
+    generate a QR code that the phone scans once, which handles credential
+    exchange end-to-end and gives the phone a long-lived session token.
+
+    Use this function only when you already have a session token from a
+    previous successful pair and want to teach the host's android_* tools
+    about it (e.g., after re-installing the plugin without re-pairing the
+    phone). It writes ``ANDROID_BRIDGE_TOKEN`` (the bearer token used for
+    every bridge HTTP call) and ``ANDROID_BRIDGE_URL`` to ``~/.hermes/.env``
+    and verifies the unified relay is reachable. It does NOT register a
+    pairing code with the relay — that's ``plugin.pair``'s job.
+
+    The parameter name was historically ``pairing_code``, but the value is
+    actually used as a long-lived bearer token, not a one-shot pairing code.
+    Renamed for clarity.
+
+    Example: android_setup("eyJraWQiOi...long-token...")
+    """
+    # Local alias keeps the rest of the function readable without
+    # propagating the rename through every line.
+    pairing_code = bridge_session_token
+    try:
+        port = _relay_port()
+        public_ip = _get_public_ip()
+
+        # Save config to ~/.hermes/.env
+        relay_url = f"http://localhost:{port}"
+        try:
+            from hermes_cli.config import save_env_value
+            save_env_value("ANDROID_BRIDGE_URL", relay_url)
+            save_env_value("ANDROID_BRIDGE_TOKEN", pairing_code)
+            save_env_value("ANDROID_RELAY_PORT", str(port))
+        except ImportError:
+            from pathlib import Path
+            env_path = Path.home() / ".hermes" / ".env"
+            env_path.parent.mkdir(parents=True, exist_ok=True)
+            _update_env_file(env_path, "ANDROID_BRIDGE_URL", relay_url)
+            _update_env_file(env_path, "ANDROID_BRIDGE_TOKEN", pairing_code)
+            _update_env_file(env_path, "ANDROID_RELAY_PORT", str(port))
+
+        # Update current process env
+        os.environ["ANDROID_BRIDGE_URL"] = relay_url
+        os.environ["ANDROID_BRIDGE_TOKEN"] = pairing_code
+
+        # Verify the unified relay is reachable and probe phone status.
+        server_address = f"{public_ip}:{port}"
+        relay_running = False
+        phone_connected = False
+        try:
+            health = requests.get(f"http://localhost:{port}/health", timeout=2)
+            if health.status_code == 200:
+                relay_running = True
+        except Exception:
+            relay_running = False
+
+        if relay_running:
+            try:
+                ping = requests.get(
+                    f"http://localhost:{port}/ping",
+                    headers=_auth_headers(),
+                    timeout=2,
+                )
+                if ping.status_code == 200:
+                    phone_connected = True
+            except Exception:
+                phone_connected = False
+
+        if not relay_running:
+            return json.dumps({
+                "status": "error",
+                "message": (
+                    "Unified Hermes-Relay is not running on "
+                    f"localhost:{port}. Start it with "
+                    "`systemctl --user start hermes-relay` and retry."
+                ),
+                "server_address": server_address,
+            })
+
+        if phone_connected:
+            return json.dumps({
+                "status": "ok",
+                "message": "Phone is connected and ready!",
+                "phone_connected": True,
+                "server_address": server_address,
+            })
+
+        return json.dumps({
+            "status": "ok",
+            "message": (
+                "Relay is running but no phone is currently connected. "
+                "Pair the phone via `hermes-pair` or /hermes-relay-pair "
+                "(canonical QR flow), then retry. android_setup is a "
+                "fallback for when you already have a session token."
+            ),
+            "phone_connected": False,
+            "server_address": server_address,
+            "user_instructions": (
+                "Run `hermes-pair` on this host, scan the resulting QR "
+                "from the Hermes-Relay app (Settings → Connection → Scan "
+                "Pairing QR), then re-run android_setup or any other "
+                "android_* tool."
+            ),
+        })
+
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+
+def android_macro(steps: list, name: str = "unnamed", pace_ms: int = 500) -> str:
+    """
+    Execute a batched workflow of android_* tool calls in order.
+
+    Use this for KNOWN workflows (e.g. "open Spotify, tap Search, type X, tap
+    first result, tap Play"). For unknown ones, use ``android_navigate``
+    (vision-driven). If a step needs vision to decide what to do next, don't
+    batch past that point — split the workflow into two macros with a
+    read_screen / navigate call between them.
+
+    Args:
+        steps: Ordered list of dicts. Each dict must have a ``"tool"`` key
+            naming one of the ``android_*`` tools and may have an ``"args"``
+            key with kwargs for that tool. Example::
+
+                [
+                    {"tool": "android_open_app", "args": {"package": "com.spotify.music"}},
+                    {"tool": "android_tap_text", "args": {"text": "Search"}},
+                    {"tool": "android_type", "args": {"text": "Daft Punk"}},
+                ]
+
+        name: Human-readable label for the macro (appears in the trace and
+            error messages). Defaults to ``"unnamed"``.
+        pace_ms: Milliseconds to sleep between steps. Defaults to 500.
+            Set to 0 for no pacing. Negative values are rejected.
+
+    Returns:
+        A JSON string describing the outcome:
+
+        * On full success::
+
+            {
+                "success": true,
+                "name": "<name>",
+                "completed": <len(steps)>,
+                "results": [<per-step result dicts>, ...]
+            }
+
+        * On first failure or malformed step::
+
+            {
+                "success": false,
+                "name": "<name>",
+                "completed": <index of failed step>,
+                "results": [<results up to but not including the failure>],
+                "error": "<reason>"
+            }
+
+        * On empty ``steps`` list: immediate success with ``completed=0``.
+
+    Behaviour:
+        * Iterates ``steps`` in order.
+        * For each step, looks up ``step["tool"]`` in ``_HANDLERS`` and calls
+          it with ``step.get("args", {})``.
+        * Parses the result as JSON. A result with ``"success": false`` or an
+          ``"error"`` key is treated as a failure; the loop stops and the
+          partial trace is returned.
+        * Sleeps ``pace_ms`` milliseconds between steps (skipped after the
+          last step). ``pace_ms=0`` disables pacing entirely.
+    """
+    results: list = []
+
+    if pace_ms < 0:
+        return json.dumps({
+            "success": False,
+            "name": name,
+            "completed": 0,
+            "results": results,
+            "error": f"pace_ms must be >= 0 (got {pace_ms})",
+        })
+
+    if not isinstance(steps, list):
+        return json.dumps({
+            "success": False,
+            "name": name,
+            "completed": 0,
+            "results": results,
+            "error": "steps must be a list",
+        })
+
+    total = len(steps)
+    sleep_s = pace_ms / 1000.0
+
+    for i, step in enumerate(steps):
+        if not isinstance(step, dict):
+            return json.dumps({
+                "success": False,
+                "name": name,
+                "completed": i,
+                "results": results,
+                "error": f"step {i}: must be a dict (got {type(step).__name__})",
+            })
+
+        tool_name = step.get("tool")
+        if not tool_name:
+            return json.dumps({
+                "success": False,
+                "name": name,
+                "completed": i,
+                "results": results,
+                "error": f"step {i}: missing 'tool' key",
+            })
+
+        handler = _HANDLERS.get(tool_name)
+        if handler is None:
+            return json.dumps({
+                "success": False,
+                "name": name,
+                "completed": i,
+                "results": results,
+                "error": f"step {i}: unknown tool: {tool_name}",
+            })
+
+        args = step.get("args") or {}
+        if not isinstance(args, dict):
+            return json.dumps({
+                "success": False,
+                "name": name,
+                "completed": i,
+                "results": results,
+                "error": f"step {i} ({tool_name}): 'args' must be a dict",
+            })
+
+        # Dispatch to the underlying handler. Existing _HANDLERS entries are
+        # `lambda args, **kw: android_foo(**args)` — we call them with the
+        # positional args dict and let kwargs default.
+        try:
+            raw = handler(args)
+        except Exception as exc:  # pragma: no cover — defensive
+            return json.dumps({
+                "success": False,
+                "name": name,
+                "completed": i,
+                "results": results,
+                "error": f"step {i} ({tool_name}): handler raised: {exc}",
+            })
+
+        # Most android_* tools return JSON strings. A couple return plain
+        # strings with MEDIA: markers (android_screenshot) — we wrap those
+        # into a structured dict for the trace instead of trying to parse.
+        parsed: dict
+        if isinstance(raw, str):
+            try:
+                parsed = json.loads(raw)
+                if not isinstance(parsed, dict):
+                    parsed = {"raw": raw}
+            except (json.JSONDecodeError, TypeError):
+                parsed = {"raw": raw}
+        elif isinstance(raw, dict):
+            parsed = raw
+        else:
+            parsed = {"raw": raw}
+
+        # Failure check: explicit `success: False`, or an `error` key, or
+        # `status: "error"`.
+        failed = False
+        err_msg: Optional[str] = None
+        if parsed.get("success") is False:
+            failed = True
+            err_msg = parsed.get("error") or parsed.get("message") or "step reported success=false"
+        elif "error" in parsed and parsed["error"]:
+            failed = True
+            err_msg = str(parsed["error"])
+        elif parsed.get("status") == "error":
+            failed = True
+            err_msg = parsed.get("message") or parsed.get("error") or "step reported status=error"
+
+        if failed:
+            results.append({"tool": tool_name, "result": parsed})
+            return json.dumps({
+                "success": False,
+                "name": name,
+                "completed": i,
+                "results": results,
+                "error": f"step {i} ({tool_name}): {err_msg}",
+            })
+
+        results.append({"tool": tool_name, "result": parsed})
+
+        # Pace between steps, but skip after the last.
+        if sleep_s > 0 and i < total - 1:
+            time.sleep(sleep_s)
+
+    return json.dumps({
+        "success": True,
+        "name": name,
+        "completed": total,
+        "results": results,
+    })
+
+
+def android_clipboard_read() -> str:
+    """
+    Read the current Android system clipboard as plain text.
+
+    Returns JSON: {"text": "..."} on success, where text is an empty
+    string when the clipboard is empty (an empty clipboard is NOT
+    treated as an error — the user simply hasn't copied anything).
+
+    Android 12+ privacy note: on API 31+, reading the clipboard from a
+    background app shows a system toast like "Hermes-Relay pasted from
+    your clipboard". This is a system-level privacy feature we can't
+    suppress and shouldn't try to.
+    """
+    try:
+        data = _get("/clipboard")
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_clipboard_write(text: str) -> str:
+    """
+    Write a plain-text value to the Android system clipboard.
+
+    Empty strings are allowed — they effectively clear the clipboard
+    from the agent's perspective — so passing "" is not an error.
+
+    The clipboard entry is labeled "hermes" so any other app that
+    inspects primaryClipDescription.label can see the content came
+    from Hermes-Relay (useful for attribution or audit trails).
+
+    Android 12+ privacy note: on API 31+, writing to the clipboard
+    shows a system toast like "Hermes-Relay copied". This is a
+    system-level privacy feature we can't suppress and shouldn't try
+    to — the user always knows when the agent touched their clipboard.
+    """
+    try:
+        data = _post("/clipboard", {"text": text})
+        return json.dumps(data)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+# ── B4: raw Intent escape hatches ──────────────────────────────────────────────
+#
+# These tools are power-user escape hatches. The phone will refuse any
+# request whose target ``package`` is on the Bridge safety blocklist
+# (banking/password managers/2FA by default) — see BridgeCommandHandler's
+# `/send_intent` and `/broadcast` cases. Extras are string-valued only;
+# wire a richer tool if you need Parcelable/Serializable support.
+
+
+def android_send_intent(action: str,
+                        data: Optional[str] = None,
+                        package: Optional[str] = None,
+                        component: Optional[str] = None,
+                        extras: Optional[dict] = None,
+                        category: Optional[str] = None) -> str:
+    """
+    Launch an arbitrary Android Activity via a raw Intent.
+
+    Examples:
+      - Open Google Maps directions: action="android.intent.action.VIEW",
+        data="google.navigation:q=1600+Amphitheatre+Parkway"
+      - Dial a number: action="android.intent.action.DIAL", data="tel:5551234"
+      - Compose SMS: action="android.intent.action.SENDTO", data="smsto:5551234",
+        extras={"sms_body": "hello"}
+      - Open a custom deep link: action="android.intent.action.VIEW",
+        data="myapp://some/path"
+      - Launch a specific Activity: action="android.intent.action.MAIN",
+        component="com.example/com.example.MainActivity"
+
+    Args:
+      action:    Android action string (required). E.g. "android.intent.action.VIEW".
+      data:      Optional data URI for the Intent. Parsed with Uri.parse on the phone.
+      package:   Optional target package name. Forces the Intent to a specific app.
+                 **Must not be on the Bridge safety blocklist** — the phone refuses
+                 blocklisted targets with a 403.
+      component: Optional fully-qualified component in the form "pkg/classname".
+                 Invalid formats are rejected with a 400.
+      extras:    Optional dict of string-keyed, string-valued Intent extras.
+                 Non-string values are not supported — stringify them first.
+      category:  Optional category string (e.g. "android.intent.category.LAUNCHER").
+
+    The phone adds `FLAG_ACTIVITY_NEW_TASK` automatically since the Bridge
+    accessibility service isn't an Activity context.
+    """
+    try:
+        payload: dict = {"action": action}
+        if data is not None:
+            payload["data"] = data
+        if package is not None:
+            payload["package"] = package
+        if component is not None:
+            payload["component"] = component
+        if extras is not None:
+            payload["extras"] = extras
+        if category is not None:
+            payload["category"] = category
+        response = _post("/send_intent", payload)
+        return json.dumps(response)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def android_broadcast(action: str,
+                      data: Optional[str] = None,
+                      package: Optional[str] = None,
+                      extras: Optional[dict] = None) -> str:
+    """
+    Send an arbitrary broadcast Intent on the phone.
+
+    Examples:
+      - Media key: action="android.intent.action.MEDIA_BUTTON"
+      - Airplane mode changed (system intents require platform-signed apps
+        and will usually 403 with "permission denied").
+      - Custom app broadcast: action="com.example.MY_BROADCAST",
+        package="com.example", extras={"key": "value"}
+
+    Args:
+      action:  Android action string (required).
+      data:    Optional data URI.
+      package: Optional target package — scopes the broadcast to a single app.
+               **Must not be on the Bridge safety blocklist** — 403 if it is.
+      extras:  Optional dict of string-keyed, string-valued Intent extras.
+               Non-string values are not supported in v1.
+    """
+    try:
+        payload: dict = {"action": action}
+        if data is not None:
+            payload["data"] = data
+        if package is not None:
+            payload["package"] = package
+        if extras is not None:
+            payload["extras"] = extras
+        response = _post("/broadcast", payload)
+        return json.dumps(response)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+def _update_env_file(env_path, key: str, value: str):
+    """Simple .env file updater (fallback when hermes_cli.config not available)."""
+    lines = []
+    if env_path.exists():
+        lines = env_path.read_text(encoding="utf-8", errors="replace").splitlines(True)
+    found = False
+    for i, line in enumerate(lines):
+        if line.strip().startswith(f"{key}="):
+            lines[i] = f"{key}={value}\n"
+            found = True
+            break
+    if not found:
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        lines.append(f"{key}={value}\n")
+    env_path.write_text("".join(lines), encoding="utf-8")
+
+
+# ── Schema definitions ─────────────────────────────────────────────────────────
+
+_SCHEMAS = {
+    "android_ping": {
+        "name": "android_ping",
+        "description": "Check if the Android bridge is reachable. Call this first before any other android_ tools.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "android_read_screen": {
+        "name": "android_read_screen",
+        "description": "Get the accessibility tree of the current Android screen. Returns all visible UI nodes with text, class names, node IDs, and interactability. Use this to understand what's on screen before tapping.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "include_bounds": {
+                    "type": "boolean",
+                    "description": "Include pixel coordinates for each node. Default false.",
+                    "default": False,
+                }
+            },
+            "required": [],
+        },
+    },
+    "android_find_nodes": {
+        "name": "android_find_nodes",
+        "description": (
+            "Targeted filtered search for accessibility nodes on the current "
+            "Android screen. Prefer this over android_read_screen when you "
+            "only need to check whether a specific element exists or find "
+            "a small set of interactive widgets — it avoids dumping the full "
+            "tree (which can be several KB). Filters are all optional and "
+            "AND together: text (case-insensitive substring match against "
+            "node text OR contentDescription), class_name (exact match), "
+            "clickable (True/False). Returns up to `limit` matches in the "
+            "same ScreenNode shape as android_read_screen, including node "
+            "IDs you can feed into android_tap(node_id=...)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Case-insensitive substring to match against node text or contentDescription.",
+                },
+                "class_name": {
+                    "type": "string",
+                    "description": "Exact Android class name to match, e.g. 'android.widget.Button'.",
+                },
+                "clickable": {
+                    "type": "boolean",
+                    "description": "If set, only return nodes with matching isClickable flag.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max number of matches to return (default 20, hard-capped at 512).",
+                    "default": 20,
+                },
+            },
+            "required": [],
+        },
+    },
+    "android_tap": {
+        "name": "android_tap",
+        "description": "Tap a UI element by node_id (preferred) or by screen coordinates (x, y). Always prefer node_id over coordinates — it's more reliable. Get node_ids from android_read_screen.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "x": {"type": "integer", "description": "X coordinate in pixels"},
+                "y": {"type": "integer", "description": "Y coordinate in pixels"},
+                "node_id": {"type": "string", "description": "Accessibility node ID from android_read_screen"},
+            },
+            "required": [],
+        },
+    },
+    "android_tap_text": {
+        "name": "android_tap_text",
+        "description": "Tap the first visible UI element matching the given text. Useful when you see text on screen and want to tap it without needing node IDs.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Text to find and tap"},
+                "exact": {"type": "boolean", "description": "Exact match (true) or contains match (false, default)", "default": False},
+            },
+            "required": ["text"],
+        },
+    },
+    "android_long_press": {
+        "name": "android_long_press",
+        "description": (
+            "Perform a long press at screen coordinates (x, y) or on an "
+            "accessibility node_id. Prefer node_id when available — it's "
+            "more reliable than coordinates. Use for context menus, text "
+            "selection, widget rearranging, and hold-to-confirm UI. "
+            "Duration defaults to 500 ms and is clamped to 100..3000 ms."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "x": {"type": "integer", "description": "X coordinate in pixels"},
+                "y": {"type": "integer", "description": "Y coordinate in pixels"},
+                "node_id": {
+                    "type": "string",
+                    "description": "Accessibility node ID from android_read_screen",
+                },
+                "duration": {
+                    "type": "integer",
+                    "description": "Hold duration in milliseconds (100..3000)",
+                    "default": 500,
+                },
+            },
+            "required": [],
+        },
+    },
+    "android_type": {
+        "name": "android_type",
+        "description": "Type text into the currently focused input field. Tap the field first using android_tap or android_tap_text.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Text to type"},
+                "clear_first": {"type": "boolean", "description": "Clear existing content before typing", "default": False},
+            },
+            "required": ["text"],
+        },
+    },
+    "android_swipe": {
+        "name": "android_swipe",
+        "description": "Perform a swipe gesture on screen.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "direction": {"type": "string", "enum": ["up", "down", "left", "right"]},
+                "distance": {"type": "string", "enum": ["short", "medium", "long"], "default": "medium"},
+            },
+            "required": ["direction"],
+        },
+    },
+    "android_drag": {
+        "name": "android_drag",
+        "description": (
+            "Drag from (start_x, start_y) to (end_x, end_y) over a duration "
+            "in milliseconds. Use for rearranging home screen icons, pulling "
+            "the notification shade a precise distance, dragging map pins, "
+            "or reordering list items — anything a coarse swipe can't express. "
+            "Duration is clamped to 100–3000 ms."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "start_x": {"type": "integer", "description": "Start X coordinate in pixels"},
+                "start_y": {"type": "integer", "description": "Start Y coordinate in pixels"},
+                "end_x": {"type": "integer", "description": "End X coordinate in pixels"},
+                "end_y": {"type": "integer", "description": "End Y coordinate in pixels"},
+                "duration": {
+                    "type": "integer",
+                    "description": "Gesture duration in milliseconds (100–3000, default 500)",
+                    "default": _DRAG_DEFAULT_DURATION_MS,
+                },
+            },
+            "required": ["start_x", "start_y", "end_x", "end_y"],
+        },
+    },
+    "android_open_app": {
+        "name": "android_open_app",
+        "description": "Launch an Android app by its package name. Use android_get_apps to find package names.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "package": {"type": "string", "description": "App package name e.g. com.ubercab"},
+            },
+            "required": ["package"],
+        },
+    },
+    "android_press_key": {
+        "name": "android_press_key",
+        "description": "Press a hardware or software key.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "enum": ["back", "home", "recents", "power", "volume_up", "volume_down", "enter", "delete", "tab", "escape", "search", "notifications"],
+                }
+            },
+            "required": ["key"],
+        },
+    },
+    "android_screenshot": {
+        "name": "android_screenshot",
+        "description": "Take a screenshot of the current Android screen. Returns base64 PNG. Use when the accessibility tree is missing context or the screen uses canvas/game rendering.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sensitive": {
+                    "type": "boolean",
+                    "description": "Set true if the screen may contain private or NSFW content (lock screen, 2FA code, banking app). The phone blurs the image per the user's setting. Defaults to false.",
+                },
+            },
+            "required": [],
+        },
+    },
+    "android_scroll": {
+        "name": "android_scroll",
+        "description": "Scroll the screen or a specific scrollable element.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "direction": {"type": "string", "enum": ["up", "down", "left", "right"]},
+                "node_id": {"type": "string", "description": "Node ID of scrollable container (optional, defaults to screen scroll)"},
+            },
+            "required": ["direction"],
+        },
+    },
+    "android_wait": {
+        "name": "android_wait",
+        "description": "Wait for a UI element to appear on screen. Use after actions that trigger loading or navigation.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Wait for element with this text"},
+                "class_name": {"type": "string", "description": "Wait for element of this class"},
+                "timeout_ms": {"type": "integer", "description": "Max wait time in milliseconds", "default": 5000},
+            },
+            "required": [],
+        },
+    },
+    "android_get_apps": {
+        "name": "android_get_apps",
+        "description": "List all installed apps on the Android device with their package names and display labels.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "android_current_app": {
+        "name": "android_current_app",
+        "description": "Get the package name and activity name of the currently active (foreground) Android app.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "android_media": {
+        "name": "android_media",
+        "description": "Control system-wide media playback (play/pause/toggle/next/previous). Works against whatever media app is currently playing — Spotify, YouTube Music, Pocket Casts, etc. — via the system media-button broadcast.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["play", "pause", "toggle", "next", "previous"],
+                    "description": "Playback action to dispatch",
+                },
+            },
+            "required": ["action"],
+        },
+    },
+    "android_describe_node": {
+        "name": "android_describe_node",
+        "description": (
+            "Return the full property bag for a specific accessibility node by ID. "
+            "Use this after android_read_screen when you need richer details about "
+            "one node than the compact tree provides — e.g. 'is this toggle checked?', "
+            "'what hint text does this input show?', or 'is this button clickable?'. "
+            "Returns bounds, className, text, contentDescription, hintText, viewIdResourceName, "
+            "childCount, and state flags (clickable, checkable, checked, enabled, etc). "
+            "`checked` is null when the node isn't a toggle."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "node_id": {
+                    "type": "string",
+                    "description": "Stable node ID from android_read_screen (e.g. 'w0:42')",
+                },
+            },
+            "required": ["node_id"],
+        },
+    },
+    "android_setup": {
+        "name": "android_setup",
+        "description": "Start the Android bridge relay and set the pairing code. Call this when the user wants to connect their phone. The relay runs on this server — the phone connects to it remotely via WebSocket. Only needs the pairing code shown in the Hermes Bridge app on the phone.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pairing_code": {
+                    "type": "string",
+                    "description": "6-character pairing code shown in the Hermes Bridge app on the phone",
+                },
+            },
+            "required": ["pairing_code"],
+        },
+    },
+    "android_macro": {
+        "name": "android_macro",
+        "description": (
+            "Execute a batched workflow of android_* tool calls in order, "
+            "stopping on the first failure. Use this for KNOWN workflows where "
+            "the steps are deterministic (e.g. 'open Spotify, tap Search, type "
+            "X, tap first result, tap Play'). For unknown workflows that need "
+            "vision to decide what to do next, use `android_navigate` instead. "
+            "If a step might need vision to decide the next action, don't "
+            "batch past that point — split into two macros with a read_screen "
+            "or navigate call between them. Returns a structured trace with "
+            "per-step results, the completed count, and an error field on "
+            "failure."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "steps": {
+                    "type": "array",
+                    "description": (
+                        "Ordered list of step dicts. Each step must have a "
+                        "'tool' key (one of the android_* tool names) and may "
+                        "have an 'args' key (kwargs for that tool). Example: "
+                        "[{\"tool\": \"android_tap\", \"args\": {\"x\": 100, "
+                        "\"y\": 200}}, {\"tool\": \"android_type\", \"args\": "
+                        "{\"text\": \"hello\"}}]"
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "tool": {"type": "string", "description": "android_* tool name"},
+                            "args": {"type": "object", "description": "kwargs for the tool (optional)"},
+                        },
+                        "required": ["tool"],
+                    },
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Human-readable label for the macro (for logs/traces).",
+                    "default": "unnamed",
+                },
+                "pace_ms": {
+                    "type": "integer",
+                    "description": "Milliseconds to sleep between steps. 0 disables pacing.",
+                    "default": 500,
+                },
+            },
+            "required": ["steps"],
+        },
+    },
+    "android_clipboard_read": {
+        "name": "android_clipboard_read",
+        "description": (
+            "Read the Android system clipboard as plain text. Returns "
+            "{\"text\": \"...\"} on success; an empty string means nothing "
+            "is currently copied (empty is NOT an error). Note: on Android "
+            "12+ (API 31+) reading the clipboard shows a system toast "
+            "'Hermes-Relay pasted from your clipboard' — this is a "
+            "system-level privacy feature and cannot be suppressed."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "android_clipboard_write": {
+        "name": "android_clipboard_write",
+        "description": (
+            "Write a plain-text value to the Android system clipboard. "
+            "Empty strings are allowed (they effectively clear the "
+            "clipboard). The clip is labeled 'hermes' so other apps can "
+            "see the source. Note: on Android 12+ (API 31+) writing to "
+            "the clipboard shows a system toast 'Hermes-Relay copied' — "
+            "this is a system-level privacy feature and cannot be "
+            "suppressed."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Text to copy to the clipboard",
+                },
+            },
+            "required": ["text"],
+        },
+    },
+    "android_screen_hash": {
+        "name": "android_screen_hash",
+        "description": (
+            "Return a cheap SHA-256 fingerprint of the current Android screen, "
+            "computed from the accessibility tree. Deterministic across "
+            "unchanged screens — use for fast change detection in navigation "
+            "loops (~100x cheaper than android_read_screen). Returns "
+            "{hash, node_count, truncated}. Known limitation: live counters "
+            "and animated text will churn the hash."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "android_diff_screen": {
+        "name": "android_diff_screen",
+        "description": (
+            "Compare the current Android screen to a previous hash and report "
+            "whether anything changed. Returns {changed, hash, node_count, "
+            "truncated} in one call so the agent can update its reference "
+            "without a second round-trip. Use after a tap/swipe to confirm "
+            "something actually happened."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "previous_hash": {
+                    "type": "string",
+                    "description": "Prior hash from android_screen_hash.",
+                },
+            },
+            "required": ["previous_hash"],
+        },
+    },
+    "android_send_intent": {
+        "name": "android_send_intent",
+        "description": (
+            "Power-user escape hatch — launch an arbitrary Android Activity via a "
+            "raw Intent. Useful for Maps directions (google.navigation:q=...), "
+            "dialer (tel:), SMS composer (smsto:), mail (mailto:), and custom "
+            "deep links. The phone adds FLAG_ACTIVITY_NEW_TASK automatically. "
+            "Extras are string-only in v1 — stringify non-string values. The "
+            "target 'package' must NOT be on the Bridge safety blocklist "
+            "(banking/passwords/2FA by default) or the phone returns 403."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "Android action string, e.g. 'android.intent.action.VIEW'",
+                },
+                "data": {
+                    "type": "string",
+                    "description": "Optional data URI for the Intent",
+                },
+                "package": {
+                    "type": "string",
+                    "description": "Optional target package — forces the Intent to a specific app",
+                },
+                "component": {
+                    "type": "string",
+                    "description": "Optional fully-qualified component 'pkg/classname'",
+                },
+                "extras": {
+                    "type": "object",
+                    "description": "Optional string-keyed/string-valued Intent extras",
+                    "additionalProperties": {"type": "string"},
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Optional Intent category (e.g. 'android.intent.category.LAUNCHER')",
+                },
+            },
+            "required": ["action"],
+        },
+    },
+    "android_broadcast": {
+        "name": "android_broadcast",
+        "description": (
+            "Power-user escape hatch — send an arbitrary broadcast Intent on the "
+            "phone via Context.sendBroadcast. Extras are string-only in v1. The "
+            "target 'package' must NOT be on the Bridge safety blocklist or the "
+            "phone returns 403. System broadcasts that require platform-signed "
+            "apps will be refused with 'permission denied'."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "Android action string (required)",
+                },
+                "data": {
+                    "type": "string",
+                    "description": "Optional data URI",
+                },
+                "package": {
+                    "type": "string",
+                    "description": "Optional target package — scopes the broadcast to a single app",
+                },
+                "extras": {
+                    "type": "object",
+                    "description": "Optional string-keyed/string-valued Intent extras",
+                    "additionalProperties": {"type": "string"},
+                },
+            },
+            "required": ["action"],
+        },
+    },
+    "android_events": {
+        "name": "android_events",
+        "description": (
+            "Poll the phone's recent AccessibilityEvent ring buffer (clicks, "
+            "text changes, window transitions, scrolls). Use this for reactive "
+            "agent scenarios — 'tell me when the user opens Slack', 'watch for "
+            "the next message typed into the search box', 'what's happening on "
+            "the phone right now?'. Capture is OFF by default — you must call "
+            "android_event_stream(enabled=true) first. The buffer is bounded "
+            "at 500 entries and throttled to one entry per (event_type, "
+            "package) per 100ms so scroll storms don't flood the stream. "
+            "Privacy-sensitive — event streams can leak search queries, "
+            "messages, and passwords typed into input fields. Default is "
+            "disabled. User must explicitly enable via "
+            "android_event_stream(true). Clears automatically on disable."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Max entries to return (1-500, default 50)",
+                    "default": 50,
+                },
+                "since": {
+                    "type": "integer",
+                    "description": (
+                        "Only return entries with timestamp > this epoch "
+                        "millisecond value. Use the timestamp of the last "
+                        "entry you saw to poll incrementally. Default 0 "
+                        "(return everything in the buffer)."
+                    ),
+                    "default": 0,
+                },
+            },
+            "required": [],
+        },
+    },
+    "android_event_stream": {
+        "name": "android_event_stream",
+        "description": (
+            "Toggle AccessibilityEvent capture on the phone. Pass "
+            "enabled=true to start recording clicks, text changes, window "
+            "transitions, and scrolls into a bounded ring buffer that "
+            "android_events then polls. Pass enabled=false to stop and wipe "
+            "the buffer. Privacy-sensitive — event streams can leak search "
+            "queries, messages, and passwords typed into input fields. "
+            "Default is disabled. User must explicitly enable via "
+            "android_event_stream(true). Clears automatically on disable. "
+            "Use only when the user has asked for reactive monitoring and "
+            "be explicit in chat about what you're turning on."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": (
+                        "true = start capture, false = stop + clear buffer"
+                    ),
+                },
+            },
+            "required": ["enabled"],
+        },
+    },
+    # ── Tier C (sideload flavor only — googlePlay returns 403) ───────────────
+    "android_location": {
+        "name": "android_location",
+        "description": (
+            "Sideload flavor only. Returns the phone's last-known GPS "
+            "location (latitude, longitude, accuracy, altitude, provider, "
+            "timestamp, staleness_ms). On googlePlay builds returns a "
+            "'sideload-only' error. If staleness_ms exceeds 5 minutes a "
+            "warning field is included — the agent should ask the user to "
+            "open a maps app briefly to refresh the fix."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "android_search_contacts": {
+        "name": "android_search_contacts",
+        "description": (
+            "Sideload flavor only. Search the phone's contact database by "
+            "name and return matching entries with phone numbers. On "
+            "googlePlay builds returns a 'sideload-only' error. Use this "
+            "to resolve a name to a number before calling android_call or "
+            "android_send_sms."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Contact name or fragment to search for",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum number of results (default 20, max 100)",
+                    "default": 20,
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    "android_call": {
+        "name": "android_call",
+        "description": (
+            "Dial a phone number. Sideload flavor auto-dials via ACTION_CALL. "
+            "googlePlay flavor falls back to opening the system dialer pre-"
+            "populated (user taps Call manually). The phone's safety-rails "
+            "ALWAYS show a destructive-verb confirmation modal before the "
+            "call is placed."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "number": {
+                    "type": "string",
+                    "description": "Phone number to dial (any user-readable format)",
+                },
+            },
+            "required": ["number"],
+        },
+    },
+    "android_send_sms": {
+        "name": "android_send_sms",
+        "description": (
+            "Sideload flavor only. Send an SMS directly via SmsManager. "
+            "On googlePlay builds returns a 'sideload-only' error (SEND_SMS "
+            "is not declared on the Play Store track). Handles multi-part "
+            "messages automatically via divideMessage. The phone's safety-"
+            "rails ALWAYS show a destructive-verb confirmation modal before "
+            "the SMS is sent. Text-only schema: {to, body}. For images, "
+            "documents, audio, video, or other attachments use "
+            "android_share_media or android_send_mms."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "to": {
+                    "type": "string",
+                    "description": "Recipient phone number (E.164 or local format)",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "SMS body text",
+                },
+            },
+            "required": ["to", "body"],
+        },
+    },
+    "android_return_to_hermes": {
+        "name": "android_return_to_hermes",
+        "description": (
+            "Bring the Hermes Relay app back to the foreground after a "
+            "bridge task opens another app. Use this as the cleanup step "
+            "after open_app, send_intent, share_media, or send_mms flows."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "android_share_media": {
+        "name": "android_share_media",
+        "description": (
+            "Share text and/or relay-host files through Android's native "
+            "ACTION_SEND/ACTION_SEND_MULTIPLE flow. Accepts host-local "
+            "paths, relay MEDIA markers, raw media tokens, or an attachments "
+            "array. Host paths are registered with the relay first, then the "
+            "phone fetches the bytes with its paired session token and hands "
+            "third-party apps a FileProvider content:// URI. The phone shows "
+            "an on-device confirmation modal before launching the share UI. "
+            "Use this for files, images, audio, video, PDFs, and arbitrary "
+            "attachments."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Host-local file path to share"},
+                "paths": {
+                    "type": "array",
+                    "description": "Multiple host-local file paths to share",
+                    "items": {"type": "string"},
+                },
+                "media": {
+                    "type": "string",
+                    "description": "Relay MEDIA marker or raw media token to share",
+                },
+                "media_token": {"type": "string", "description": "Raw relay media token"},
+                "media_tokens": {
+                    "type": "array",
+                    "description": "Multiple raw relay media tokens",
+                    "items": {"type": "string"},
+                },
+                "attachments": {
+                    "type": "array",
+                    "description": (
+                        "Attachment objects with one of path, media, token, or "
+                        "media_token plus optional content_type and file_name"
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "media": {"type": "string"},
+                            "token": {"type": "string"},
+                            "media_token": {"type": "string"},
+                            "content_type": {"type": "string"},
+                            "file_name": {"type": "string"},
+                        },
+                    },
+                },
+                "content_type": {
+                    "type": "string",
+                    "description": "Optional MIME type hint for a single path/media value",
+                },
+                "file_name": {
+                    "type": "string",
+                    "description": "Optional filename hint for a single path/media value",
+                },
+                "text": {"type": "string", "description": "Optional text to share with attachments"},
+                "title": {"type": "string", "description": "Optional Android chooser title"},
+                "package": {
+                    "type": "string",
+                    "description": "Optional target package to launch directly instead of the chooser",
+                },
+            },
+            "required": [],
+        },
+    },
+    "android_send_mms": {
+        "name": "android_send_mms",
+        "description": (
+            "Open a user-mediated MMS compose/share handoff with text and/or "
+            "attachments. Android only allows true background MMS sending "
+            "for the default SMS app, so Hermes does not silently send MMS. "
+            "Instead, the phone fetches relay media, grants FileProvider "
+            "content:// access, pre-fills recipient/text when the target app "
+            "supports it, and launches the native compose/share UI after "
+            "on-device confirmation."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string", "description": "Recipient phone number"},
+                "body": {"type": "string", "description": "Optional message body"},
+                "path": {"type": "string", "description": "Host-local file path to attach"},
+                "paths": {
+                    "type": "array",
+                    "description": "Multiple host-local file paths to attach",
+                    "items": {"type": "string"},
+                },
+                "media": {"type": "string", "description": "Relay MEDIA marker or raw media token"},
+                "media_token": {"type": "string", "description": "Raw relay media token"},
+                "media_tokens": {
+                    "type": "array",
+                    "description": "Multiple raw relay media tokens",
+                    "items": {"type": "string"},
+                },
+                "attachments": {
+                    "type": "array",
+                    "description": (
+                        "Attachment objects with one of path, media, token, or "
+                        "media_token plus optional content_type and file_name"
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "media": {"type": "string"},
+                            "token": {"type": "string"},
+                            "media_token": {"type": "string"},
+                            "content_type": {"type": "string"},
+                            "file_name": {"type": "string"},
+                        },
+                    },
+                },
+                "content_type": {
+                    "type": "string",
+                    "description": "Optional MIME type hint for a single path/media value",
+                },
+                "file_name": {
+                    "type": "string",
+                    "description": "Optional filename hint for a single path/media value",
+                },
+                "package": {
+                    "type": "string",
+                    "description": "Optional SMS/MMS app package to launch directly",
+                },
+            },
+            "required": ["to"],
+        },
+    },
+}
+
+_DEVICE_TARGETABLE_TOOLS = {
+    name for name in _SCHEMAS
+    if name != "android_setup"
+}
+
+for _tool_name in _DEVICE_TARGETABLE_TOOLS:
+    _params = _SCHEMAS[_tool_name].setdefault("parameters", {"type": "object"})
+    _properties = _params.setdefault("properties", {})
+    _properties.setdefault("device", _DEVICE_SELECTOR_PROPERTY)
+
+# ── Tool handlers map ──────────────────────────────────────────────────────────
+#
+# Dispatch table mapping tool names to their handler callables. Used by the
+# registry (below) AND by `android_macro`, which walks this dict to resolve
+# step["tool"] → handler function at runtime.
+#
+# NOTE: When a new android_* tool lands in this file, add it here too —
+# otherwise `android_macro` can't dispatch to it and the registry won't see
+# the handler. Parallel Wave 2 branches (A1 long_press, A2 drag, A3 find_nodes,
+# A4 describe_node, A5 screen_hash/diff_screen, A6 clipboard, A7 media,
+# B4 send_intent) each add their own entries; this file lists only the tools
+# that exist in THIS worktree at the time of writing.
+#
+# Handler signature: `lambda args, **kw: android_<tool>(**args)` — the extra
+# `**kw` swallows any future keyword-only params the registry might pass.
+# `android_macro` only ever calls `handler(args)` with the positional dict.
+
+_HANDLERS = {
+    "android_ping":             lambda args, **kw: _dispatch_android_tool(android_ping, args),
+    "android_read_screen":      lambda args, **kw: _dispatch_android_tool(android_read_screen, args),
+    "android_find_nodes":       lambda args, **kw: _dispatch_android_tool(android_find_nodes, args),
+    "android_tap":              lambda args, **kw: _dispatch_android_tool(android_tap, args),
+    "android_tap_text":         lambda args, **kw: _dispatch_android_tool(android_tap_text, args),
+    "android_long_press":       lambda args, **kw: _dispatch_android_tool(android_long_press, args),
+    "android_type":             lambda args, **kw: _dispatch_android_tool(android_type, args),
+    "android_swipe":            lambda args, **kw: _dispatch_android_tool(android_swipe, args),
+    "android_drag":             lambda args, **kw: _dispatch_android_tool(android_drag, args),
+    "android_open_app":         lambda args, **kw: _dispatch_android_tool(android_open_app, args),
+    "android_press_key":        lambda args, **kw: _dispatch_android_tool(android_press_key, args),
+    "android_screenshot":       lambda args, **kw: _dispatch_android_tool(android_screenshot, args),
+    "android_scroll":           lambda args, **kw: _dispatch_android_tool(android_scroll, args),
+    "android_wait":             lambda args, **kw: _dispatch_android_tool(android_wait, args),
+    "android_get_apps":         lambda args, **kw: _dispatch_android_tool(android_get_apps, args),
+    "android_current_app":      lambda args, **kw: _dispatch_android_tool(android_current_app, args),
+    "android_describe_node":    lambda args, **kw: _dispatch_android_tool(android_describe_node, args),
+    "android_setup":            lambda args, **kw: _dispatch_android_tool(android_setup, args),
+    "android_macro":            lambda args, **kw: _dispatch_android_tool(android_macro, args),
+    "android_clipboard_read":   lambda args, **kw: _dispatch_android_tool(android_clipboard_read, args),
+    "android_clipboard_write":  lambda args, **kw: _dispatch_android_tool(android_clipboard_write, args),
+    "android_media":            lambda args, **kw: _dispatch_android_tool(android_media, args),
+    "android_screen_hash":      lambda args, **kw: _dispatch_android_tool(android_screen_hash, args),
+    "android_diff_screen":      lambda args, **kw: _dispatch_android_tool(android_diff_screen, args),
+    "android_send_intent":      lambda args, **kw: _dispatch_android_tool(android_send_intent, args),
+    "android_broadcast":        lambda args, **kw: _dispatch_android_tool(android_broadcast, args),
+    "android_events":           lambda args, **kw: _dispatch_android_tool(android_events, args),
+    "android_event_stream":     lambda args, **kw: _dispatch_android_tool(android_event_stream, args),
+    # Tier C (C1-C4) — sideload-only; phone returns 403 on googlePlay.
+    "android_location":         lambda args, **kw: _dispatch_android_tool(android_location, args),
+    "android_search_contacts":  lambda args, **kw: _dispatch_android_tool(android_search_contacts, args),
+    "android_call":             lambda args, **kw: _dispatch_android_tool(android_call, args),
+    "android_send_sms":         lambda args, **kw: _dispatch_android_tool(android_send_sms, args),
+    "android_return_to_hermes": lambda args, **kw: _dispatch_android_tool(android_return_to_hermes, args),
+    "android_share_media":      lambda args, **kw: _dispatch_android_tool(android_share_media, args),
+    "android_send_mms":         lambda args, **kw: _dispatch_android_tool(android_send_mms, args),
+}
+# ── Registry registration ──────────────────────────────────────────────────────
+
+try:
+    from tools.registry import registry
+
+    for tool_name, schema in _SCHEMAS.items():
+        registry.register(
+            name=tool_name,
+            toolset="android",
+            schema=schema,
+            handler=_HANDLERS[tool_name],
+            # android_setup must work without a bridge connection (it creates the connection)
+            check_fn=(lambda: True) if tool_name == "android_setup" else _check_requirements,
+            requires_env=[],  # ANDROID_BRIDGE_URL has a default
+        )
+except ImportError:
+    # Running outside hermes-agent context (e.g. tests)
+    pass

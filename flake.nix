@@ -36,7 +36,8 @@
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
 
     nix-hermes-agent = {
-      url = "github:NousResearch/hermes-agent/v2026.7.20";
+      url = "github:NousResearch/hermes-agent/v2026.8.3";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
@@ -223,6 +224,60 @@
       specialArgs = { inherit inputs; };
       modules = [
         ./hosts/nxc/nxc-base
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
+    ## pihole-native-test ##
+    nixosConfigurations.pihole-native-test = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; };
+      modules = [
+        ./hosts/nxc/pihole-native-test
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
+    ## pihole1 ##
+    nixosConfigurations.pihole1 = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; outputs = self; piholeHostName = "pihole1"; };
+      modules = [
+        ./hosts/nxc/pihole
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
+    ## pihole2 ##
+    nixosConfigurations.pihole2 = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; outputs = self; piholeHostName = "pihole2"; };
+      modules = [
+        ./hosts/nxc/pihole
         sops-nix.nixosModules.sops
 
         home-manager.nixosModules.home-manager
@@ -760,7 +815,12 @@
     nixosConfigurations.hermes = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
       modules = [
-        { nixpkgs.overlays = [ nix-hermes-agent.overlays.default ]; }
+        { nixpkgs.overlays = [
+          nix-hermes-agent.overlays.default
+          (final: prev: {
+            hermes-relay = final.callPackage ./packages/hermes-relay.nix { };
+          })
+        ]; }
         ./hosts/nxc/hermes
         sops-nix.nixosModules.sops
 

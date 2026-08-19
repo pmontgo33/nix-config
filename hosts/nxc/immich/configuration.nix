@@ -60,18 +60,14 @@
     };
   };
 
-  # Add immich user to video and render groups for hardware acceleration
-  users.users.immich.extraGroups = [ "video" "render" ];
-
-  # Enable hardware acceleration support
-  hardware.graphics = {
+  # Use the shared Intel GPU module. Keep the existing `render` group during
+  # this first migration because the mutable guest already has it at GID 104.
+  hardware.intelGpu = {
     enable = true;
-    extraPackages = with pkgs; [
-      intel-media-driver
-      intel-vaapi-driver
-      libva-vdpau-driver
-      libvdpau-va-gl
-    ];
+    users = [ "immich" ];
+    accessGroup = "render";
+    legacyAccessGroup = true;
+    computeRuntime = true;
   };
 
   # Immich Kiosk - slideshow display service

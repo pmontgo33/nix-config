@@ -15,5 +15,8 @@
     ./obsidian-headless.nix
     ./proxmox-storage-monitor.nix
     ./simplex-relay.nix
+    ./hermes-relay.nix
+    ./intel-gpu.nix
+    ./pihole
   ];
 }

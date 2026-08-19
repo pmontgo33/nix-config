@@ -1,0 +1,51 @@
+{
+  "inventory": {
+    "schemaVersion": 1,
+    "identitySource": "sops-runtime",
+    "ownership": {
+      "dhcpv4": "opnsense-dnsmasq",
+      "dhcpv6": "opnsense",
+      "routerAdvertisements": "opnsense",
+      "rdnss": "opnsense",
+      "dnsDuringPhase1": "adguard",
+      "localDns": "opnsense-unbound"
+    },
+    "networkProfiles": {
+      "lan": {
+        "interface": "lan",
+        "subnet": "192.168.86.0/24",
+        "gateway": "192.168.86.1",
+        "dhcpRange": {"from": "192.168.86.210", "to": "192.168.86.254"},
+        "dnsDuringPhase1": ["192.168.86.1"]
+      }
+    },
+    "devices": {
+      "test-server": {
+        "network": {
+          "hostname": "test-server",
+          "address": "192.168.86.10",
+          "identityRef": "lan-test-server",
+          "interface": "lan",
+          "piholeGroup": "normal"
+        },
+        "services": {
+          "web": {
+            "hostname": "test.home.montycasa.net",
+            "protocol": "http",
+            "upstreamPort": 8080,
+            "proxy": "caddy"
+          }
+        }
+      },
+      "test-tablet": {
+        "network": {
+          "hostname": null,
+          "address": "192.168.86.11",
+          "identityRef": "lan-test-tablet",
+          "interface": "lan",
+          "piholeGroup": "normal"
+        }
+      }
+    }
+  }
+}
