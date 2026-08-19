@@ -25,7 +25,7 @@ FORBIDDEN_KEYS = {
     "mac", "macaddress", "clientid", "clientidentifier", "password", "secret",
     "token", "apikey", "accesstoken",
 }
-TOP_LEVEL_KEYS = {"schemaVersion", "identitySource", "ownership", "networkProfiles", "staticGuests", "devices", "localDns"}
+TOP_LEVEL_KEYS = {"schemaVersion", "identitySource", "ownership", "networkProfiles", "staticGuests", "devices", "localDns", "policy"}
 OWNERSHIP_KEYS = {"dhcpv4", "dhcpv6", "routerAdvertisements", "rdnss", "dnsDuringPhase1", "localDns"}
 PROFILE_KEYS = {"interface", "subnet", "gateway", "dhcpRange", "dnsDuringPhase1"}
 RANGE_KEYS = {"from", "to"}
@@ -38,6 +38,13 @@ LOCAL_DNS_KEYS = {"zones"}
 LOCAL_DNS_ZONE_KEYS = {"hostOverrides", "aliases"}
 HOST_OVERRIDE_KEYS = {"hostname", "rr", "server", "ttl", "addptr", "enabled", "description"}
 HOST_ALIAS_KEYS = {"hostname", "target", "targetRr", "enabled", "description"}
+POLICY_KEYS = {"base", "adlists", "groups", "groupAssignments", "localDns", "rules"}
+POLICY_BASE_KEYS = {"upstreams", "listeningInterfaces", "queryLogging", "retention"}
+POLICY_ADLIST_KEYS = {"address", "enabled", "description", "type"}
+POLICY_GROUP_KEYS = {"description", "enabled"}
+POLICY_RULE_KINDS = {"allow", "block"}
+POLICY_ADLIST_ADDRESS = "file:///var/lib/pihole/baseline.hosts"
+POLICY_ADLIST_DESCRIPTION = "Shared Pi-hole baseline adlist"
 DNS_ZONE_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
 DNS_HOST_RE = re.compile(r"^[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?$")
 
@@ -264,6 +271,88 @@ def _validate_local_dns(inventory: dict[str, Any]) -> tuple[list[dict[str, Any]]
     return sorted(overrides, key=lambda item: item["recordRef"]), sorted(aliases, key=lambda item: item["aliasRef"])
 
 
+def _policy_text(value: Any, path: str, *, allow_empty: bool = False) -> str:
+    _require(isinstance(value, str), f"{path} must be a string")
+    _require(allow_empty or bool(value), f"{path} must not be empty")
+    _require(not any(ord(char) < 0x20 or ord(char) == 0x7F for char in value), f"{path} contains control characters")
+    _require(len(value) <= 2048, f"{path} is too long")
+    return value
+
+
+def _validate_policy(inventory: dict[str, Any]) -> dict[str, Any]:
+    _require("policy" in inventory, "inventory.policy is required for the complete baseline policy")
+    policy = inventory["policy"]
+    _require(isinstance(policy, dict), "policy must be an object")
+    _ensure_keys(policy, POLICY_KEYS, "inventory.policy")
+    _require(set(policy) == POLICY_KEYS, "inventory.policy must contain the complete baseline policy")
+
+    base = policy["base"]
+    _require(isinstance(base, dict), "policy.base must be an object")
+    _ensure_keys(base, POLICY_BASE_KEYS, "inventory.policy.base")
+    _require(set(base) == POLICY_BASE_KEYS, "policy.base must contain the complete baseline settings")
+    _require(base["upstreams"] == ["192.168.86.1#5353"], "policy.base.upstreams must contain the current upstream only")
+    _require(base["listeningInterfaces"] == ["eth0"], "policy.base.listeningInterfaces must contain eth0 only")
+    _require(base["queryLogging"] is True, "policy.base.queryLogging must be true")
+    _require(base["retention"] == 91, "policy.base.retention must be 91 days")
+    _policy_text(base["upstreams"][0], "policy.base.upstreams[0]")
+    _policy_text(base["listeningInterfaces"][0], "policy.base.listeningInterfaces[0]")
+    _require(isinstance(base["queryLogging"], bool), "policy.base.queryLogging must be a boolean")
+    _require(isinstance(base["retention"], int) and not isinstance(base["retention"], bool), "policy.base.retention must be an integer")
+
+    adlists = policy["adlists"]
+    _require(isinstance(adlists, dict), "policy.adlists must be an object")
+    _require(set(adlists) == {"standard", "kids"}, "policy.adlists must contain standard and kids lists only")
+    standard = adlists["standard"]
+    kids = adlists["kids"]
+    _require(isinstance(standard, list) and len(standard) == 1, "policy.adlists.standard must contain the baseline list only")
+    _require(kids == [], "policy.adlists.kids must be empty for the baseline policy")
+    adlist = standard[0]
+    _require(isinstance(adlist, dict), "policy.adlists.standard entry must be an object")
+    _ensure_keys(adlist, POLICY_ADLIST_KEYS, "inventory.policy.adlists.standard[0]")
+    _require(set(adlist) == {"address", "enabled", "description"}, "baseline adlist has unsupported or missing fields")
+    _require(adlist["address"] == POLICY_ADLIST_ADDRESS, "policy adlist must use the existing shared baseline list")
+    _require(adlist["enabled"] is True, "baseline adlist must be enabled")
+    _require(adlist["description"] == POLICY_ADLIST_DESCRIPTION, "baseline adlist description does not match the shared baseline")
+    _policy_text(adlist["address"], "policy.adlists.standard[0].address")
+    _policy_text(adlist["description"], "policy.adlists.standard[0].description")
+
+    groups = policy["groups"]
+    _require(isinstance(groups, dict) and set(groups) == {"normal", "kids"}, "policy.groups must contain normal and kids only")
+    normalized_groups: dict[str, dict[str, str]] = {}
+    for name in ("normal", "kids"):
+        group = groups[name]
+        _require(isinstance(group, dict), f"policy.groups.{name} must be an object")
+        _ensure_keys(group, POLICY_GROUP_KEYS, f"inventory.policy.groups.{name}")
+        _require(set(group) == {"description"}, f"policy.groups.{name} must contain only its description")
+        description = _policy_text(group["description"], f"policy.groups.{name}.description")
+        normalized_groups[name] = {"description": description}
+    _require(normalized_groups == {
+        "normal": {"description": "Normal clients"},
+        "kids": {"description": "Kids clients"},
+    }, "policy group descriptions do not match the baseline policy")
+
+    assignments = policy["groupAssignments"]
+    _require(assignments == {}, "policy.groupAssignments must be empty until identities are resolved")
+    _require(policy["localDns"] == [], "policy.localDns must be empty for the baseline policy")
+    rules = policy["rules"]
+    _require(isinstance(rules, dict) and set(rules) == POLICY_RULE_KINDS, "policy.rules must contain allow and block only")
+    _require(rules["allow"] == [] and rules["block"] == [], "policy.rules must be empty for the baseline policy")
+
+    return {
+        "base": {
+            "upstreams": list(base["upstreams"]),
+            "listeningInterfaces": list(base["listeningInterfaces"]),
+            "queryLogging": base["queryLogging"],
+            "retention": base["retention"],
+        },
+        "adlists": {"standard": [dict(adlist)], "kids": []},
+        "groups": normalized_groups,
+        "groupAssignments": {},
+        "localDns": [],
+        "rules": {"allow": [], "block": []},
+    }
+
+
 def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
     _scan_for_forbidden(inventory)
     _ensure_keys(inventory, TOP_LEVEL_KEYS, "inventory")
@@ -281,6 +370,8 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
         "dnsDuringPhase1": "adguard",
         "localDns": "opnsense-unbound",
     }, "Gate 1A ownership must keep DHCPv6/RA/RDNSS/local DNS on OPNsense and DNS on AdGuard")
+
+    policy = _validate_policy(inventory)
 
     profiles = inventory.get("networkProfiles")
     static_guests = inventory.get("staticGuests", {})
@@ -440,6 +531,7 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
     return {
         "schemaVersion": 1,
         "ownership": ownership,
+        "policy": policy,
         "networkProfiles": profiles,
         "staticGuests": static_guest_records,
         "reservations": reservations,
@@ -456,7 +548,7 @@ def render(inventory: dict[str, Any]) -> dict[str, Any]:
     reservations = checked["reservations"]
     services = checked["services"]
     addresses = checked["deviceAddresses"]
-    return {
+    output = {
         "schemaVersion": checked["schemaVersion"],
         "apply": False,
         "identityResolutionRequired": bool(reservations),
@@ -493,6 +585,8 @@ def render(inventory: dict[str, Any]) -> dict[str, Any]:
         "unboundHostOverrides": checked["unboundHostOverrides"],
         "unboundHostAliases": checked["unboundHostAliases"],
     }
+    output["policy"] = checked["policy"]
+    return output
 
 
 def main() -> int:
