@@ -52,6 +52,33 @@
       };
     };
 
+    staticGuests = {
+      pihole1 = {
+        network = {
+          hostname = "pihole1";
+          address = "192.168.86.101";
+          interface = "lan";
+        };
+        placement = {
+          preferredNode = "loki";
+          fallbackNodes = [ "stark" ];
+        };
+      };
+
+      pihole2 = {
+        network = {
+          hostname = "pihole2";
+          address = "192.168.86.102";
+          interface = "lan";
+        };
+        placement = {
+          preferredNode = "starlord";
+          fallbackNodes = [ "stark" ];
+        };
+      };
+
+    };
+
     devices = {
       poe-switch-basement = {
         network = {

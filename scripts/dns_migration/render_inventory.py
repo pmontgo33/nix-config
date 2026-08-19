@@ -25,12 +25,14 @@ FORBIDDEN_KEYS = {
     "mac", "macaddress", "clientid", "clientidentifier", "password", "secret",
     "token", "apikey", "accesstoken",
 }
-TOP_LEVEL_KEYS = {"schemaVersion", "identitySource", "ownership", "networkProfiles", "devices", "localDns"}
+TOP_LEVEL_KEYS = {"schemaVersion", "identitySource", "ownership", "networkProfiles", "staticGuests", "devices", "localDns"}
 OWNERSHIP_KEYS = {"dhcpv4", "dhcpv6", "routerAdvertisements", "rdnss", "dnsDuringPhase1", "localDns"}
 PROFILE_KEYS = {"interface", "subnet", "gateway", "dhcpRange", "dnsDuringPhase1"}
 RANGE_KEYS = {"from", "to"}
 DEVICE_KEYS = {"network", "placement", "services"}
 NETWORK_KEYS = {"hostname", "address", "identityRef", "interface", "piholeGroup"}
+STATIC_GUEST_KEYS = {"network", "placement"}
+STATIC_GUEST_NETWORK_KEYS = {"hostname", "address", "interface"}
 SERVICE_KEYS = {"hostname", "protocol", "upstreamPort", "proxy"}
 LOCAL_DNS_KEYS = {"zones"}
 LOCAL_DNS_ZONE_KEYS = {"hostOverrides", "aliases"}
@@ -281,8 +283,10 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
     }, "Gate 1A ownership must keep DHCPv6/RA/RDNSS/local DNS on OPNsense and DNS on AdGuard")
 
     profiles = inventory.get("networkProfiles")
+    static_guests = inventory.get("staticGuests", {})
     devices = inventory.get("devices")
     _require(bool(isinstance(profiles, dict) and profiles), "networkProfiles must be non-empty")
+    _require(isinstance(static_guests, dict), "staticGuests must be an object")
     _require(bool(isinstance(devices, dict) and devices), "devices must be non-empty")
     profiles = profiles if isinstance(profiles, dict) else {}
     devices = devices if isinstance(devices, dict) else {}
@@ -325,6 +329,41 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
     pool_warnings: list[dict[str, str]] = []
     services: list[dict[str, Any]] = []
     device_addresses: dict[str, str] = {}
+    static_guest_records: list[dict[str, Any]] = []
+    for guest_name, guest_value in sorted(static_guests.items()):
+        _require(isinstance(guest_value, dict), f"static guest {guest_name} must be an object")
+        guest = guest_value
+        _ensure_keys(guest, STATIC_GUEST_KEYS, f"staticGuests.{guest_name}")
+        network_value = guest.get("network")
+        _require(isinstance(network_value, dict), f"static guest {guest_name}.network is required")
+        network = network_value
+        _ensure_keys(network, STATIC_GUEST_NETWORK_KEYS, f"staticGuests.{guest_name}.network")
+        interface = network.get("interface")
+        _require(isinstance(interface, str) and interface in ALLOWED_INTERFACES, f"invalid static guest interface: {guest_name}")
+        _require(interface in profile_networks, f"static guest interface has no matching network profile: {guest_name}")
+        address = _ipv4(network.get("address"), f"staticGuests.{guest_name}.network.address")
+        _require(address in profile_networks[interface], f"static guest address is outside profile subnet: {guest_name}")
+        range_from, range_to = profile_ranges[interface]
+        _require(not (range_from <= address <= range_to), f"static guest address is inside dynamic DHCP range: {guest_name}")
+        address_text = str(address)
+        _require(address_text not in addresses, f"duplicate static guest address {address_text}: {addresses.get(address_text)}")
+        hostname = network.get("hostname")
+        _require(isinstance(hostname, str) and bool(DNS_HOST_RE.fullmatch(hostname)), f"invalid static guest hostname: {guest_name}")
+        _require(hostname not in hostnames and hostname not in {item["hostname"] for item in static_guest_records}, f"duplicate static guest hostname: {hostname}")
+        placement_value = guest.get("placement")
+        if placement_value is not None:
+            _require(isinstance(placement_value, dict), f"staticGuests.{guest_name}.placement must be an object")
+            _ensure_keys(placement_value, {"preferredNode", "fallbackNodes"}, f"staticGuests.{guest_name}.placement")
+            preferred_node = placement_value.get("preferredNode")
+            fallback_nodes = placement_value.get("fallbackNodes")
+            _require(isinstance(preferred_node, str) and bool(preferred_node), f"invalid preferredNode: {guest_name}")
+            _require(isinstance(fallback_nodes, list) and all(isinstance(node, str) and bool(node) for node in fallback_nodes), f"invalid fallbackNodes: {guest_name}")
+            _require(len(fallback_nodes) == len(set(fallback_nodes)), f"duplicate fallback node: {guest_name}")
+            _require(preferred_node not in fallback_nodes, f"preferredNode is also a fallback node: {guest_name}")
+        static_guest_records.append({"guest": guest_name, "hostname": hostname, "address": address_text, "interface": interface, "placement": placement_value or {}})
+        addresses[address_text] = guest_name
+        hostnames[hostname] = guest_name
+        device_addresses[guest_name] = address_text
     for device_name, device_value in sorted(devices.items()):
         _require(isinstance(device_value, dict), f"device {device_name} must be an object")
         device = device_value
@@ -402,6 +441,7 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
         "schemaVersion": 1,
         "ownership": ownership,
         "networkProfiles": profiles,
+        "staticGuests": static_guest_records,
         "reservations": reservations,
         "services": services,
         "deviceAddresses": device_addresses,
@@ -422,6 +462,7 @@ def render(inventory: dict[str, Any]) -> dict[str, Any]:
         "identityResolutionRequired": bool(reservations),
         "ownership": checked["ownership"],
         "networkProfiles": checked["networkProfiles"],
+        "staticGuests": checked["staticGuests"],
         "networkReservations": reservations,
         "piholeClients": [
             {

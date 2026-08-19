@@ -49,7 +49,7 @@
 
       "pbs.montycasa.net" = { 
         protocol = "https"; 
-        upstream = "192.168.86.102:8007"; 
+        upstream = "192.168.86.123:8007";
       };
 
       "truenas.montycasa.net" = { 

@@ -255,6 +255,44 @@
       ];
     };
 
+    ## pihole1 ##
+    nixosConfigurations.pihole1 = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; outputs = self; piholeHostName = "pihole1"; };
+      modules = [
+        ./hosts/nxc/common
+        ./hosts/nxc/pihole/configuration.nix
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
+    ## pihole2 ##
+    nixosConfigurations.pihole2 = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit inputs; outputs = self; piholeHostName = "pihole2"; };
+      modules = [
+        ./hosts/nxc/common
+        ./hosts/nxc/pihole/configuration.nix
+        sops-nix.nixosModules.sops
+
+        home-manager.nixosModules.home-manager
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.backupFileExtension = "backup";
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          home-manager.sharedModules = [ sops-nix.homeManagerModules.sops ];
+        }
+      ];
+    };
+
     ## lxc-tailscale ##
     nixosConfigurations.lxc-tailscale = nixpkgs.lib.nixosSystem {
       specialArgs = { inherit inputs; };
