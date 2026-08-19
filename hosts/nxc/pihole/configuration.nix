@@ -4,6 +4,11 @@
   proxmoxLXC.manageHostName = true;
   networking.hostName = piholeHostName;
 
+  extra-services.tailscale = {
+    enable = true;
+    lxc = true;
+  };
+
   imports = [
     (modulesPath + "/virtualisation/proxmox-lxc.nix")
   ];
