@@ -1,7 +1,13 @@
 keys:
   - &primary age1mj505tutcdlqrmwstn6n2dka55py3f5pq9kcnrwfg8hggy6ckd2q3u5x48
+  - &pihole_identities age1skt64unrssfygud3n7m9nvn65rmgx39p90v7xkwryc44dp7vl4ts7gcy8s
 creation_rules:
-  - path_regex: secrets/[^/]+\.(yaml|json|env|ini)$
+  - path_regex: ^secrets/pihole-identities\.yaml$
+    key_groups:
+    - age:
+      - *primary
+      - *pihole_identities
+  - path_regex: ^secrets/[^/]+\.(yaml|json|env|ini)$
     key_groups:
     - age:
       - *primary
