@@ -39,6 +39,12 @@ nfc:
 secrets:
   -nix-shell -p sops --run "SOPS_AGE_KEY_FILE='/home/patrick/.config/sops/age/keys.txt' sops secrets/secrets.yaml"
 
+pihole-identities:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-/home/patrick/.config/sops/age/keys.txt}"
+  exec nix shell nixpkgs#sops --command sops secrets/pihole-identities.yaml
+
 git-acpush message branch="master":
   git add .
   git commit -m "{{message}}"
