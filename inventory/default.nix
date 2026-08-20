@@ -262,15 +262,6 @@
         };
       };
 
-      reservation-guest-193 = {
-        network = {
-          hostname = null;
-          address = "192.168.20.193";
-          identityRef = "guest-reservation-193";
-          interface = "guest";
-          piholeGroup = "normal";
-        };
-      };
     };
 
     localDns = {
