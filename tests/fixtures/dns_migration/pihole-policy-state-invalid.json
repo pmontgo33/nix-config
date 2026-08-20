@@ -1,0 +1,9 @@
+{
+  "base": {
+    "upstreams": ["192.168.86.1#5353"],
+    "listeningInterfaces": ["eth0"],
+    "queryLogging": true,
+    "retention": 91
+  },
+  "groups": {"groups": []}
+}

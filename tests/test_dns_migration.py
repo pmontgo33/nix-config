@@ -27,6 +27,29 @@ class InventoryRenderingTests(unittest.TestCase):
         self.assertEqual(first["ownership"]["dhcpv6"], "opnsense")
         self.assertEqual(first["ownership"]["routerAdvertisements"], "opnsense")
         self.assertEqual(first["ownership"]["localDns"], "opnsense-unbound")
+        self.assertEqual(first["policy"], {
+            "base": {
+                "upstreams": ["192.168.86.1#5353"],
+                "listeningInterfaces": ["eth0"],
+                "queryLogging": True,
+                "retention": 91,
+            },
+            "adlists": {
+                "standard": [{
+                    "address": "file:///var/lib/pihole/baseline.hosts",
+                    "enabled": True,
+                    "description": "Shared Pi-hole baseline adlist",
+                }],
+                "kids": [],
+            },
+            "groups": {
+                "normal": {"description": "Normal clients"},
+                "kids": {"description": "Kids clients"},
+            },
+            "groupAssignments": {},
+            "localDns": [],
+            "rules": {"allow": [], "block": []},
+        })
         self.assertEqual(first["staticGuests"], [
             {
                 "guest": "pihole1",
@@ -71,6 +94,18 @@ class InventoryRenderingTests(unittest.TestCase):
         self.assertEqual(rendered["caddyRoutes"][0]["upstream"], "192.168.86.10:8080")
         self.assertIsNone(rendered["piholeClients"][0]["identifier"])
         self.assertEqual(rendered["piholeClients"][0]["status"], "pending-encrypted-identity-resolution")
+
+    def test_policy_is_required_at_the_inventory_boundary(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory.pop("policy", None)
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
+
+    def test_policy_schema_rejects_unsupported_baseline_fields(self):
+        inventory = render_inventory.load_source(self.inventory_path, None)
+        inventory["policy"]["base"]["safeSearch"] = True
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
 
     def test_local_dns_renders_opnsense_unbound_host_overrides_and_aliases(self):
         inventory = render_inventory.load_source(None, self.fixture_path)

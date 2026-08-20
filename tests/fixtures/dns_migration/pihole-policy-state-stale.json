@@ -1,0 +1,16 @@
+{
+  "base": {
+    "upstreams": ["192.168.86.1#5353"],
+    "listeningInterfaces": ["eth0"],
+    "queryLogging": true,
+    "retention": 91
+  },
+  "adlists": [],
+  "groups": [
+    {"name": "normal", "description": "Normal clients", "managed": true, "owner": "shared-pihole-policy"},
+    {"name": "obsolete", "description": "old managed group", "managed": true, "owner": "shared-pihole-policy"}
+  ],
+  "clients": [],
+  "localDns": [],
+  "rules": []
+}

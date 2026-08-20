@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "apply": false,
+  "identityResolutionRequired": false,
+  "unresolvedIdentityRefs": [],
+  "piholeClients": [
+    {
+      "clientRef": "identityRef:lan-test-server",
+      "identifier": "fixture-client-alpha",
+      "status": "resolved",
+      "device": "test-server",
+      "hostname": "test-server",
+      "address": "192.168.86.10",
+      "group": "normal"
+    },
+    {
+      "clientRef": "identityRef:lan-test-tablet",
+      "identifier": "fixture-client-beta",
+      "status": "resolved",
+      "device": "test-tablet",
+      "hostname": null,
+      "address": "192.168.86.11",
+      "group": "kids"
+    }
+  ],
+  "services": [],
+  "unboundHostOverrides": [],
+  "unboundHostAliases": [],
+  "policy": {
+    "base": {
+      "upstreams": ["192.168.86.1#5353"],
+      "listeningInterfaces": ["eth0"],
+      "queryLogging": true,
+      "retention": 91
+    },
+    "adlists": {
+      "standard": [
+        {
+          "address": "file:///var/lib/pihole/baseline.hosts",
+          "enabled": true,
+          "description": "Shared Pi-hole baseline adlist"
+        }
+      ],
+      "kids": []
+    },
+    "groups": {
+      "normal": {"description": "Normal clients"},
+      "kids": {"description": "Kids clients"}
+    },
+    "groupAssignments": {
+      "identityRef:lan-test-server": "normal",
+      "identityRef:lan-test-tablet": "kids"
+    },
+    "localDns": [],
+    "rules": {"allow": [], "block": []}
+  }
+}

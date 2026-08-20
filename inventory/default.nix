@@ -17,6 +17,38 @@
       localDns = "opnsense-unbound";
     };
 
+    policy = {
+      base = {
+        upstreams = [ "192.168.86.1#5353" ];
+        listeningInterfaces = [ "eth0" ];
+        queryLogging = true;
+        retention = 91;
+      };
+
+      adlists = {
+        standard = [
+          {
+            address = "file:///var/lib/pihole/baseline.hosts";
+            enabled = true;
+            description = "Shared Pi-hole baseline adlist";
+          }
+        ];
+        kids = [ ];
+      };
+
+      groups = {
+        normal = { description = "Normal clients"; };
+        kids = { description = "Kids clients"; };
+      };
+
+      groupAssignments = { };
+      localDns = [ ];
+      rules = {
+        allow = [ ];
+        block = [ ];
+      };
+    };
+
     networkProfiles = {
       lan = {
         interface = "lan";
