@@ -236,7 +236,7 @@ def _validate_config(config: dict[str, Any]) -> None:
 
     schemas = {
         "dns": {"port": int, "queryLogging": bool, "upstreams": list, "interface": str},
-        "database": {"DBimport": bool, "maxDBdays": int, "DBinterval": int, "useWAL": bool, "forceDisk": bool, "network": bool},
+        "database": {"DBimport": bool, "maxDBdays": int, "DBinterval": int, "useWAL": bool, "forceDisk": bool, "network": {"parseARPcache": bool, "expire": int}},
         "ntp": {"ipv4": {"active": bool, "address": str}, "ipv6": {"active": bool, "address": str}, "sync": {"active": bool, "server": str, "interval": int, "count": int, "rtc": {"set": bool, "device": str, "utc": bool}}},
         "resolver": {"resolveIPv4": bool, "resolveIPv6": bool, "macNames": bool, "networkNames": bool, "refreshNames": str},
         "files": {"pid": str, "database": str, "tmp_db": str, "gravity": str, "gravity_tmp": str, "macvendor": str, "pcap": str, "log": {"ftl": str, "dnsmasq": str, "webserver": str}},
@@ -618,9 +618,12 @@ def _validate_write_response(response: Any, family: str) -> None:
 def reconcile_live(inventory: Any, *, credential_callback: Callable[[], str], transport: Any, apply: bool = False, confirmation: str | None = None) -> dict[str, Any]:
     if apply and (type(confirmation) is not str or confirmation != APPLY_CONFIRMATION):
         raise _error("exact apply confirmation is required")
-    if apply and type(transport) is not UrllibTransport:
-        raise _error("live apply requires validated Pi-hole transport")
-    validated_origin = validate_origin(transport.origin) if type(transport) is UrllibTransport else None
+    if apply:
+        if type(transport) is not UrllibTransport:
+            raise _error("live apply requires validated Pi-hole transport")
+        validated_origin = validate_origin(transport.origin, allow_private_http=getattr(transport, "_allow_private_http", False))
+    else:
+        validated_origin = None
     _desired(inventory)
     password = _credential(credential_callback)
     sid = _authenticate_password(transport, password, guarded=apply, origin=validated_origin)
@@ -762,17 +765,18 @@ def validate_origin(origin: str, *, allow_private_http: bool = False) -> str:
 
 class UrllibTransport:
     """Fixed-surface JSON transport with redirects disabled."""
-    __slots__ = ("_origin", "timeout", "_frozen")
+    __slots__ = ("_origin", "timeout", "_frozen", "_allow_private_http")
     safety_validated = True
 
     def __init__(self, origin: str, *, allow_private_http: bool = False, timeout: int = 15):
         validated = validate_origin(origin, allow_private_http=allow_private_http)
         object.__setattr__(self, "_origin", validated)
+        object.__setattr__(self, "_allow_private_http", allow_private_http)
         self.timeout = timeout
         object.__setattr__(self, "_frozen", True)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if hasattr(self, "_frozen") and name in {"_origin", "timeout", "_frozen"}:
+        if hasattr(self, "_frozen") and name in {"_origin", "timeout", "_frozen", "_allow_private_http"}:
             raise AttributeError("transport is immutable")
         object.__setattr__(self, name, value)
 
