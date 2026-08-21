@@ -20,21 +20,40 @@ let
   '';
 
   # Generate config based on protocol type
-  mkConfig = { protocol, upstream }: 
-    if protocol == "http" then ''
-      ${cfTls}
-      reverse_proxy ${upstream}
-    ''
-    else if protocol == "https" then ''
-      ${cfTls}
-      reverse_proxy ${upstream} {
-        transport http {
-          tls
-          tls_insecure_skip_verify
+  mkConfig = { protocol, upstream, pathRewrite }:
+    let
+      mkRoute = rewrite: ''
+        route {
+          @rewrite path ${rewrite}*
+          redir @rewrite ${rewrite} permanent
+          reverse_proxy ${upstream}
         }
-      }
-    ''
-    else throw "Protocol ${protocol} should be handled in layer4, not virtualHosts";
+      '';
+      mkHttp = rewrite:
+        if rewrite != null && rewrite != "" then ''
+          ${cfTls}
+          ${mkRoute rewrite}
+        '' else ''
+          ${cfTls}
+          reverse_proxy ${upstream}
+        '';
+      mkHttps = rewrite:
+        if rewrite != null && rewrite != "" then ''
+          ${cfTls}
+          ${mkRoute rewrite}
+        '' else ''
+          ${cfTls}
+          reverse_proxy ${upstream} {
+            transport http {
+              tls
+              tls_insecure_skip_verify
+            }
+          }
+        '';
+    in
+      if protocol == "http" then mkHttp pathRewrite
+      else if protocol == "https" then mkHttps pathRewrite
+      else throw "Protocol ${protocol} should be handled in layer4, not virtualHosts";
 
   # Generate layer4 config for SNI-based services
   mkLayer4SniConfig = domain: { protocol, upstream }: ''
@@ -70,6 +89,15 @@ in
           upstream = mkOption {
             type = types.str;
             description = "Upstream server address (e.g., host.internal:8080)";
+          };
+          pathRewrite = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = ''
+              Optional URL prefix to 301-redirect traffic to. When set, requests
+              to the bare hostname are permanently redirected to the given
+              target, and all other requests are proxied normally.
+            '';
           };
         };
       });
@@ -159,7 +187,7 @@ in
       '';
       
       virtualHosts = mapAttrs (domain: config: {
-        extraConfig = mkConfig config;
+        extraConfig = mkConfig { inherit (config) protocol upstream pathRewrite; };
       }) httpServices;
     };
 
