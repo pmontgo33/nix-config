@@ -143,6 +143,10 @@ let
     cp -r ${mnemosyneHermes}/lib/python3.12/site-packages/mnemosyne_hermes/* $out/
     chmod -R a+rX $out
   '';
+  hermes-scripts = pkgs.runCommandLocal "hermes-scripts" { } ''
+    mkdir -p $out
+    install -m 0555 ${../../../scripts/bernie/model_worker.py} $out/model_worker.py
+  '';
   forgejo-credential-helper = pkgs.writeShellScript "forgejo-credential-helper" ''
     host=""
     protocol=""
@@ -278,8 +282,16 @@ in
 
   # Hermes gateway API keys stay in openclaw-env. Forgejo Git authentication is
   # a separate, runtime-only file consumed solely by the URL-scoped helper.
-  sops.secrets."openclaw-env".mode = "0444";
-  sops.secrets."hermes-webhook".mode = "0444";
+  sops.secrets."openclaw-env" = {
+    owner = "hermes";
+    group = "users";
+    mode = "0400";
+  };
+  sops.secrets."hermes-webhook" = {
+    owner = "hermes";
+    group = "users";
+    mode = "0400";
+  };
   sops.secrets."forgejo-token" = {
     owner = "hermes";
     group = "users";
@@ -755,6 +767,10 @@ in
     documents."SOUL.md" = builtins.readFile ./documents/SOUL.md;
   };
 
+  environment.etc."hermes/bernie/worker-registry.json" = {
+    source = ./delegation/worker-registry.json;
+  };
+
   # Inject allowlist into the systemd environment so hermes's os.getenv()
   # check sees it at startup (the module writes these to .env but the gateway
   # allowlist check uses os.getenv, not hermes's own .env loader).
@@ -763,6 +779,8 @@ in
     HERMES_MANAGED = "true";
     MATTERMOST_ALLOWED_USERS = "yyhr83fpj3n3fpnjzf3o1zah6r";
     WIKI_PATH = "/var/lib/hermes/vault/MontyVault/Hermes/Wiki";
+    BERNIE_WORKER_REGISTRY = "/etc/hermes/bernie/worker-registry.json";
+    BERNIE_WORKER_EXECUTABLE = "/var/lib/hermes/scripts/bernie/model_worker.py";
   };
 
   # Fix file ownership after nix rebuilds. The activation script chowns
@@ -775,6 +793,12 @@ in
   '';
 
   systemd.tmpfiles.rules = [
+    "d /var/lib/hermes/scripts 0755 hermes users -"
+    "L+ /var/lib/hermes/scripts/bernie - - - - ${hermes-scripts}"
+    "z /var/lib/hermes/.hermes/.env 0600 hermes users -"
+    "d /var/lib/hermes/.local 0700 hermes users -"
+    "d /var/lib/hermes/.local/state 0700 hermes users -"
+    "d /var/lib/hermes/.local/state/bernie-delegation 0700 hermes users -"
     "d /var/lib/hermes/.cache 0700 hermes users -"
     "d /var/lib/hermes/.hermes/mnemosyne 0750 hermes users -"
     "d /var/lib/hermes/.hermes/mnemosyne/data 0750 hermes users -"
