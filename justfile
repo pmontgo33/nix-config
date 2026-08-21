@@ -86,3 +86,6 @@ av-edit-vars:
 
 reqs:
   ansible-galaxy install -r ansible/requirements.yml
+
+pihole-deploy host="all":
+  python3 scripts/pihole/deploy.py {{host}}

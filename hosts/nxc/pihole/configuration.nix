@@ -55,8 +55,12 @@
 
   services.pihole-ftl.lists = [
     {
-      url = "file://${pkgs.stevenblack-blocklist}/hosts";
-      description = "Shared Pi-hole baseline adlist";
+      url = "https://big.oisd.nl";
+      description = "OISD big — comprehensive ad/tracker/malware list";
+    }
+    {
+      url = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/pro.txt";
+      description = "Hagezi Pro — balanced DNS blocklist with malware coverage";
     }
   ];
 
