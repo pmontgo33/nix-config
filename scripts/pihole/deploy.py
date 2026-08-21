@@ -16,7 +16,7 @@ HOSTS = {
     "pihole1": "192.168.86.101",
     "pihole2": "192.168.86.102",
 }
-HEALTH_URL = "http://{ip}:8080/api/info/versions"
+HEALTH_URL = "http://{ip}:8080/api/auth"
 REBUILD_TIMEOUT = 600
 CURL_TIMEOUT = 10
 HEALTH_RETRIES = 10
@@ -61,9 +61,8 @@ def deploy(host):
                 capture_output=True, text=True, timeout=CURL_TIMEOUT,
             )
             data = json.loads(result.stdout)
-            if "FTL" in data:
-                ver = data.get("FTL", {}).get("version", "?")
-                log(host, f"Health OK — FTL {ver}")
+            if "session" in data:
+                log(host, "Health OK — Pi-hole API responding")
                 return True
             log(host, f"Attempt {attempt}: unexpected response: {result.stdout[:120]}")
         except subprocess.TimeoutExpired:
@@ -110,11 +109,15 @@ def main():
         print(f"Unknown host: {target}. Options: {', '.join(HOSTS.keys())}, all")
         sys.exit(1)
 
-    # --- Deploy each host in sequence ---
+    # --- Deploy each host in sequence (abort on first failure) ---
     results = {}
     try:
         for host in hosts:
-            results[host] = deploy(host)
+            ok = deploy(host)
+            results[host] = ok
+            if not ok:
+                print(f"\n!!! {host} FAILED — aborting. Remaining hosts skipped.")
+                break
     except KeyboardInterrupt:
         print("\n\nInterrupted (Ctrl+C). Cleaning up...")
         sys.exit(130)
@@ -125,7 +128,10 @@ def main():
     print(f"  {'-'*12} {'-'*17} {'-'*10}")
     for host in hosts:
         ip = HOSTS[host]
-        status = "OK" if results[host] else "FAILED"
+        if host not in results:
+            status = "SKIPPED"
+        else:
+            status = "OK" if results[host] else "FAILED"
         print(f"  {host:<12} {ip:<17} {status}")
 
     all_ok = all(results.values())
