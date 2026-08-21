@@ -373,7 +373,9 @@ class WorkerContractTests(unittest.TestCase):
             worker.load_registry(self.registry_path)
 
     def test_nix_registry_source_resolves_enabled_lanes(self) -> None:
-        path = Path("/var/lib/hermes/workspace/nix-config/hosts/nxc/hermes/delegation/worker-registry.json")
+        path = Path(__file__).resolve().parents[3] / "hosts/nxc/hermes/delegation/worker-registry.json"
+        if not path.is_file():
+            self.skipTest("Nix registry source is not present in this checkout")
         registry = worker.load_registry(path)
         self.assertEqual(worker.resolve_lane(registry, "general-tasks")["model"], "MiniMax-M3")
         self.assertEqual(worker.resolve_lane(registry, "simple-tasks")["model"], "MiniMax-M2.7")
