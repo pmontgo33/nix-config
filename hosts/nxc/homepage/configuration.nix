@@ -433,6 +433,7 @@ in
               widget = {
                 type = "pihole";
                 url = "https://pihole1.montycasa.net";
+                version = 6;
                 key = "{{HOMEPAGE_VAR_PIHOLE_API_KEY}}";
               };
             };
@@ -446,6 +447,7 @@ in
               widget = {
                 type = "pihole";
                 url = "https://pihole2.montycasa.net";
+                version = 6;
                 key = "{{HOMEPAGE_VAR_PIHOLE_API_KEY}}";
               };
             };
