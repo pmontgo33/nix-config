@@ -344,6 +344,9 @@ in
       enable = true;
       privacyLevel = cfg.privacyLevel;
       openFirewallDNS = cfg.openFirewallDNS;
+      # Do not use openFirewallWebserver — pihole-web.nix sets
+      # settings.webserver.port to "host:port" which breaks the NixOS
+      # firewall parser's toInt call. Instead, open the port directly.
       openFirewallWebserver = false;
       stateDirectory = cfg.stateDirectory;
       logDirectory = cfg.logDirectory;
@@ -395,6 +398,13 @@ in
         cfg.apiPasswordEnvironmentFile;
 
     systemd.services.pihole-ftl-setup.script = lib.mkForce setupScript;
+
+    # Open the web interface port when binding beyond loopback.
+    # Cannot use pihole-ftl's openFirewallWebserver because pihole-web.nix
+    # sets settings.webserver.port to "host:port" which breaks the NixOS
+    # firewall parser's toInt call.
+    networking.firewall.allowedTCPPorts =
+      lib.optionals (cfg.webListenAddress != "127.0.0.1") [ cfg.webPort ];
 
     services.pihole-web = {
       enable = true;
