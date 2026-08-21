@@ -429,7 +429,7 @@ in
               href = "https://pihole1.montycasa.net";
               siteMonitor = "https://pihole1.montycasa.net";
               description = "DNS Filtering — pihole1 (loki)";
-              icon = "sh-pihole.svg";
+              icon = "sh-pi-hole";
               widget = {
                 type = "pihole";
                 url = "https://pihole1.montycasa.net";
@@ -442,8 +442,8 @@ in
             "Pi-hole 2" = {
               href = "https://pihole2.montycasa.net";
               siteMonitor = "https://pihole2.montycasa.net";
-              description = "DNS Filtering — pihole2 (starlord)";
-              icon = "sh-pihole.svg";
+              description = "DNS Filtering — pihole2 (stark)";
+              icon = "sh-pi-hole";
               widget = {
                 type = "pihole";
                 url = "https://pihole2.montycasa.net";
