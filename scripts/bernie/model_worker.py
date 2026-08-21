@@ -291,6 +291,12 @@ def build_sandbox_argv(
         "--wait",
         "--collect",
         "--pipe",
+        *[f"--setenv={key}={value}" for key, value in {
+            "HOME": isolated_home,
+            "HERMES_HOME": isolated_home,
+            "HERMES_REAL_HOME": str(AUTH_DOTENV_PATH.parent.parent),
+            "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}",
+        }.items()],
         f"--unit={unit_name}",
         f"--working-directory={workspace}",
         *[f"--property={value}" for value in properties],
@@ -819,6 +825,16 @@ def _communicate_limited(process: subprocess.Popen[bytes], timeout: int, maximum
     return stdout, stderr, timed_out, oversized
 
 
+def _remove_credential_file(path: Path) -> bool:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 def _run_worker_with_registry(*, registry: dict[str, Any], lane_name: str, goal: str, context: str, repo: Path, dry_run: bool = False) -> dict[str, Any]:
     validate_registry(registry)
     limits = registry["limits"]
@@ -956,9 +972,8 @@ def _run_worker_with_registry(*, registry: dict[str, Any], lane_name: str, goal:
     except Exception as exc:
         result["error"] = str(exc)
     finally:
-        if credential_file is not None:
-            with contextlib.suppress(OSError):
-                credential_file.unlink()
+        if credential_file is not None and not _remove_credential_file(credential_file):
+            result["error"] = "credential environment file cleanup failed"
         after_git: dict[str, Any] | None = None
         after_tree: dict[str, Any] | None = None
         try:
