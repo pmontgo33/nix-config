@@ -153,8 +153,23 @@
       };
 
       "search.montycasa.net" = {
-        protocol = "http"; 
-        upstream = "192.168.86.137:8080"; 
+        protocol = "http";
+        upstream = "192.168.86.137:8080";
+      };
+
+      # Pi-hole admin/API web UIs — Gate 3B exposure. The Caddy host is the
+      # only Internet-reachable HTTPS endpoint; it proxies to the LAN-only
+      # Pi-hole Web at port 8080 on each instance. Both Pi-holes use the
+      # SOPS-rendered API credential (pihole-api-password) and serve the
+      # same reviewed Nix policy.
+      "pihole1.montycasa.net" = {
+        protocol = "http";
+        upstream = "192.168.86.101:8080";
+      };
+
+      "pihole2.montycasa.net" = {
+        protocol = "http";
+        upstream = "192.168.86.102:8080";
       };
     };
 

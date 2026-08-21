@@ -40,9 +40,14 @@
     upstreams = [
       "192.168.86.1#5353"
     ];
-    # Keep the API loopback-only during initial provisioning. Remote audit
-    # access will use an explicitly approved private path after smoke testing.
-    webListenAddress = "127.0.0.1";
+    # Gate 3B exposes the Pi-hole web admin/API on all interfaces so the
+    # Caddy reverse proxy (local-proxy) can terminate HTTPS at
+    # pihole1.montycasa.net / pihole2.montycasa.net. Narrowed to private
+    # management networks by the Caddy host firewall (LAN + Tailscale only)
+    # and proxied over HTTPS — port 8080 is not advertised to clients.
+    # SOPS-rendered apiPasswordEnvironmentFile is already required at this
+    # bind scope (modules/pihole default.nix).
+    webListenAddress = "0.0.0.0";
     apiPasswordEnvironmentFile = config.sops.templates."pihole-api-env".path;
     webPort = 8080;
     openFirewallDNS = true;
