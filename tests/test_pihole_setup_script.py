@@ -57,10 +57,9 @@ class NixSetupScriptBehaviourTests(unittest.TestCase):
         _ensure_bash_syntax(SETUP_SCRIPT)
         cls.declared_lists = _read_declared_lists()
 
-    def test_declared_lists_contain_baseline_oisd_hagezi(self):
+    def test_declared_lists_contain_oisd_and_hagezi(self):
         urls = {entry["url"] for entry in self.declared_lists}
         self.assertEqual(urls, {
-            "file:///var/lib/pihole/baseline.hosts",
             "https://big.oisd.nl",
             "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/pro.txt",
         })

@@ -34,11 +34,9 @@ class LiveAdapterTests(unittest.TestCase):
         self.assertNotIn("192.168.86.10", serialised)
         self.assertNotIn("192.168.86.11", serialised)
 
-    def test_adapt_emits_one_blocklist_adlist(self):
+    def test_adapt_emits_no_adlists(self):
         adapted = live_adapter.adapt(_rendered())
-        self.assertEqual(len(adapted["adlists"]), 1)
-        self.assertEqual(adapted["adlists"][0]["type"], "block")
-        self.assertTrue(adapted["adlists"][0]["address"].startswith("file:///"))
+        self.assertEqual(adapted["adlists"], [])
 
     def test_adapt_emits_two_groups_with_expected_names(self):
         adapted = live_adapter.adapt(_rendered())
@@ -59,13 +57,6 @@ class LiveAdapterTests(unittest.TestCase):
         self.assertEqual(adapted["base"]["dns"]["interface"], "eth0")
         self.assertEqual(adapted["base"]["dns"]["queryLogging"], True)
         self.assertEqual(adapted["base"]["database"]["maxDBdays"], 91)
-
-    def test_adapt_rejects_unknown_adlist_type(self):
-        rendered = _rendered()
-        for entry in rendered["desired"]["adlists"]:
-            entry["type"] = "bogus"
-        with self.assertRaises(live_adapter.LiveAdapterError):
-            live_adapter.adapt(rendered)
 
     def test_adapt_rejects_empty_local_dns_entries(self):
         rendered = _rendered()

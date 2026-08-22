@@ -55,10 +55,6 @@
 
   services.pihole-ftl.lists = [
     {
-      url = "file:///var/lib/pihole/baseline.hosts";
-      description = "Shared Pi-hole baseline adlist";
-    }
-    {
       url = "https://big.oisd.nl";
       description = "OISD big — comprehensive ad/tracker/malware list";
     }

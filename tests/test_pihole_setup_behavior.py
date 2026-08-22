@@ -284,13 +284,15 @@ exit_test_api() { return 0; }
         m = re.search(r'pihole="(/nix/store/[^"]*pihole-6[^"]*)"', script_text)
         assert m, "could not find pihole binary path in rendered script"
         script_text = script_text.replace(m.group(1), str(fake_dir / "pihole"))
-        script_text = script_text.replace(
-            f"{PIHOLE_NIX}/share/pihole/advanced/Scripts/api.sh",
+        script_text = re.sub(
+            r'/nix/store/[^"]+-pihole-[^"]+/share/pihole/advanced/Scripts/api\.sh',
             str(fake_api),
+            script_text,
         )
-        script_text = script_text.replace(
-            f"{PIHOLE_NIX}/share/pihole/advanced/Scripts/utils.sh",
+        script_text = re.sub(
+            r'/nix/store/[^"]+-pihole-[^"]+/share/pihole/advanced/Scripts/utils\.sh',
             str(fake_utils),
+            script_text,
         )
         # Replace every nix store path that points to one of the tools we
         # want to shim. The Nix module hard-codes absolute paths for
@@ -319,10 +321,8 @@ exit_test_api() { return 0; }
         # The install/mktemp/mv/rm binaries are still referenced by variable
         # name; ensure our shim dir is first on PATH so calls reach the
         # wrapped version.
-        # Replace the absolute `desired_lists=...` line in the script with a
-        # rewritten manifest that points the local file:// entry at the fake
-        # path inside tmp (so the preflight inside the script can read it).
-        fake_baseline_path = tmp / "fake_state_dir" / "var" / "lib" / "pihole" / "baseline.hosts"
+        # Replace the absolute `desired_lists=...` line in the script with
+        # the test manifest.
         rewritten_desired = json.dumps(desired_manifest, separators=(",", ":"))
         script_text = re.sub(
             r'^desired_lists=.*$',
@@ -331,19 +331,9 @@ exit_test_api() { return 0; }
             count=1,
             flags=re.M,
         )
-        # Also rewrite every `ensureList '<json>'` payload so the create
-        # calls post the rewritten file:// URL to the fake API; otherwise
-        # the state would still contain /var/lib/pihole/baseline.hosts and
-        # the post-gravity verification would fail to converge.
-        # The rewrite must happen on the rewritten desired_lists too.
-        script_text = re.sub(
-            r"file:///var/lib/pihole/baseline\.hosts",
-            f"file://{fake_baseline_path}",
-            script_text,
-        )
 
         # Rewrite absolute Pi-hole state directory references to the test
-        # tmp dir so the preflight, marker, and mac vendor paths resolve.
+        # tmp dir so the marker and mac vendor paths resolve.
         state_dir = tmp / "state"
         script_text = re.sub(
             r'^install=.*$',
@@ -481,15 +471,14 @@ exit_test_api() { return 0; }
             ]
             self.assertEqual(len(delete_requests), 1)
             self.assertTrue(all(set(item) == {"item", "type"} for item in delete_requests[0]["payload"]))
-            self.assertEqual(len(create_requests), 3)
+            self.assertEqual(len(create_requests), 2)
             self.assertTrue(
                 all("type" not in request["payload"] for request in create_requests),
                 final_state["requests"],
             )
             self.assertTrue(all(request["endpoint"] == "lists?type=block" for request in create_requests))
             final_lists = final_state["lists"]
-            self.assertEqual(len(final_lists), 3)
-            self.assertTrue(any(l["address"].endswith("/baseline.hosts") for l in final_lists))
+            self.assertEqual(len(final_lists), 2)
             self.assertTrue(any(l["address"] == "https://big.oisd.nl" for l in final_lists))
             self.assertTrue(any("hagezi" in l["address"] for l in final_lists))
 
