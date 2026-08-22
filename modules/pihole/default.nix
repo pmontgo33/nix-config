@@ -54,7 +54,13 @@ let
       # to the same inode while we attempt our non-blocking flock. The
       # lockfile itself persists across writer invocations; flock is the
       # only mutual-exclusion signal.
-      $install -d -m 0700 "${ftl.stateDirectory}" 2>/dev/null || true
+      $install -d -m 0770 "${ftl.stateDirectory}" 2>/dev/null || true
+      # The persistent lockfile may have been created by the policy apply
+      # (which runs as root over SSH) with mode 0600. Relax it so the
+      # setup service, which runs as the pihole user, can take the flock.
+      if [ -e "$lock_path" ]; then
+        $chmod 0660 "$lock_path" 2>/dev/null || true
+      fi
       while [ "$attempts" -gt 0 ]; do
         if eval "exec $lockfd>>\"$lock_path\"" 2>/dev/null && $flock -n "$lockfd"; then
           trap '$flock -u "$lockfd" 2>/dev/null; $rm -f "$macvendor_tmp"' EXIT
@@ -83,6 +89,7 @@ let
     mv="${lib.getExe' pkgs.coreutils "mv"}"
     rm="${lib.getExe' pkgs.coreutils "rm"}"
     install="${lib.getExe' pkgs.coreutils "install"}"
+    chmod="${lib.getExe' pkgs.coreutils "chmod"}"
     flock="${lib.getExe' pkgs.util-linux "flock"}"
     macvendor_url=${lib.escapeShellArg ftl.macvendorURL}
     desired_lists=${lib.escapeShellArg listManifest}
