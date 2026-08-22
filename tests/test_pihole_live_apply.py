@@ -41,6 +41,10 @@ class ApplyConfirmationTests(unittest.TestCase):
 
     def test_build_apply_inventory_preserves_raw_macs(self):
         rendered = {
+            "policy": {
+                "groups": {"kids": {"description": "Kids clients"}},
+                "base": {"upstreams": ["192.168.86.1"], "retention": 91},
+            },
             "piholeClients": [
                 {
                     "clientRef": "identityRef:emma-book",
@@ -51,7 +55,7 @@ class ApplyConfirmationTests(unittest.TestCase):
                     "address": None,
                     "group": "kids",
                 }
-            ]
+            ],
         }
         identities = {"emma-book": {"mac": "88:49:2d:42:92:8c"}}
         inv = live_apply._build_apply_inventory(rendered, identities)
@@ -62,11 +66,20 @@ class ApplyConfirmationTests(unittest.TestCase):
         self.assertEqual(client["identifier"], "88:49:2d:42:92:8c")
         self.assertNotIn("client:", client["identifier"])
         self.assertEqual(client["group"], "kids")
-        self.assertEqual(client["hostname"], "emma-book")
+        # The live reconciler rejects extra keys on clients (only identifier
+        # and group are allowed). Hostname must be dropped here.
+        self.assertNotIn("hostname", client)
         self.assertIn(
-            {"name": "kids", "description": "kids clients", "enabled": True},
+            {"name": "kids", "description": "Kids clients", "enabled": True},
             inv["groups"],
         )
+        # Base must be translated into the live reconciler's BASELINE_BASE
+        # shape, not the offline inventory shape.
+        self.assertEqual(
+            inv["base"]["dns"]["upstreams"], ["192.168.86.1"]
+        )
+        self.assertEqual(inv["base"]["dns"]["interface"], "eth0")
+        self.assertEqual(inv["base"]["database"]["maxDBdays"], 91)
 
 
 class RemoteLockAcquisitionTests(unittest.TestCase):
@@ -109,6 +122,68 @@ class RemoteLockAcquisitionTests(unittest.TestCase):
             self._release_remote_lock(fd)
             # Dropping the flock must not delete the lockfile.
             self.assertTrue(lock.exists())
+
+
+class SecretsPathResolutionTests(unittest.TestCase):
+    """Verify the orchestrator resolves the per-host sops-nix secret path."""
+
+    def test_resolve_secrets_path_uses_symlink_target(self):
+        import unittest.mock as mock
+        with mock.patch.object(
+            live_apply.subprocess, "run",
+            return_value=mock.Mock(
+                returncode=0,
+                stdout="/run/secrets.d/12/pihole-api-password\n",
+                stderr="",
+            ),
+        ) as fake_run:
+            path = live_apply._resolve_secrets_path(
+                "root@pihole1", "pihole-api-password",
+            )
+        self.assertEqual(path, "/run/secrets.d/12/pihole-api-password")
+        # SSH command must not use bash -c (Pi-hole default shell is fish).
+        args = fake_run.call_args[0][0]
+        joined = " ".join(str(a) for a in args)
+        self.assertNotIn("bash -c", joined)
+        self.assertNotIn("$(", joined)
+        self.assertNotIn("`", joined)
+
+    def test_resolve_secrets_path_raises_on_empty(self):
+        import unittest.mock as mock
+        from scripts.pihole import live_dry_run as dry
+        with mock.patch.object(
+            live_apply.subprocess, "run",
+            return_value=mock.Mock(returncode=0, stdout="", stderr=""),
+        ):
+            with self.assertRaises(dry.OrchestratorError):
+                live_apply._resolve_secrets_path(
+                    "root@pihole1", "pihole-api-password",
+                )
+
+    def test_resolve_secrets_path_raises_on_nonzero(self):
+        import unittest.mock as mock
+        from scripts.pihole import live_dry_run as dry
+        with mock.patch.object(
+            live_apply.subprocess, "run",
+            return_value=mock.Mock(returncode=1, stdout="", stderr="permission denied"),
+        ):
+            with self.assertRaises(dry.OrchestratorError):
+                live_apply._resolve_secrets_path(
+                    "root@pihole1", "pihole-api-password",
+                )
+
+    def test_resolve_secrets_path_rejects_unsafe_name(self):
+        for name in (
+            "pihole; rm -rf /",          # shell metacharacter
+            "../../etc/passwd",          # path traversal
+            "pihole-api-password\nrm",  # newline injection
+            "",                          # empty
+            "-rf",                       # option-like
+        ):
+            with self.subTest(name=name):
+                with self.assertRaises(Exception) as ctx:
+                    live_apply._resolve_secrets_path("root@pihole1", name)
+                self.assertIn("unsafe SOPS secret name", str(ctx.exception))
 
 
 if __name__ == "__main__":

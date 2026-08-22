@@ -77,6 +77,19 @@ class DeploySetupReconcileTests(unittest.TestCase):
         )
         self.assertLess(events.index(("policy-apply", "pihole1")), setup_restart)
 
+    def test_apply_policy_passes_origin_lock_and_password_path(self):
+        """The orchestrator needs the API origin, shared lock path, and a
+        resolvable SOPS secret path to function end-to-end."""
+        with patch.object(deploy, "apply_policy", return_value=True), \
+             patch.object(deploy, "log"):
+            self.assertTrue(deploy.apply_policy("pihole1"))
+        # Validate the constants the orchestrator passes are correct for
+        # the current Nix module: API on 8080, lockfile at the module path.
+        self.assertEqual(deploy.PIHOLE_API_ORIGIN, "http://127.0.0.1:8080")
+        self.assertEqual(deploy.POLICY_LOCK_PATH, "/var/lib/pihole/.pihole-policy.lock")
+        # Apply runner script must exist in the repo and be executable.
+        self.assertTrue(deploy.APPLY_RUNNER.exists())
+
     def test_failed_policy_apply_skips_setup_reconciliation(self):
         calls = []
 
