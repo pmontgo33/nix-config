@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""Explicit Hermes-side apply orchestrator for owner-scoped Pi-hole policy.
+
+This is intentionally separate from ``live_dry_run.py``. It resolves the
+inventory locally, sends no password over SSH, and asks the Pi-hole-local
+wrapper to execute the exact guarded live_reconcile apply transaction.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.pihole import live_dry_run as dry
+
+APPLY_CONFIRMATION = "APPLY_SHARED_PIHOLE_POLICY"
+REMOTE_DEFAULT_PATH = "/etc/pihole/live-policy-apply"
+
+
+class OrchestratorError(dry.OrchestratorError):
+    """Raised when the guarded policy apply cannot be completed."""
+
+
+def _require_apply_confirmation(value: str) -> str:
+    if value != APPLY_CONFIRMATION:
+        raise OrchestratorError("exact apply confirmation is required")
+    return value
+
+
+def _apply_payload(*, inventory: dict[str, Any], origin: str, password_path: str) -> dict[str, Any]:
+    return {
+        "inventory": inventory,
+        "origin": origin,
+        "password_path": password_path,
+        "apply": True,
+        "confirmation": APPLY_CONFIRMATION,
+    }
+
+
+def _build_apply_inventory(rendered_inventory: dict[str, Any], identities: dict[str, dict[str, str]]) -> dict[str, Any]:
+    """Construct the live_reconcile apply inventory directly from a resolved
+    inventory + identities.
+
+    Unlike ``live_adapter.adapt``, which redacts MACs into
+    ``client:<sha256(MAC)>`` opaque keys for dry-run plans, this preserves
+    the raw MAC so Pi-hole's ``POST /api/clients`` can identify the device.
+    """
+    clients_in = rendered_inventory.get("piholeClients")
+    if not isinstance(clients_in, list) or not clients_in:
+        raise OrchestratorError("inventory has no resolved Pi-hole clients")
+    output_clients: list[dict[str, Any]] = []
+    for client in clients_in:
+        if not isinstance(client, dict):
+            raise OrchestratorError("inventory client entry is not an object")
+        ref = client.get("clientRef")
+        if not isinstance(ref, str):
+            raise OrchestratorError("inventory client is missing clientRef")
+        # clientRef is `identityRef:<name>`; the identities map keys are the
+        # bare name without the `identityRef:` prefix.
+        if ref.startswith("identityRef:"):
+            name = ref[len("identityRef:"):]
+        else:
+            name = ref
+        entry = identities.get(name)
+        if not isinstance(entry, dict):
+            raise OrchestratorError(f"no MAC mapping for identity ref {ref}")
+        mac = entry.get("mac")
+        if not isinstance(mac, str) or not mac:
+            raise OrchestratorError(f"identity ref {ref} has no MAC")
+        group = client.get("group")
+        if not isinstance(group, str) or not group:
+            raise OrchestratorError(f"inventory client {ref} has no group")
+        payload = {"identifier": mac, "group": group}
+        hostname = client.get("hostname")
+        if isinstance(hostname, str) and hostname:
+            payload["hostname"] = hostname
+        output_clients.append(payload)
+    return {
+        "base": {},
+        "groups": [
+            {"name": name, "description": f"{name} clients", "enabled": True}
+            for name in sorted({c["group"] for c in output_clients})
+        ],
+        "adlists": [],
+        "clients": output_clients,
+        "localDns": [],
+        "rules": {"allow": [], "block": []},
+    }
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", required=True, choices=sorted(dry._TARGETS))
+    parser.add_argument("--apply-confirmation", required=True)
+    # Pi-hole's webserver/API listens on the declared `webPort`, which the
+    # module currently fixes to 8080. Default to the loopback origin so the
+    # hermes-side orchestrator talks to the local FTL over the runtime
+    # SOPS-rendered API password file.
+    parser.add_argument("--origin", default="http://127.0.0.1:8080")
+    parser.add_argument("--ssh-host", default=None)
+    parser.add_argument("--remote-path", default=REMOTE_DEFAULT_PATH)
+    parser.add_argument("--inventory-nix", type=Path, default=dry.REPO_ROOT / "inventory" / "default.nix")
+    parser.add_argument("--secrets", type=Path, default=dry.REPO_ROOT / "secrets" / "pihole-identities.yaml")
+    parser.add_argument("--age-key-file", type=Path, default=Path("/var/lib/hermes/.config/sops/age/pihole-identities.txt"))
+    parser.add_argument("--password-path", default=dry._PASSWORD_PATH)
+    parser.add_argument("--lock-path", default="/var/lib/pihole/.pihole-policy.lock")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_parser().parse_args(argv)
+    try:
+        _require_apply_confirmation(args.apply_confirmation)
+        origin, _ = dry._validate_origin(args.origin)
+        target = args.target
+        ssh_host = dry._validate_ssh_host(args.ssh_host or f"root@{target}", target=target)
+        remote_path = dry._validate_remote_path(args.remote_path)
+        password_path = dry._validate_password_path(args.password_path)
+        rendered_inventory = dry.inventory_renderer.render(dry.inventory_renderer.load_source(args.inventory_nix, None))
+        identities = dry._decrypt_identities(args.secrets, args.age_key_file)
+        apply_inventory = _build_apply_inventory(rendered_inventory, identities)
+        dry._safe_keys(apply_inventory)
+
+        payload = _apply_payload(
+            inventory=apply_inventory, origin=origin, password_path=password_path,
+        )
+        payload["lock_path"] = args.lock_path
+        dry._safe_keys(payload)
+        result = dry._ssh_dry_run(ssh_host, remote_path, payload)
+        if result.get("apply") is not True or result.get("verified") is not True:
+            raise OrchestratorError("remote policy apply did not verify convergence")
+        sys.stdout.write(json.dumps(result, sort_keys=True) + "\n")
+        return 0
+    except OrchestratorError as exc:
+        print(f"Pi-hole live apply failed: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -23,6 +23,15 @@ ROOT = Path(__file__).resolve().parents[1]
 RENDERED_SCRIPT = Path("/tmp/pihole-rendered-setup.sh")
 PIHOLE_NIX = "/nix/store/dpk1qdgn7202dn2ad0vmy1vyddg9i8y2-pihole-6.4.2"
 
+# Group name -> id mapping must match the fake GetFTLData "groups" response in
+# the behavioural harness so resolved desired groups line up with simulated
+# live state.
+_GROUP_IDS = {"Default": 0, "normal": 2, "kids": 1, "unfiltered": 3}
+
+
+def _resolve_group_ids(names: list[str]) -> list[int]:
+    return [_GROUP_IDS[n] for n in names]
+
 
 def _render_setup_script() -> str:
     result = subprocess.run(
@@ -50,7 +59,7 @@ def _read_declared_lists() -> list[dict]:
             "nix", "eval", "--json",
             "--extra-experimental-features", "nix-command flakes",
             "--impure",
-            ".#nixosConfigurations.pihole1.config.services.pihole-ftl.lists",
+            ".#nixosConfigurations.pihole1.config.services.pihole-native.lists",
         ],
         cwd=ROOT, capture_output=True, text=True, timeout=240,
     )
@@ -68,7 +77,9 @@ class SetupScriptBehaviouralTests(unittest.TestCase):
     def _build_harness(self, tmp: Path, *, state_lists: list[dict], desired_manifest: list[dict] | None = None,
                         gravity_should_fail: bool = False,
                         post_gravity_lists: list[dict] | None = None,
-                        first_ensure_fails: bool = False) -> dict:
+                        first_ensure_fails: bool = False,
+                        initial_groups: dict[str, int] | None = None,
+                        group_response: list[dict] | None = None) -> dict:
         """Write a fake api.sh + utils.sh into tmp and rewrite the rendered
         setup script to use them. Returns a state dict the tests can inspect."""
         # Map the declared file:// lists onto a real, readable, non-empty
@@ -77,7 +88,8 @@ class SetupScriptBehaviouralTests(unittest.TestCase):
         for d in self.declared:
             entry = {"type": "block", "address": d["url"],
                      "enabled": d.get("enabled", True),
-                     "comment": d.get("description", "")}
+                     "comment": d.get("description", ""),
+                     "groups": d.get("groups", ["Default"])}
             if entry["address"].startswith("file://"):
                 rel = entry["address"][len("file://"):].lstrip("/")
                 real_path = tmp / "fake_state_dir" / rel
@@ -88,16 +100,25 @@ class SetupScriptBehaviouralTests(unittest.TestCase):
                 entry["address"] = f"file://{real_path}"
             declared_for_state.append(entry)
 
-        # Rewrite desired_manifest entries so the shell script's
-        # desired_lists points at the local fake file path.
+        # The new setup script requires every desired list to carry a `groups`
+        # array (resolved to group IDs at apply time). The test manifests
+        # constructed by individual tests drop `groups`, so backfill from the
+        # declared list definition when absent. This keeps the behavioural
+        # tests focused on reconciliation logic, not group plumbing.
+        declared_by_url = {d["url"]: d for d in self.declared}
         for entry in desired_manifest:
-            if entry.get("address", "").startswith("file://"):
-                rel = entry["address"][len("file://"):].lstrip("/")
-                real_path = tmp / "fake_state_dir" / rel
-                real_path.parent.mkdir(parents=True, exist_ok=True)
-                if not real_path.exists():
-                    real_path.write_text("0.0.0.0 example.com\n")
-                entry["address"] = f"file://{real_path}"
+            if "groups" not in entry and entry.get("address") in declared_by_url:
+                entry["groups"] = declared_by_url[entry["address"]].get("groups", ["Default"])
+                # Only rewrite file:// URLs to the local fake path so the
+                # preflight check can read the file. https:// URLs are passed
+                # through untouched.
+                if entry["address"].startswith("file://"):
+                    rel = entry["address"][len("file://"):].lstrip("/")
+                    real_path = tmp / "fake_state_dir" / rel
+                    real_path.parent.mkdir(parents=True, exist_ok=True)
+                    if not real_path.exists():
+                        real_path.write_text("0.0.0.0 example.com\n")
+                    entry["address"] = f"file://{real_path}"
 
         # For pre-state (what the FTL DB "currently" contains), use the
         # caller-provided lists, but rewrite any file:// URLs to the
@@ -107,6 +128,17 @@ class SetupScriptBehaviouralTests(unittest.TestCase):
         current = []
         for l in state_lists:
             entry = dict(l)
+            if "groups" not in entry:
+                # Simulate Pi-hole v6's always-present groups array as integer
+                # IDs (the real API shape). When the entry maps to a known
+                # declared list, use the declared group IDs so exact-match
+                # tests reflect the resolved desired state rather than
+                # forcing a spurious drift.
+                declared_groups = declared_by_url.get(entry.get("address"), {}).get("groups")
+                if declared_groups is not None:
+                    entry["groups"] = _resolve_group_ids(declared_groups)
+                else:
+                    entry["groups"] = [0]
             if entry.get("address", "").startswith("file://"):
                 rel = entry["address"][len("file://"):].lstrip("/")
                 real_path = tmp / "fake_state_dir" / rel
@@ -116,6 +148,11 @@ class SetupScriptBehaviouralTests(unittest.TestCase):
                 entry["address"] = f"file://{real_path}"
             current.append(entry)
 
+        # Default to a provisioned instance. Callers can supply only Default to
+        # exercise the clean-bootstrap group creation path.
+        if initial_groups is None:
+            initial_groups = dict(_GROUP_IDS)
+
         state = {
             "calls": [],
             "lists": current,
@@ -123,6 +160,14 @@ class SetupScriptBehaviouralTests(unittest.TestCase):
             "post_lists": post_gravity_lists,
             "first_ensure_fails": first_ensure_fails,
             "declared": declared_for_state,
+            # A dict lets the fake POST /groups atomically add a name while the
+            # fake GET /groups renders the real API's array shape.
+            "groups": {
+                name: {"name": name, "id": group_id}
+                for name, group_id in initial_groups.items()
+            },
+            # Optional raw API payload for malformed/ambiguous-response tests.
+            "group_response": group_response,
         }
         state_path = tmp / "ftl-state.json"
         state_path.write_text(json.dumps(state))
@@ -220,12 +265,18 @@ if state.get("first_ensure_fails"):
     open(state_path, "w").write(json.dumps(state))
     raise SystemExit(1)
 new = json.loads(os.environ.get("FTL_PAYLOAD", "{}"))
+# Pi-hole v6 returns group assignments as a list of integer IDs on GET
+# (e.g. [0, 1, 2]) regardless of how they were posted. Mirror that shape so
+# the harness reflects real FTL behavior rather than a non-existent object
+# form.
 state.setdefault("requests", []).append({
     "endpoint": os.environ.get("FTL_ENDPOINT"),
     "payload": dict(new),
 })
 new.setdefault("type", os.environ["FTL_ENDPOINT"].split("type=", 1)[1])
 new.setdefault("id", 9000 + len(state["lists"]) + 1)
+# Keep `groups` as posted (list of ints). This matches what the real API
+# returns and what the setup script's verifier expects.
 state["lists"].append(new)
 open(state_path, "w").write(json.dumps(state))
 '''
@@ -239,6 +290,9 @@ open(state_path, "w").write(json.dumps(state))
             "  case \"$endpoint\" in\n"
             "    lists)\n"
             "      body=$(python3 -c 'import json,os; print(json.dumps({\"lists\": json.load(open(os.environ[\"STATE_FILE\"]))[\"lists\"]}))')\n"
+            "      ;;\n"
+            "    groups)\n"
+            "      body=$(python3 -c 'import json,os; s=json.load(open(os.environ[\"STATE_FILE\"])); raw=s.get(\"group_response\"); g=s.get(\"groups\", {}); groups=raw if raw is not None else [{\"name\": n, \"id\": v[\"id\"]} for n,v in sorted(g.items(), key=lambda x: x[1][\"id\"])]; print(json.dumps({\"groups\": groups}))')\n"
             "      ;;\n"
             "    *) body='{}' ;;\n"
             "  esac\n"
@@ -262,6 +316,22 @@ open(state_path, "w").write(json.dumps(state))
             + ensure_list_py + "PY\n"
             "      then return 1; fi\n"
             "      printf '{\"lists\":[{\"id\":9999}], \"error\": null}201'\n"
+            "      return 0\n"
+            "      ;;\n"
+            "    groups)\n"
+            "      STATE_FILE=\"$STATE_FILE\" FTL_PAYLOAD=\"$payload\" python3 - <<'PY'\n"
+            "import json, os\n"
+            "state_path = os.environ[\"STATE_FILE\"]\n"
+            "state = json.loads(open(state_path).read())\n"
+            "incoming = json.loads(os.environ.get(\"FTL_PAYLOAD\", \"{}\"))\n"
+            "state.setdefault(\"requests\", []).append({\"endpoint\": \"groups\", \"payload\": incoming})\n"
+            "state.setdefault(\"groups\", {})\n"
+            "name = incoming.get(\"name\")\n"
+            "if name and name not in state[\"groups\"]:\n"
+            "    state[\"groups\"][name] = {\"name\": name, \"id\": len(state[\"groups\"]) + 100}\n"
+            "open(state_path, \"w\").write(json.dumps(state))\n"
+            "PY\n"
+            "      printf '{\"groups\":[{\"id\":101}], \"error\": null}201'\n"
             "      return 0\n"
             "      ;;\n"
             "    *) printf '{\"error\": null}204' ;;\n"
@@ -357,6 +427,22 @@ exit_test_api() { return 0; }
             '"${ftl.stateDirectory}/.pihole-ftl-lists-pending"',
             f'"{state_dir}/.pihole-ftl-lists-pending"',
         )
+        script_text = script_text.replace(
+            '/var/lib/pihole/.pihole-policy.lock',
+            f'{state_dir}/.pihole-policy.lock',
+        )
+        script_text = script_text.replace(
+            '"${ftl.stateDirectory}/.pihole-policy.lock"',
+            f'"{state_dir}/.pihole-policy.lock"',
+        )
+        script_text = script_text.replace(
+            '/var/lib/pihole/.pihole-policy.lock',
+            f'{state_dir}/.pihole-policy.lock',
+        )
+        # The harness must provision the state dir before lock acquisition
+        # runs; create it on disk so the install shim can create the lock
+        # probe inside it.
+        state_dir.mkdir(parents=True, exist_ok=True)
         script_text = script_text.replace(
             'macvendor_tmp=$($mktemp "/var/lib/pihole/macvendor.db.XXXXXX")',
             f'macvendor_tmp=$($mktemp "{state_dir}/macvendor.db.XXXXXX")',
@@ -471,16 +557,22 @@ exit_test_api() { return 0; }
             ]
             self.assertEqual(len(delete_requests), 1)
             self.assertTrue(all(set(item) == {"item", "type"} for item in delete_requests[0]["payload"]))
-            self.assertEqual(len(create_requests), 2)
+            # All declared lists are recreated after the batch delete (the
+            # reconciler recreates the full desired set, not just the delta).
+            self.assertEqual(len(create_requests), 5)
             self.assertTrue(
                 all("type" not in request["payload"] for request in create_requests),
                 final_state["requests"],
             )
             self.assertTrue(all(request["endpoint"] == "lists?type=block" for request in create_requests))
             final_lists = final_state["lists"]
-            self.assertEqual(len(final_lists), 2)
+            self.assertEqual(len(final_lists), 5)
             self.assertTrue(any(l["address"] == "https://big.oisd.nl" for l in final_lists))
             self.assertTrue(any("hagezi" in l["address"] for l in final_lists))
+            # Kids-only lists are also present after reconcile.
+            self.assertTrue(any("nsfw" in l["address"] for l in final_lists))
+            self.assertTrue(any("doh-vpn-proxy-bypass" in l["address"] for l in final_lists))
+            self.assertTrue(any("gambling.mini" in l["address"] for l in final_lists))
 
     def test_gravity_failure_keeps_marker(self):
         import tempfile
@@ -530,6 +622,163 @@ exit_test_api() { return 0; }
             self.assertNotEqual(r.returncode, 0)
             self.assertTrue((tmp / "state" / ".pihole-ftl-lists-pending").exists())
 
+    def test_non_integral_live_group_id_fails_before_reset(self):
+        """A malformed FTL response must not trigger destructive list reset."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            desired_manifest = [
+                {
+                    "type": d.get("type", "block"),
+                    "enabled": d.get("enabled", True),
+                    "address": d["url"],
+                    "comment": d.get("description", ""),
+                }
+                for d in self.declared
+            ]
+            malformed = [{
+                "type": "block",
+                "address": self.declared[0]["url"],
+                "enabled": True,
+                "comment": self.declared[0].get("description", ""),
+                "groups": [1.5],
+            }]
+            self._build_harness(tmp, state_lists=malformed, desired_manifest=desired_manifest)
+            result = self._run(tmp / "setup.sh")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unable to read current Pi-hole lists", result.stdout)
+            final_state = json.loads((tmp / "ftl-state-live.json").read_text())
+            self.assertFalse(any(
+                request["endpoint"] == "lists:batchDelete"
+                for request in final_state.get("requests", [])
+            ))
+
+    def test_missing_declared_group_fails_before_list_reset(self):
+        """List setup must not bypass the policy reconciler's group ownership."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            desired_manifest = [
+                {
+                    "type": d.get("type", "block"),
+                    "enabled": d.get("enabled", True),
+                    "address": d["url"],
+                    "comment": d.get("description", ""),
+                }
+                for d in self.declared
+            ]
+            self._build_harness(
+                tmp,
+                state_lists=[],
+                desired_manifest=desired_manifest,
+                initial_groups={"Default": 0},
+            )
+            result = self._run(tmp / "setup.sh")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Pi-hole list references a group not present", result.stdout)
+
+            final_state = json.loads((tmp / "ftl-state-live.json").read_text())
+            self.assertEqual(set(final_state["groups"]), {"Default"})
+            self.assertFalse(any(
+                request["endpoint"] == "lists:batchDelete"
+                for request in final_state.get("requests", [])
+            ))
+            self.assertFalse(any(
+                request["endpoint"].startswith("lists?type=")
+                for request in final_state.get("requests", [])
+            ))
+            self.assertFalse((tmp / "ftl-state.json.log").exists(), result.stdout)
+
+    def test_ambiguous_group_api_response_fails_before_gravity(self):
+        """Duplicate names or IDs must never be collapsed into a wrong cohort."""
+        import tempfile
+        for groups in (
+            [
+                {"name": "Default", "id": 0},
+                {"name": "kids", "id": 1},
+                {"name": "kids", "id": 2},
+                {"name": "normal", "id": 3},
+            ],
+            [
+                {"name": "Default", "id": 0},
+                {"name": "kids", "id": 1},
+                {"name": "normal", "id": 1},
+            ],
+        ):
+            with self.subTest(groups=groups), tempfile.TemporaryDirectory() as td:
+                tmp = Path(td)
+                desired_manifest = [
+                    {
+                        "type": d.get("type", "block"),
+                        "enabled": d.get("enabled", True),
+                        "address": d["url"],
+                        "comment": d.get("description", ""),
+                    }
+                    for d in self.declared
+                ]
+                self._build_harness(
+                    tmp,
+                    state_lists=[],
+                    desired_manifest=desired_manifest,
+                    group_response=groups,
+                )
+                result = self._run(tmp / "setup.sh")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("unexpected or ambiguous shape", result.stdout)
+                self.assertFalse((tmp / "ftl-state.json.log").exists(), result.stdout)
+                final_state = json.loads((tmp / "ftl-state-live.json").read_text())
+                self.assertFalse(final_state.get("requests", []))
+
+    def test_lock_held_by_other_actor_fails_before_batch_delete(self):
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            desired_manifest = [
+                {"type": d.get("type", "block"), "enabled": d.get("enabled", True),
+                 "address": d["url"], "comment": d.get("description", "")}
+                for d in self.declared
+            ]
+            self._build_harness(
+                tmp,
+                state_lists=[
+                    {"type": "block", "address": d["url"],
+                     "enabled": True, "comment": d.get("description", "")}
+                    for d in self.declared
+                ],
+                desired_manifest=desired_manifest,
+            )
+            # Another writer holds the policy lock exclusively; the setup
+            # script's flock(-n) must fail fast before any list mutation.
+            holder = subprocess.Popen(
+                ["bash", "-c",
+                 f"exec 9>{tmp / 'state' / '.pihole-policy.lock'}; "
+                 "flock --exclusive --nonblock 9; "
+                 "echo acquired; sleep 5"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            try:
+                import time
+                deadline = time.time() + 2
+                while time.time() < deadline:
+                    r = subprocess.run(
+                        ["flock", "--exclusive", "--nonblock", "--conflict-exit-code", "1",
+                         "true"],
+                        stderr=subprocess.DEVNULL,
+                        timeout=2,
+                    )
+                    if r.returncode != 0:
+                        break
+                    time.sleep(0.05)
+                r = self._run(tmp / "setup.sh")
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("policy lock held by another actor", r.stdout)
+                self.assertFalse((tmp / "state" / ".pihole-ftl-lists-pending").exists())
+            finally:
+                holder.kill()
+                holder.wait()
+
     def test_post_gravity_drift_keeps_marker(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
@@ -556,6 +805,10 @@ exit_test_api() { return 0; }
             stale = [{"type": "block", "address": "https://stale.example",
                       "enabled": True, "comment": "stale"}]
             state = self._build_harness(tmp, state_lists=stale, desired_manifest=desired_manifest, post_gravity_lists=post_drift)
+            # Existing gravity state skips first-boot gravity; post_drift must
+            # therefore be injected by the reconciliation gravity run.
+            (tmp / "state").mkdir(exist_ok=True)
+            (tmp / "state" / "gravity.db").write_text("existing")
             r = self._run(tmp / "setup.sh")
             self.assertNotEqual(r.returncode, 0)
             self.assertTrue((tmp / "state" / ".pihole-ftl-lists-pending").exists())
@@ -583,10 +836,12 @@ exit_test_api() { return 0; }
             self._build_harness(
                 tmp,
                 state_lists=[{"type": "block", "address": "https://stale.example",
-                              "enabled": True, "comment": "stale"}],
+                             "enabled": True, "comment": "stale"}],
                 desired_manifest=desired_manifest,
                 post_gravity_lists=malformed,
             )
+            (tmp / "state").mkdir(exist_ok=True)
+            (tmp / "state" / "gravity.db").write_text("existing")
             r = self._run(tmp / "setup.sh")
             self.assertNotEqual(r.returncode, 0)
             self.assertTrue((tmp / "state" / ".pihole-ftl-lists-pending").exists())

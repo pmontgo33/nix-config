@@ -21,8 +21,12 @@ REBUILD_TIMEOUT = 600
 CURL_TIMEOUT = 10
 HEALTH_RETRIES = 10
 SETUP_TIMEOUT = 300
+POLICY_TIMEOUT = 300
 HEALTH_SLEEP = 3
-RECONCILER = REPO / "scripts" / "pihole" / "live_reconcile.py"
+APPLY_CONFIRMATION = "APPLY_SHARED_PIHOLE_POLICY"
+APPLY_RUNNER = REPO / "scripts" / "pihole" / "live_apply.py"
+PIHOLE_API_ORIGIN = "http://127.0.0.1:8080"
+POLICY_LOCK_PATH = "/var/lib/pihole/.pihole-policy.lock"
 
 
 def log(host, msg):
@@ -50,6 +54,14 @@ def deploy(host):
             log(host, f"stderr: {result.stderr[-300:]}")
         return False
     log(host, "Build OK")
+
+    # A fresh host must expose a responsive local API before the owner-scoped
+    # policy apply can create its groups and clients.
+    if not api_healthy(host):
+        return False
+    if not apply_policy(host):
+        log(host, "Policy reconciliation failed; skipping list setup")
+        return False
 
     # Run the declarative Pi-hole setup reconciler explicitly. NixOS does not
     # reliably rerun an inactive oneshot unit when only its generated script
@@ -99,7 +111,49 @@ def deploy(host):
         return False
     log(host, "Pi-hole setup reconciliation OK")
 
-    # Health check
+    return api_healthy(host)
+
+
+def apply_policy(host):
+    """Run the explicit, guarded group/client policy apply for one host."""
+    log(host, "Reconciling Pi-hole policy groups and clients...")
+    try:
+        result = subprocess.run(
+            ["python3", str(APPLY_RUNNER), "--target", host,
+             "--apply-confirmation", APPLY_CONFIRMATION,
+             "--origin", PIHOLE_API_ORIGIN,
+             "--lock-path", POLICY_LOCK_PATH],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            timeout=POLICY_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        log(host, "Pi-hole policy reconciliation timed out")
+        return False
+    except Exception as exc:
+        log(host, f"Pi-hole policy reconciliation could not start: {exc}")
+        return False
+    if result.returncode != 0:
+        log(host, f"Pi-hole policy reconciliation FAILED (exit {result.returncode})")
+        if result.stderr:
+            log(host, f"stderr: {result.stderr[-300:]}")
+        return False
+    try:
+        response = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        log(host, "Pi-hole policy reconciliation returned invalid JSON")
+        return False
+    if response.get("apply") is not True or response.get("verified") is not True:
+        log(host, "Pi-hole policy reconciliation did not verify convergence")
+        return False
+    log(host, "Pi-hole policy reconciliation OK")
+    return True
+
+
+def api_healthy(host):
+    """Poll the unauthenticated API session endpoint without exposing secrets."""
+    ip = HOSTS[host]
     url = HEALTH_URL.format(ip=ip)
     log(host, f"Health check (polling {url}, {HEALTH_RETRIES} attempts)...")
     for attempt in range(1, HEALTH_RETRIES + 1):
@@ -120,31 +174,8 @@ def deploy(host):
             log(host, f"Attempt {attempt}: bad JSON: {result.stdout[:120]}")
         except Exception as exc:
             log(host, f"Attempt {attempt}: {exc}")
-
     log(host, "HEALTH CHECK FAILED after all retries")
     return False
-
-
-def run_reconciler():
-    """Run the policy reconciler. Non-fatal — logs errors but never blocks."""
-    print("\n=== Running policy reconciler ===")
-    try:
-        result = subprocess.run(
-            ["python3", str(RECONCILER)],
-            cwd=REPO,
-            capture_output=True, text=True, timeout=120,
-        )
-        if result.stdout:
-            print(result.stdout.rstrip())
-        if result.returncode != 0:
-            print(f"Reconciler exited with code {result.returncode}")
-            if result.stderr:
-                print(f"stderr: {result.stderr[-300:]}")
-            print("Policy sync failed (non-critical, deployment continues).")
-        else:
-            print("Policy sync OK.")
-    except Exception as exc:
-        print(f"Reconciler error: {exc}")
 
 
 def main():
@@ -184,16 +215,6 @@ def main():
         print(f"  {host:<12} {ip:<17} {status}")
 
     all_ok = all(results.values())
-    if all_ok:
-        # Only run reconciler if every host succeeded
-        try:
-            run_reconciler()
-        except KeyboardInterrupt:
-            print("\n\nInterrupted during reconciler. Deployment was successful.")
-            sys.exit(130)
-    else:
-        print("\nSkipping policy reconciler — one or more hosts failed.")
-
     overall = "SUCCESS" if all_ok else "FAILED"
     print(f"\nOverall: {overall}")
 

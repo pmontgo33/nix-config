@@ -34,6 +34,7 @@ without leaking the password or any MAC identifier.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -46,6 +47,36 @@ from scripts.pihole import live_reconcile as live
 
 _LEGAL_ORIGIN_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 _SAFE_KEY = re.compile(r"^[a-zA-Z0-9._:/-]+$")
+_DEFAULT_LOCK_PATH = "/var/lib/pihole/.pihole-policy.lock"
+
+
+def _acquire_remote_lock(lock_path: str) -> int:
+    """Acquire the shared Pi-hole policy lock exclusively on the remote host.
+
+    Uses fcntl.flock semantics via a Python wrapper so both `live_apply`
+    (here) and the setup service's `pihole-ftl-setup` script share the same
+    lockfile. The lockfile is intentionally left in place after release so
+    the inode persists across writer invocations; only the flock is dropped.
+    """
+    import fcntl
+    path = Path(lock_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (OSError, BlockingIOError):
+        os.close(fd)
+        raise RuntimeError(f"Pi-hole policy lock is held by another actor: {lock_path}")
+    return fd
+
+
+def _release_lock(fd: int | None) -> None:
+    if fd is None:
+        return
+    try:
+        os.close(fd)
+    except OSError:
+        return
 
 
 def _sanitize_error(message: str) -> str:
@@ -108,6 +139,7 @@ def _check_keys(value: Any) -> None:
 
 
 def main() -> int:
+    lock_fd = None
     try:
         payload = _read_payload()
         inventory = payload["inventory"]
@@ -115,9 +147,11 @@ def main() -> int:
         origin = payload["origin"]
         apply = payload.get("apply", False)
         confirmation = payload.get("confirmation", "")
+        lock_path = payload.get("lock_path", _DEFAULT_LOCK_PATH)
 
         _require(type(inventory) is dict, "inventory must be an object")
         _check_keys(inventory)
+        _require(type(lock_path) is str and bool(lock_path), "lock path must be a non-empty string")
 
         validated_origin, allow_private = _validate_origin(origin)
         password = _read_password(password_path)
@@ -125,6 +159,11 @@ def main() -> int:
 
         def _credential_callback() -> str:
             return password
+
+        # Acquire the shared Pi-hole policy lock around the apply transaction
+        # so the setup service cannot run concurrently. Lockfile persists
+        # across releases; only the flock is dropped on exit.
+        lock_fd = _acquire_remote_lock(lock_path)
 
         plan = live.reconcile_live(
             inventory,
@@ -134,15 +173,19 @@ def main() -> int:
             confirmation=confirmation if apply else None,
         )
     except live.LivePolicyError as exc:
+        _release_lock(lock_fd)
         sys.stdout.write(json.dumps({"error": _sanitize_error(str(exc))}, sort_keys=True) + "\n")
         return 2
-    except (ValueError, KeyError, OSError) as exc:
+    except (ValueError, KeyError, OSError, RuntimeError) as exc:
+        _release_lock(lock_fd)
         sys.stdout.write(json.dumps({"error": _sanitize_error(str(exc))}, sort_keys=True) + "\n")
         return 2
     except Exception:  # noqa: BLE001 - sanitized re-raise
+        _release_lock(lock_fd)
         sys.stdout.write(json.dumps({"error": "unexpected Pi-hole dry-run failure"}, sort_keys=True) + "\n")
         return 2
 
+    _release_lock(lock_fd)
     sys.stdout.write(json.dumps(plan, indent=2, sort_keys=True) + "\n")
     return 0
 

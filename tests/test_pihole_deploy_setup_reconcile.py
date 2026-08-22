@@ -35,7 +35,8 @@ class DeploySetupReconcileTests(unittest.TestCase):
 
         with patch.object(deploy.subprocess, "run", side_effect=fake_run):
             with patch.object(deploy, "log"):
-                result = deploy.deploy("pihole1")
+                with patch.object(deploy, "apply_policy", return_value=True):
+                    result = deploy.deploy("pihole1")
         return calls, result
 
     def test_setup_reconcile_runs_stop_reset_restart(self):
@@ -46,6 +47,56 @@ class DeploySetupReconcileTests(unittest.TestCase):
         ssh_calls = [c for c in calls if c["cmd"][0] == "ssh"]
         verbs = [c["cmd"][-2] for c in ssh_calls[:3]]
         self.assertEqual(verbs, ["stop", "reset-failed", "restart"])
+
+    def test_policy_apply_succeeds_before_setup_reconciliation(self):
+        calls = []
+        events = []
+
+        def fake_run(cmd, *args, **kwargs):
+            calls.append(list(cmd))
+            events.append(list(cmd))
+            if any("nixos-rebuild" in str(c) for c in cmd):
+                return _FakeResult(0)
+            if any("curl" in str(c) for c in cmd):
+                return _FakeResult(0, '{"session": {}}')
+            return _FakeResult(0)
+
+        def applied(host):
+            events.append(("policy-apply", host))
+            return True
+
+        with patch.object(deploy.subprocess, "run", side_effect=fake_run), \
+             patch.object(deploy, "log"), \
+             patch.object(deploy, "apply_policy", side_effect=applied) as apply_policy:
+            self.assertTrue(deploy.deploy("pihole1"))
+
+        apply_policy.assert_called_once_with("pihole1")
+        setup_restart = next(
+            index for index, event in enumerate(events)
+            if isinstance(event, list) and event[0] == "ssh" and "restart" in event and "pihole-ftl-setup.service" in event
+        )
+        self.assertLess(events.index(("policy-apply", "pihole1")), setup_restart)
+
+    def test_failed_policy_apply_skips_setup_reconciliation(self):
+        calls = []
+
+        def fake_run(cmd, *args, **kwargs):
+            calls.append(list(cmd))
+            if any("nixos-rebuild" in str(c) for c in cmd):
+                return _FakeResult(0)
+            if any("curl" in str(c) for c in cmd):
+                return _FakeResult(0, '{"session": {}}')
+            return _FakeResult(0)
+
+        with patch.object(deploy.subprocess, "run", side_effect=fake_run), \
+             patch.object(deploy, "log"), \
+             patch.object(deploy, "apply_policy", return_value=False):
+            self.assertFalse(deploy.deploy("pihole1"))
+
+        self.assertFalse(any(
+            cmd[0] == "ssh" and "pihole-ftl-setup.service" in cmd
+            for cmd in calls
+        ))
 
     def test_timeout_triggers_stop_reset_kill_cleanup(self):
         import subprocess as sp

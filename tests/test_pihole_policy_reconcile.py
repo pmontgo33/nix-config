@@ -102,11 +102,22 @@ class PiHolePolicyTests(unittest.TestCase):
         self.assertNotIn("fixture-client-alpha", rendered_text)
         self.assertNotIn("fixture-client-beta", rendered_text)
 
+    def test_mac_only_client_is_valid_but_address_must_be_explicit(self):
+        data = copy.deepcopy(self.input_data)
+        data["piholeClients"][0]["address"] = None
+        rendered = policy.render_policy(data, "pihole1")
+        self.assertEqual(len(rendered["desired"]["clients"]), len(data["piholeClients"]))
+        self.assertNotIn("address", rendered["desired"]["clients"][0])
+
+        data["piholeClients"][0].pop("address")
+        with self.assertRaises(policy.PolicyError):
+            policy.render_policy(data, "pihole1")
+
     def test_group_assignments_must_match_resolved_clients_exactly(self):
         for label, mutate in [
-            ("missing assignment", lambda d: d["policy"]["groupAssignments"].pop("identityRef:lan-test-server")),
+            ("missing assignment", lambda d: d["policy"]["groupAssignments"].pop("identityRef:test-server")),
             ("unknown assignment", lambda d: d["policy"]["groupAssignments"].update({"identityRef:unknown": "normal"})),
-            ("wrong assignment", lambda d: d["policy"]["groupAssignments"].update({"identityRef:lan-test-server": "kids"})),
+            ("wrong assignment", lambda d: d["policy"]["groupAssignments"].update({"identityRef:test-server": "kids"})),
         ]:
             data = copy.deepcopy(self.input_data)
             mutate(data)

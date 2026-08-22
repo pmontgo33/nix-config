@@ -19,9 +19,9 @@ class InventoryRenderingTests(unittest.TestCase):
         first = render_inventory.render(inventory)
         second = render_inventory.render(inventory)
         self.assertEqual(first, second)
-        self.assertEqual(len(first["networkReservations"]), 15)
+        self.assertEqual(len(first["networkReservations"]), 16)
         self.assertEqual(len(first["services"]), 0)
-        self.assertEqual(len(first["unresolvedIdentityRefs"]), 15)
+        self.assertEqual(len(first["unresolvedIdentityRefs"]), 16)
         self.assertEqual(first["unboundHostOverrides"], [])
         self.assertEqual(first["unboundHostAliases"], [])
         self.assertEqual(first["ownership"]["dhcpv6"], "opnsense")
@@ -90,6 +90,19 @@ class InventoryRenderingTests(unittest.TestCase):
         self.assertEqual(rendered["caddyRoutes"][0]["upstream"], "192.168.86.10:8080")
         self.assertIsNone(rendered["piholeClients"][0]["identifier"])
         self.assertEqual(rendered["piholeClients"][0]["status"], "pending-encrypted-identity-resolution")
+
+    def test_mac_only_device_requires_explicit_null_address(self):
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["devices"]["test-tablet"]["network"]["address"] = None
+        rendered = render_inventory.render(inventory)
+        tablet = next(r for r in rendered["networkReservations"] if r["device"] == "test-tablet")
+        self.assertIsNone(tablet["address"])
+        self.assertFalse(tablet["_hasStaticAddress"])
+
+        inventory = render_inventory.load_source(None, self.fixture_path)
+        inventory["devices"]["test-tablet"]["network"].pop("address")
+        with self.assertRaises(render_inventory.InventoryError):
+            render_inventory.render(inventory)
 
     def test_policy_is_required_at_the_inventory_boundary(self):
         inventory = render_inventory.load_source(None, self.fixture_path)
@@ -456,6 +469,22 @@ class InventoryRenderingTests(unittest.TestCase):
         inventory["devices"]["test-tablet"]["network"]["address"] = "192.168.10.11"
         with self.assertRaises(render_inventory.InventoryError):
             render_inventory.render(inventory)
+
+    def test_dnsmasq_plan_excludes_mac_only_devices(self):
+        inventory = render_inventory.load_source(self.inventory_path, None)
+        inventory["devices"]["emma-book"]["network"]["address"] = None
+        rendered = render_inventory.render(inventory)
+        plan = render_dnsmasq_plan.render(rendered)
+        device_addresses = [
+            reservation["device"]
+            for profile in plan["profiles"]
+            for reservation in profile["reservations"]
+        ]
+        self.assertNotIn("emma-book", device_addresses)
+        self.assertEqual(
+            {p["profile"]: p["reservationCount"] for p in plan["profiles"]},
+            {"lan": 6, "iot": 7, "guest": 2},
+        )
 
     def test_dnsmasq_plan_is_review_only_and_preserves_ownership(self):
         inventory = render_inventory.load_source(self.inventory_path, None)
