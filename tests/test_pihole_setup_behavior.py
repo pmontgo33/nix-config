@@ -773,7 +773,7 @@ exit_test_api() { return 0; }
                     time.sleep(0.05)
                 r = self._run(tmp / "setup.sh")
                 self.assertNotEqual(r.returncode, 0)
-                self.assertIn("policy lock held by another actor", r.stdout)
+                self.assertIn("policy lock is unavailable", r.stdout)
                 self.assertFalse((tmp / "state" / ".pihole-ftl-lists-pending").exists())
             finally:
                 holder.kill()

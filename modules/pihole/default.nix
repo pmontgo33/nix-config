@@ -48,10 +48,12 @@ let
     set -eo pipefail
     acquirePolicyLock() {
       local attempts=20
-      # Open the lock file via flock(1) for an atomic, race-free exclusive
-      # acquisition. Opening with `>>` creates the file when absent and
-      # never truncates, so an existing holder's fd stays bound to the
-      # same inode while we attempt our non-blocking flock.
+      # Open the persistent lock file via flock(1) for an atomic, race-free
+      # exclusive acquisition. Opening with `>>` creates the file when
+      # absent and never truncates, so an existing holder's fd stays bound
+      # to the same inode while we attempt our non-blocking flock. The
+      # lockfile itself persists across writer invocations; flock is the
+      # only mutual-exclusion signal.
       $install -d -m 0700 "${ftl.stateDirectory}" 2>/dev/null || true
       while [ "$attempts" -gt 0 ]; do
         if eval "exec $lockfd>>\"$lock_path\"" 2>/dev/null && $flock -n "$lockfd"; then
@@ -59,10 +61,10 @@ let
           return 0
         fi
         eval "exec $lockfd>&-" 2>/dev/null || true
-        if [ -e "$lock_path" ]; then
-          echo "Pi-hole policy lock held by another actor; aborting before list mutation"
-          exit 1
-        fi
+        # The lockfile is intentionally persistent. flock(-n) is the only
+        # signal that another actor holds the lock; if it failed while the
+        # file exists, another writer is currently in flight. Retry briefly
+        # in case the previous holder just released.
         attempts=$((attempts - 1))
         ${lib.getExe' pkgs.coreutils "sleep"} .25s
       done

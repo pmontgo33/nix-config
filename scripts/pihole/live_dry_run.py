@@ -56,8 +56,10 @@ _SAFE_ORIGIN_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 _SAFE_KEY = re.compile(r"^[a-zA-Z0-9._:/-]+$")
 _VALID_HOST_LABEL = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$")
 _TARGETS = frozenset({"pihole1", "pihole2"})
-_REMOTE_DEFAULT_PATH = "/var/lib/pihole/live_dry_run_remote.py"
-_PASSWORD_PATH = "/run/secrets.d/1/pihole-api-password"
+_REMOTE_DEFAULT_PATH = "/etc/pihole/live-policy-apply"
+# Dry-run still expects this default, but the apply orchestrator resolves
+# the live per-activation path itself before sending the payload.
+_PASSWORD_PATH = "/run/secrets.d/pihole-api-password"
 _SAFE_PATH_CHARS = re.compile(r"^[a-zA-Z0-9._/+-]+$")
 _SOPS_GLOB = "/nix/store/*-sops-*/bin/sops"
 
@@ -203,9 +205,11 @@ def _sanitize(text: str) -> str:
 
 def _ssh_dry_run(ssh_host: str, remote_path: str, payload: dict[str, Any]) -> dict[str, Any]:
     body = json.dumps(payload, indent=2, sort_keys=True)
-    parent_dir = str(Path(remote_path).parent.parent)
-    remote_command = f"PYTHONPATH={parent_dir} nix-shell -p python3 --run 'PYTHONPATH={parent_dir} python3 {remote_path}'"
-    command = ["ssh", "-o", "BatchMode=yes", "-o", "LogLevel=ERROR", ssh_host, remote_command]
+    # ``remote_path`` is either the sealed ``/etc/pihole/live-policy-apply``
+    # shell wrapper or, for tests, a path the hermes-side can resolve.
+    # We never invoke ``python3`` against it: the wrapper is a script that
+    # reads JSON on stdin and writes JSON on stdout.
+    command = ["ssh", "-o", "BatchMode=yes", "-o", "LogLevel=ERROR", ssh_host, remote_path]
     result = subprocess.run(command, input=body, capture_output=True, text=True, check=False)
     _require(result.returncode == 0, f"remote wrapper exited {result.returncode}: {_sanitize(result.stderr)}")
     _require(bool(result.stdout), "remote wrapper produced no output")
