@@ -24,9 +24,9 @@ let
   ) cfg.lists);
   policyRuntime = pkgs.runCommand "pihole-policy-runtime" { } ''
     mkdir -p $out/scripts/pihole
-    cp ${../../scripts/pihole/live_reconcile.py} $out/scripts/pihole/
-    cp ${../../scripts/pihole/live_dry_run_remote.py} $out/scripts/pihole/
-    cp ${../../scripts/pihole/__init__.py} $out/scripts/pihole/
+    cp ${../../scripts/pihole/__init__.py} $out/scripts/pihole/__init__.py
+    cp ${../../scripts/pihole/live_reconcile.py} $out/scripts/pihole/live_reconcile.py
+    cp ${../../scripts/pihole/live_dry_run_remote.py} $out/scripts/pihole/live_dry_run_remote.py
   '';
   policyApply = pkgs.writeShellApplication {
     name = "pihole-policy-apply";

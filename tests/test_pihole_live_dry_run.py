@@ -4,6 +4,35 @@ import unittest
 from scripts.pihole import live_dry_run as orchestrator
 
 
+class SopsResolutionTests(unittest.TestCase):
+    def test_resolve_sops_uses_path_when_available(self):
+        from scripts.pihole import live_dry_run as orchestrator
+        import unittest.mock as mock
+        with mock.patch.object(orchestrator.shutil, "which", return_value=None), \
+             mock.patch.object(orchestrator.os.path, "exists", return_value=True), \
+             mock.patch.object(orchestrator.glob, "glob",
+                               return_value=["/nix/store/abc-sops-3.13.2/bin/sops"]):
+            self.assertEqual(
+                orchestrator._resolve_sops(),
+                "/nix/store/abc-sops-3.13.2/bin/sops",
+            )
+
+    def test_resolve_sops_prefers_path_env(self):
+        from scripts.pihole import live_dry_run as orchestrator
+        import unittest.mock as mock
+        with mock.patch.object(orchestrator.shutil, "which",
+                              return_value="/usr/bin/sops"):
+            self.assertEqual(orchestrator._resolve_sops(), "/usr/bin/sops")
+
+    def test_resolve_sops_raises_when_unavailable(self):
+        from scripts.pihole import live_dry_run as orchestrator
+        import unittest.mock as mock
+        with mock.patch.object(orchestrator.shutil, "which", return_value=None), \
+             mock.patch.object(orchestrator.glob, "glob", return_value=[]):
+            with self.assertRaises(orchestrator.OrchestratorError):
+                orchestrator._resolve_sops()
+
+
 class OriginValidationTests(unittest.TestCase):
     def test_accepts_loopback_http(self):
         origin, allow = orchestrator._validate_origin("http://127.0.0.1:80")
