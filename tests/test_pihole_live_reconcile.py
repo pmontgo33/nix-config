@@ -59,14 +59,11 @@ class StatefulTransport(FakeTransport):
         self.next_id = 100
 
     def request(self, method, path, *, payload=None, headers=None):
-        if method == "POST" and (path in {"/api/groups", "/api/clients"} or path.startswith("/api/lists?type=")):
+        if method == "POST" and path in {"/api/groups", "/api/clients"}:
             self.next_id += 1
             if path == "/api/groups":
                 self.current["groups"].append({"id": self.next_id, **payload})
                 self.responses[("POST", path)] = {"groups": [{"id": self.next_id}]}
-            elif path.startswith("/api/lists?type="):
-                self.current["lists"].append({"id": self.next_id, "type": "block", **payload})
-                self.responses[("POST", path)] = {"lists": [{"id": self.next_id}]}
             else:
                 self.current["clients"].append({"id": self.next_id, **payload})
                 self.responses[("POST", path)] = {"clients": [{"id": self.next_id}]}
@@ -80,11 +77,7 @@ def inventory():
             {"name": "normal", "description": "Normal clients", "enabled": True},
             {"name": "kids", "description": "Kids clients", "enabled": True},
         ],
-        "adlists": [{
-            "address": "file:///var/lib/pihole/baseline.hosts",
-            "description": "Shared Pi-hole baseline adlist",
-            "enabled": True,
-        }],
+        "adlists": [],
         "clients": [{
             "identifier": "device-a.example",
             "group": "normal",
@@ -139,7 +132,6 @@ def responses_for(current):
         ("POST", "/api/auth"): {"session": {"valid": True, "sid": "valid"}},
         ("GET", "/api/config"): {"config": current["config"], "took": 0.001},
         ("GET", "/api/groups"): {"groups": current["groups"], "took": 0.001, "processed": None},
-        ("GET", "/api/lists"): {"lists": current["lists"], "took": 0.001, "processed": None},
         ("GET", "/api/domains"): {"domains": current["domains"], "took": 0.001, "processed": None},
         ("GET", "/api/clients"): {"clients": current["clients"], "took": 0.001, "processed": None},
         ("GET", "/api/info/version"): {**current["version"], "took": 0.001},
@@ -162,6 +154,16 @@ class LivePiHoleReconcileTests(unittest.TestCase):
         self.assertTrue(all(call["method"] in {"GET", "POST"} for call in transport.calls))
         self.assertEqual([call["method"] for call in transport.calls].count("POST"), 1)
         self.assertFalse(any(call["method"] in {"PUT", "PATCH", "DELETE"} for call in transport.calls))
+
+    def test_live_policy_reconciler_never_reads_or_writes_adlists(self):
+        transport = FakeTransport(responses_for(state()))
+        live.reconcile_live(
+            inventory(),
+            credential_callback=lambda: "fixture-value",
+            transport=transport,
+        )
+        self.assertNotIn("/api/lists", [call["path"] for call in transport.calls])
+        self.assertFalse(any(call["path"].startswith("/api/lists") for call in transport.calls))
 
     def test_apply_requires_exact_confirmation_before_authentication(self):
         transport = FakeTransport({})
@@ -285,14 +287,6 @@ class LivePiHoleReconcileTests(unittest.TestCase):
 
         self.assertEqual(str(raised.exception), "malformed Pi-hole state")
 
-    def test_missing_list_type_fails_closed(self):
-        current = state()
-        del current["lists"][0]["type"]
-
-        with self.assertRaises(live.LivePolicyError) as raised:
-            make_plan(inventory(), current)
-
-        self.assertEqual(str(raised.exception), "malformed Pi-hole state")
 
     def test_unknown_observed_fields_fail_closed(self):
         current = state()
@@ -306,11 +300,8 @@ class LivePiHoleReconcileTests(unittest.TestCase):
     def test_new_group_dependency_produces_plan_without_key_error(self):
         desired = inventory()
         desired["groups"].append({"name": "new", "description": "New clients", "enabled": True})
-        desired["adlists"][0]["groups"] = ["new"]
-
         plan = make_plan(desired, state())
         self.assertIn({"action": "create", "family": "groups", "managed": True}, plan["actions"])
-        self.assertIn({"action": "update", "family": "lists", "managed": True}, plan["actions"])
 
     def test_unvalidated_injected_transport_is_rejected(self):
         class UnvalidatedTransport(FakeTransport):
@@ -390,7 +381,6 @@ class LivePiHoleReconcileTests(unittest.TestCase):
         transport = StatefulTransport(responses_for(current), current)
         transport.responses.update({
             ("POST", "/api/groups"): {"groups": [{"id": 101}]},
-            ("POST", "/api/lists?type=block"): {"lists": [{"id": 102}]},
             ("POST", "/api/clients"): {"clients": [{"id": 103}]},
         })
 
@@ -423,7 +413,6 @@ class LivePiHoleReconcileTests(unittest.TestCase):
         transport = StatefulTransport(responses_for(current), current)
         transport.responses.update({
             ("POST", "/api/groups"): {"groups": [{"id": 101}]},
-            ("POST", "/api/lists?type=block"): {"lists": [{"id": 102}]},
             ("POST", "/api/clients"): {"clients": [{"id": 103}]},
         })
 
@@ -447,18 +436,10 @@ class LivePiHoleReconcileTests(unittest.TestCase):
 
         self.assertTrue(result["apply"])
         self.assertTrue(result["verified"])
-        self.assertGreaterEqual(calls["reads"], 12)
+        self.assertGreaterEqual(calls["reads"], 10)
         first_write = next(index for index, call in enumerate(transport.calls) if call["method"] in {"POST", "PUT", "PATCH", "DELETE"} and call["path"] != "/api/auth")
         self.assertTrue(all(call["method"] == "GET" for call in transport.calls[1:first_write]))
 
-    def test_adlist_groups_compare_canonical_names_to_api_ids(self):
-        desired = inventory()
-        desired["adlists"][0]["groups"] = ["normal"]
-        current = state()
-        current["lists"][0]["groups"] = [10]
-
-        plan = make_plan(desired, current)
-        self.assertFalse(any(action["family"] == "lists" for action in plan["actions"]))
 
     def test_direct_transport_mutations_require_apply_capability(self):
         transport = live.UrllibTransport("https://pihole.test")
@@ -479,26 +460,6 @@ class LivePiHoleReconcileTests(unittest.TestCase):
         transport = FakeTransport({("POST", "/api/auth"): {"session": {"valid": True, "sid": "vFA+EP4MQ5JJvJg+3Q2Jnw="}, "took": 0.001}})
         self.assertEqual(live._authenticate(transport, lambda: "fixture-value"), "vFA+EP4MQ5JJvJg+3Q2Jnw=")
 
-    def test_v6_mutation_paths_and_payloads_use_named_resources(self):
-        current = state()
-        current["groups"] = []
-        current["lists"] = []
-        current["clients"] = []
-        transport = StatefulTransport(responses_for(current), current)
-        transport.responses.update({
-            ("POST", "/api/groups"): {"groups": [{"id": 101}]},
-            ("POST", "/api/lists?type=block"): {"lists": [{"id": 102}]},
-            ("POST", "/api/clients"): {"clients": [{"id": 103}]},
-        })
-        with patch.object(live, "build_opener", lambda *_args: transport), patch.object(live, "UrllibTransport", type(transport)):
-            live.reconcile_live(inventory(), credential_callback=lambda: "fixture-value", transport=transport, apply=True, confirmation=live.APPLY_CONFIRMATION)
-        writes = [call for call in transport.calls if call["method"] in {"PUT", "POST", "DELETE"} and call["path"] != "/api/auth"]
-        list_write = next(call for call in writes if call["path"].startswith("/api/lists"))
-        self.assertEqual(list_write["path"], "/api/lists?type=block")
-        self.assertNotIn("type", list_write["payload"])
-        self.assertTrue(all(isinstance(group_id, int) for group_id in list_write["payload"]["groups"]))
-        self.assertTrue(any(call["path"] == "/api/clients" for call in writes))
-        self.assertTrue(any(call["path"] == "/api/groups" for call in writes))
 
     def test_unknown_collection_envelope_fields_fail_closed(self):
         current = state()
@@ -506,18 +467,6 @@ class LivePiHoleReconcileTests(unittest.TestCase):
         with self.assertRaises(live.LivePolicyError):
             make_plan(inventory(), current)
 
-    def test_list_identity_includes_type(self):
-        current = state()
-        current["lists"].append({
-            "id": 21,
-            "address": current["lists"][0]["address"],
-            "comment": "Administrator allow-list",
-            "type": "allow",
-            "groups": [],
-            "enabled": True,
-        })
-        plan = make_plan(inventory(), current)
-        self.assertIn({"family": "lists", "managed": False, "reason": "unmanaged-object"}, plan["preserved"])
 
     def test_origin_and_serialization_failures_have_no_exception_context(self):
         with self.assertRaises(live.LivePolicyError) as origin_error:

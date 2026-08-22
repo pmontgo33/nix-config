@@ -75,6 +75,12 @@ class PiHolePolicyTests(unittest.TestCase):
             with self.subTest(label=label), self.assertRaises(policy.PolicyError):
                 policy.render_policy(data, "pihole1")
 
+    def test_empty_adlists_are_valid_when_pi_hole_module_owns_lists(self):
+        data = copy.deepcopy(self.input_data)
+        data["policy"]["adlists"] = {"standard": [], "kids": []}
+        rendered = policy.render_policy(data, "pihole1")
+        self.assertEqual(rendered["desired"]["adlists"], [])
+
     def test_identity_resolution_is_fail_closed_and_identifiers_are_not_rendered(self):
         for label, mutate in [
             ("required flag", lambda d: d.update({"identityResolutionRequired": True})),

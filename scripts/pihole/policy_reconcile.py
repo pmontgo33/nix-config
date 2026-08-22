@@ -169,18 +169,20 @@ def _normalize_base(value: Any) -> dict[str, Any]:
 def _normalize_adlists(value: Any) -> list[dict[str, Any]]:
     _require(isinstance(value, dict), "policy.adlists must be an object")
     _require(set(value) == set(_ADLIST_KINDS), "policy.adlists must contain standard and kids lists only")
-    _require(value["kids"] == [], "policy.adlists.kids must be empty for the baseline policy")
-    _require(isinstance(value["standard"], list) and len(value["standard"]) == 1, "policy.adlists.standard must contain the baseline list only")
-    output: list[dict[str, Any]] = []
-    entry = value["standard"][0]
-    _require(isinstance(entry, dict), "policy.adlists.standard entry must be an object")
-    _require(set(entry) == _ADLIST_KEYS, "baseline adlist must contain its complete supported fields")
-    _require(entry == _BASELINE_ADLIST, "policy adlist must match the existing shared baseline list")
-    _require(isinstance(entry["enabled"], bool), "adlist enabled must be a boolean")
-    _text(entry["address"], "adlist address")
-    _text(entry["description"], "adlist description")
-    output.append({"kind": "standard", **{key: entry[key] for key in sorted(entry)}})
-    return output
+    _require(value["kids"] == [], "policy.adlists.kids must be empty")
+    _require(isinstance(value["standard"], list) and len(value["standard"]) <= 1, "policy.adlists.standard must be empty or contain the legacy baseline list")
+    # The Pi-hole Nix module owns all adlists. Discard the legacy baseline
+    # entry from the policy inventory so live reconciliation never sees
+    # an authoritative overlap with services.pihole-ftl.lists.
+    if value["standard"]:
+        entry = value["standard"][0]
+        _require(isinstance(entry, dict), "policy.adlists.standard entry must be an object")
+        _require(set(entry) == _ADLIST_KEYS, "baseline adlist must contain its complete supported fields")
+        _require(entry == _BASELINE_ADLIST, "policy adlist must match the existing shared baseline list")
+        _require(isinstance(entry["enabled"], bool), "adlist enabled must be a boolean")
+        _text(entry["address"], "adlist address")
+        _text(entry["description"], "adlist description")
+    return []
 
 
 def _normalize_groups(value: Any) -> dict[str, dict[str, Any]]:
