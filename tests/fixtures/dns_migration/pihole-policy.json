@@ -28,7 +28,7 @@
   "unboundHostAliases": [],
   "policy": {
     "base": {
-      "upstreams": ["192.168.86.1#5353"],
+      "upstreams": ["192.168.86.1"],
       "listeningInterfaces": ["eth0"],
       "queryLogging": true,
       "retention": 91

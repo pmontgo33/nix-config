@@ -8,7 +8,7 @@ class PiHolePolicyReconcileAdlistTests(unittest.TestCase):
     def test_legacy_baseline_is_discarded(self):
         baseline = {
             "base": {
-                "upstreams": ["192.168.86.1#5353"],
+                "upstreams": ["192.168.86.1"],
                 "interface": "eth0",
                 "queryLogging": True,
                 "retention": 91,

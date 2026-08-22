@@ -29,7 +29,7 @@ class InventoryRenderingTests(unittest.TestCase):
         self.assertEqual(first["ownership"]["localDns"], "opnsense-unbound")
         self.assertEqual(first["policy"], {
             "base": {
-                "upstreams": ["192.168.86.1#5353"],
+                "upstreams": ["192.168.86.1"],
                 "listeningInterfaces": ["eth0"],
                 "queryLogging": True,
                 "retention": 91,
@@ -484,6 +484,30 @@ class InventoryRenderingTests(unittest.TestCase):
         rendered["piholeClients"][0]["clientRef"] = "identityRef:not-a-reservation"
         with self.assertRaises(render_dnsmasq_plan.PlanError):
             render_dnsmasq_plan.render(rendered)
+
+    def test_no_production_source_uses_stale_port_5353_upstream(self):
+        """Regression guard for the 2026-08-22 guest internet outage.
+
+        OPNsense Unbound moved to port 53 at Gate 4 (2026-08-21). The Nix
+        source-of-truth was left at ``192.168.86.1#5353`` in three places,
+        which caused every uncached DNS lookup to time out before FTL fell
+        back to the working port. This test fails if any production file
+        (outside the disposable pihole-native-test host and the encrypted
+        Ansible hex blob) reintroduces the stale port.
+        """
+        files_to_check = [
+            ROOT / "inventory" / "default.nix",
+            ROOT / "hosts" / "nxc" / "pihole" / "configuration.nix",
+            ROOT / "scripts" / "pihole" / "live_reconcile.py",
+            ROOT / "scripts" / "pihole" / "policy_reconcile.py",
+            ROOT / "scripts" / "dns_migration" / "render_inventory.py",
+        ]
+        offenders = [p for p in files_to_check if "192.168.86.1#5353" in p.read_text()]
+        self.assertEqual(
+            offenders,
+            [],
+            f"production source still references stale :5353 upstream: {offenders}",
+        )
 
 
 if __name__ == "__main__":

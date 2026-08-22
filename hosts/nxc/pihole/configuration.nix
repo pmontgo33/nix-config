@@ -35,10 +35,12 @@
   services.pihole-native = {
     enable = true;
     interface = "eth0";
-    # Temporary upstream while AdGuard owns OPNsense port 53. This preserves
-    # the existing recursive path through OPNsense Unbound.
+    # OPNsense Unbound has listened on port 53 since the Gate 4 cutover. The
+    # earlier `:5353` upstream caused every uncached DNS lookup to time out
+    # before FTL fell back to the working port, surfacing as user-visible
+    # "no internet" symptoms on guest and IoT VLANs.
     upstreams = [
-      "192.168.86.1#5353"
+      "192.168.86.1"
     ];
     # Gate 3B exposes the Pi-hole web admin/API on all interfaces so the
     # Caddy reverse proxy (local-proxy) can terminate HTTPS at

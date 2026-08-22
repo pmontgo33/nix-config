@@ -53,7 +53,7 @@ class LiveAdapterTests(unittest.TestCase):
 
     def test_adapt_base_carries_current_upstream(self):
         adapted = live_adapter.adapt(_rendered())
-        self.assertEqual(adapted["base"]["dns"]["upstreams"], ["192.168.86.1#5353"])
+        self.assertEqual(adapted["base"]["dns"]["upstreams"], ["192.168.86.1"])
         self.assertEqual(adapted["base"]["dns"]["interface"], "eth0")
         self.assertEqual(adapted["base"]["dns"]["queryLogging"], True)
         self.assertEqual(adapted["base"]["database"]["maxDBdays"], 91)
@@ -99,7 +99,7 @@ _UNRESOLVED_INVENTORY = {
     ],
     "policy": {
         "base": {
-            "upstreams": ["192.168.86.1#5353"],
+            "upstreams": ["192.168.86.1"],
             "listeningInterfaces": ["eth0"],
             "queryLogging": True,
             "retention": 91,
