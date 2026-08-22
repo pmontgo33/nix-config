@@ -509,6 +509,49 @@ class InventoryRenderingTests(unittest.TestCase):
             f"production source still references stale :5353 upstream: {offenders}",
         )
 
+    def test_inventory_device_key_matches_identityRef(self):
+        """Convention: inventory device KEY equals ``identityRef``.
+
+        A device's inventory key should be the same as its ``identityRef``
+        field, with no interface prefix or other decoration. This decouples
+        device identity from operational state (which VLAN it sits on) so a
+        device that moves between VLANs retains its identity and SOPS mapping.
+        """
+        inventory = render_inventory.load_source(self.inventory_path, None)
+        devices = inventory["devices"]
+        mismatched = [
+            (name, dev["network"].get("identityRef"))
+            for name, dev in devices.items()
+            if dev["network"].get("identityRef") and dev["network"]["identityRef"] != name
+        ]
+        self.assertEqual(
+            mismatched,
+            [],
+            f"device keys must equal their identityRef (no interface prefix): {mismatched}",
+        )
+
+    def test_no_production_identityRef_carries_interface_prefix(self):
+        """Regression guard for the 2026-08-22 identityRef-rename refactor.
+
+        ``identityRef`` is a stable, host-only identifier that follows a
+        device across VLAN changes. It must never encode the current
+        interface (no ``lan-``, ``iot-``, or ``guest-`` prefix). This test
+        fails if any production file re-introduces such a prefix.
+        """
+        import re
+
+        inventory = render_inventory.load_source(self.inventory_path, None)
+        prefixed = [
+            (name, dev["network"]["identityRef"])
+            for name, dev in inventory["devices"].items()
+            if re.match(r"^(lan|iot|guest)-", dev["network"]["identityRef"])
+        ]
+        self.assertEqual(
+            prefixed,
+            [],
+            f"identityRef must not encode the current interface: {prefixed}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

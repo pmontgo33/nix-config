@@ -110,7 +110,7 @@
         network = {
           hostname = "poe-switch-basement";
           address = "192.168.86.5";
-          identityRef = "lan-poe-switch-basement";
+          identityRef = "poe-switch-basement";
           interface = "lan";
           piholeGroup = "normal";
         };
@@ -120,7 +120,7 @@
         network = {
           hostname = "esp32s3-3AF8E0";
           address = "192.168.86.70";
-          identityRef = "lan-esp32s3-3af8e0";
+          identityRef = "esp32s3-3af8e0";
           interface = "lan";
           piholeGroup = "normal";
         };
@@ -130,17 +130,17 @@
         network = {
           hostname = "esp32s3-9C5358";
           address = "192.168.86.71";
-          identityRef = "lan-esp32s3-9c5358";
+          identityRef = "esp32s3-9c5358";
           interface = "lan";
           piholeGroup = "normal";
         };
       };
 
-      reservation-lan-197 = {
+      reservation-197 = {
         network = {
           hostname = null;
           address = "192.168.86.197";
-          identityRef = "lan-reservation-197";
+          identityRef = "reservation-197";
           interface = "lan";
           piholeGroup = "normal";
         };
@@ -150,17 +150,17 @@
         network = {
           hostname = "roborock-vacuum-a65";
           address = "192.168.86.201";
-          identityRef = "lan-roborock-vacuum-a65";
+          identityRef = "roborock-vacuum-a65";
           interface = "lan";
           piholeGroup = "normal";
         };
       };
 
-      reservation-lan-202 = {
+      reservation-202 = {
         network = {
           hostname = null;
           address = "192.168.86.202";
-          identityRef = "lan-reservation-202";
+          identityRef = "reservation-202";
           interface = "lan";
           piholeGroup = "normal";
         };
@@ -170,7 +170,7 @@
         network = {
           hostname = "wled-cabinets";
           address = "192.168.10.17";
-          identityRef = "iot-wled-cabinets";
+          identityRef = "wled-cabinets";
           interface = "iot";
           piholeGroup = "normal";
         };
@@ -180,7 +180,7 @@
         network = {
           hostname = "wled-patio";
           address = "192.168.10.19";
-          identityRef = "iot-wled-patio";
+          identityRef = "wled-patio";
           interface = "iot";
           piholeGroup = "normal";
         };
@@ -190,7 +190,7 @@
         network = {
           hostname = "emma_cam";
           address = "192.168.10.50";
-          identityRef = "iot-emma-cam";
+          identityRef = "emma-cam";
           interface = "iot";
           piholeGroup = "normal";
         };
@@ -200,7 +200,7 @@
         network = {
           hostname = "ali_cam";
           address = "192.168.10.51";
-          identityRef = "iot-ali-cam";
+          identityRef = "ali-cam";
           interface = "iot";
           piholeGroup = "normal";
         };
@@ -210,7 +210,7 @@
         network = {
           hostname = "nursery_cam";
           address = "192.168.10.52";
-          identityRef = "iot-nursery-cam";
+          identityRef = "nursery-cam";
           interface = "iot";
           piholeGroup = "normal";
         };
@@ -220,7 +220,7 @@
         network = {
           hostname = "back_door_cam";
           address = "192.168.10.53";
-          identityRef = "iot-back-door-cam";
+          identityRef = "back-door-cam";
           interface = "iot";
           piholeGroup = "normal";
         };
@@ -230,7 +230,7 @@
         network = {
           hostname = "front_door_cam";
           address = "192.168.10.54";
-          identityRef = "iot-front-door-cam";
+          identityRef = "front-door-cam";
           interface = "iot";
           piholeGroup = "normal";
         };
@@ -240,17 +240,17 @@
         network = {
           hostname = "elegoo-cc2";
           address = "192.168.20.20";
-          identityRef = "guest-elegoo-cc2";
+          identityRef = "elegoo-cc2";
           interface = "guest";
           piholeGroup = "normal";
         };
       };
 
-      reservation-guest-80 = {
+      reservation-80 = {
         network = {
           hostname = null;
           address = "192.168.20.80";
-          identityRef = "guest-reservation-80";
+          identityRef = "reservation-80";
           interface = "guest";
           piholeGroup = "normal";
         };
