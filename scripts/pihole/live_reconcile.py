@@ -20,7 +20,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 OWNER = "shared-pihole-policy"
 OWNER_MARKER = "[owner=shared-pihole-policy]"
 APPLY_CONFIRMATION = "APPLY_SHARED_PIHOLE_POLICY"
-BASELINE_BASE = {"dns": {"upstreams": ["192.168.86.1#5353"], "interface": "eth0", "queryLogging": True}, "database": {"maxDBdays": 91}}
+BASELINE_BASE = {"dns": {"upstreams": ["192.168.86.1"], "interface": "eth0", "queryLogging": True}, "database": {"maxDBdays": 91}}
 _DESIRED_FIELDS = {
     "groups": frozenset({"name", "description", "enabled"}),
     "clients": frozenset({"identifier", "group"}),

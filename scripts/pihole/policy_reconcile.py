@@ -45,7 +45,7 @@ _MANAGED_REQUIRED = {
 }
 _IDENTITY_REF = re.compile(r"^identityRef:[a-z0-9][a-z0-9-]{1,62}$")
 _BASELINE_BASE = {
-    "upstreams": ["192.168.86.1#5353"],
+    "upstreams": ["192.168.86.1"],
     "listeningInterfaces": ["eth0"],
     "queryLogging": True,
     "retention": 91,

@@ -290,7 +290,7 @@ def _validate_policy(inventory: dict[str, Any]) -> dict[str, Any]:
     _require(isinstance(base, dict), "policy.base must be an object")
     _ensure_keys(base, POLICY_BASE_KEYS, "inventory.policy.base")
     _require(set(base) == POLICY_BASE_KEYS, "policy.base must contain the complete baseline settings")
-    _require(base["upstreams"] == ["192.168.86.1#5353"], "policy.base.upstreams must contain the current upstream only")
+    _require(base["upstreams"] == ["192.168.86.1"], "policy.base.upstreams must contain the current upstream only")
     _require(base["listeningInterfaces"] == ["eth0"], "policy.base.listeningInterfaces must contain eth0 only")
     _require(base["queryLogging"] is True, "policy.base.queryLogging must be true")
     _require(base["retention"] == 91, "policy.base.retention must be 91 days")

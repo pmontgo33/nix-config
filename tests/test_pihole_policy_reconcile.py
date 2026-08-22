@@ -16,7 +16,7 @@ STALE_STATE = ROOT / "tests" / "fixtures" / "dns_migration" / "pihole-policy-sta
 UNMANAGED_STATE = ROOT / "tests" / "fixtures" / "dns_migration" / "pihole-policy-state-unmanaged.json"
 INVALID_STATE = ROOT / "tests" / "fixtures" / "dns_migration" / "pihole-policy-state-invalid.json"
 BASE = {
-    "upstreams": ["192.168.86.1#5353"],
+    "upstreams": ["192.168.86.1"],
     "listeningInterfaces": ["eth0"],
     "queryLogging": True,
     "retention": 91,
