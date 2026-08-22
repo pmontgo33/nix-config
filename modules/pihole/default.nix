@@ -10,17 +10,65 @@ let
       enabled = list.enabled;
       address = list.url;
       comment = list.description;
+      groups = list.groups;
     }
-  ) ftl.lists;
+  ) cfg.lists;
   listManifest = builtins.toJSON (map (
     list: {
       type = list.type;
       enabled = list.enabled;
       address = list.url;
       comment = list.description;
+      groups = list.groups;
     }
-  ) ftl.lists);
+  ) cfg.lists);
+  policyRuntime = pkgs.runCommand "pihole-policy-runtime" { } ''
+    mkdir -p $out/scripts/pihole
+    cp ${../../scripts/pihole/live_reconcile.py} $out/scripts/pihole/
+    cp ${../../scripts/pihole/live_dry_run_remote.py} $out/scripts/pihole/
+    cp ${../../scripts/pihole/__init__.py} $out/scripts/pihole/
+  '';
+  policyApply = pkgs.writeShellApplication {
+    name = "pihole-policy-apply";
+    runtimeInputs = [ pkgs.python3 ];
+    text = ''
+      exec ${lib.getExe pkgs.python3} ${policyRuntime}/scripts/pihole/live_dry_run_remote.py
+    '';
+  };
+  # Root-owned advisory lockfile serialises the owner-scoped policy apply
+  # and the list/gravity setup so a cooperative second actor cannot slip in
+  # between group resolution and list mutation. Non-blocking probe; both
+  # writers acquire it exclusively with a short bounded wait.
+  policyLockPath = "${cfg.stateDirectory}/.pihole-policy.lock";
   setupScript = ''
+    # This intentionally mirrors the pinned NixOS 26.05 native setup behavior
+    # while making list registration idempotent. Re-review this override when
+    # the nixpkgs Pi-hole module or package input changes.
+    set +u
+    set -eo pipefail
+    acquirePolicyLock() {
+      local attempts=20
+      # Open the lock file via flock(1) for an atomic, race-free exclusive
+      # acquisition. Opening with `>>` creates the file when absent and
+      # never truncates, so an existing holder's fd stays bound to the
+      # same inode while we attempt our non-blocking flock.
+      $install -d -m 0700 "${ftl.stateDirectory}" 2>/dev/null || true
+      while [ "$attempts" -gt 0 ]; do
+        if eval "exec $lockfd>>\"$lock_path\"" 2>/dev/null && $flock -n "$lockfd"; then
+          trap '$flock -u "$lockfd" 2>/dev/null; $rm -f "$macvendor_tmp"' EXIT
+          return 0
+        fi
+        eval "exec $lockfd>&-" 2>/dev/null || true
+        if [ -e "$lock_path" ]; then
+          echo "Pi-hole policy lock held by another actor; aborting before list mutation"
+          exit 1
+        fi
+        attempts=$((attempts - 1))
+        ${lib.getExe' pkgs.coreutils "sleep"} .25s
+      done
+      echo "Pi-hole policy lock is unavailable"
+      exit 1
+    }
     # This intentionally mirrors the pinned NixOS 26.05 native setup behavior
     # while making list registration idempotent. Re-review this override when
     # the nixpkgs Pi-hole module or package input changes.
@@ -33,11 +81,18 @@ let
     mv="${lib.getExe' pkgs.coreutils "mv"}"
     rm="${lib.getExe' pkgs.coreutils "rm"}"
     install="${lib.getExe' pkgs.coreutils "install"}"
+    flock="${lib.getExe' pkgs.util-linux "flock"}"
     macvendor_url=${lib.escapeShellArg ftl.macvendorURL}
     desired_lists=${lib.escapeShellArg listManifest}
+    desired_lists_resolved=""
     pending_marker="${ftl.stateDirectory}/.pihole-ftl-lists-pending"
     lists_changed=false
     any_failed=0
+    lock_path="${ftl.stateDirectory}/.pihole-policy.lock"
+    lockfd=9
+    # Acquire the shared advisory policy lock after tools are resolved so
+    # the function and its call site can both reference $install/$mv/$rm.
+    acquirePolicyLock
 
     # Validate local file-backed lists before any destructive API operation.
     while IFS= read -r file_url; do
@@ -50,7 +105,12 @@ let
     done < <($jq -r '.[] | select(.address | startswith("file://")) | .address' <<< "$desired_lists")
 
     macvendor_tmp=$($mktemp "${ftl.stateDirectory}/macvendor.db.XXXXXX")
-    trap '$rm -f "$macvendor_tmp"' EXIT
+    # Preserve the lock-cleanup trap set in acquirePolicyLock; chain the
+    # macvendor_tmp cleanup so it does not overwrite the lock release.
+    # The lockfile itself is intentionally persistent: dropping it would
+    # create a new inode and break the advisory lock shared with
+    # live_apply. Only the flock is released.
+    trap '$flock -u "$lockfd" 2>/dev/null; $rm -f "$macvendor_tmp"' EXIT
     if $curl --fail --retry 3 --retry-delay 5 "$macvendor_url" \
       -o "$macvendor_tmp"; then
       $mv -f "$macvendor_tmp" "${ftl.stateDirectory}/macvendor.db"
@@ -60,24 +120,6 @@ let
       if [ ! -s "${ftl.stateDirectory}/macvendor.db" ]; then
         echo "No existing Pi-hole MAC database is available"
       fi
-    fi
-
-    if [ ! -f "${ftl.stateDirectory}/gravity.db" ]; then
-      $pihole -g
-      main_pid=$(systemctl show --property MainPID --value ${config.systemd.services.pihole-ftl.name})
-      if [ -z "$main_pid" ]; then
-        echo "Unable to determine the Pi-hole FTL process ID"
-        exit 1
-      fi
-      case "$main_pid" in
-        0|*[!0-9]*)
-          echo "Unable to determine the Pi-hole FTL process ID"
-          exit 1
-          ;;
-        *)
-          ${lib.getExe' pkgs.procps "kill"} -s SIGRTMIN "$main_pid"
-          ;;
-      esac
     fi
 
     . ${ftl.piholePackage}/share/pihole/advanced/Scripts/api.sh
@@ -99,6 +141,69 @@ let
 
     LoginAPI
 
+    # Group membership is policy-owned runtime state. Resolve the declared
+    # names only after API authentication, and fail before gravity or list
+    # mutation if the group API is malformed, ambiguous, or incomplete.
+    validateDeclaredGroups() {
+      local group_data
+      if group_data=$(GetFTLData "groups"); then
+        :
+      else
+        echo "Unable to read current Pi-hole groups"
+        exit 1
+      fi
+      if ! $jq -e '
+        type == "object" and (.error == null) and (.groups | type == "array")
+        and all(.groups[];
+          (type == "object")
+          and ((.name | type) == "string")
+          and (.name | length) > 0
+          and ((.id | type) == "number")
+          and (.id == (.id | floor))
+          and (.id >= 0)
+        )
+        and (([.groups[] | .name] | length) == ([.groups[] | .name] | unique | length))
+        and (([.groups[] | .id] | length) == ([.groups[] | .id] | unique | length))
+      ' >/dev/null <<< "$group_data"; then
+        echo "Unable to parse Pi-hole groups (unexpected or ambiguous shape)"
+        exit 1
+      fi
+      if ! group_name_to_id=$($jq -c 'reduce (.groups[]) as $g ({}; .[$g.name] = $g.id)' <<< "$group_data"); then
+        echo "Unable to parse Pi-hole groups"
+        exit 1
+      fi
+      desired_lists_resolved=$($jq -c --argjson gm "$group_name_to_id" '
+        map(
+          .groups = ([.groups[]?] | map($gm[.] // error("unknown Pi-hole group: " + (. // "<null>"))))
+        )
+      ' <<< "$desired_lists") || {
+        echo "Pi-hole list references a group not present on this instance"
+        exit 1
+      }
+    }
+
+    # Validate the group contract before initial gravity, so a fresh instance
+    # with missing or ambiguous groups remains untouched.
+    validateDeclaredGroups
+
+    if [ ! -f "${ftl.stateDirectory}/gravity.db" ]; then
+      $pihole -g
+      main_pid=$(systemctl show --property MainPID --value ${config.systemd.services.pihole-ftl.name})
+      if [ -z "$main_pid" ]; then
+        echo "Unable to determine the Pi-hole FTL process ID"
+        exit 1
+      fi
+      case "$main_pid" in
+        0|*[!0-9]*)
+          echo "Unable to determine the Pi-hole FTL process ID"
+          exit 1
+          ;;
+        *)
+          ${lib.getExe' pkgs.procps "kill"} -s SIGRTMIN "$main_pid"
+          ;;
+      esac
+    fi
+
     reconcileLists() {
       local current_lists current_signature desired_signature delete_payload response status result error id
       if current_lists=$(GetFTLData "lists"); then
@@ -107,6 +212,9 @@ let
         echo "Unable to read current Pi-hole lists"
         exit 1
       fi
+      # Pi-hole v6 returns `groups` as a sorted list of integer group IDs
+      # (e.g. [0, 1]). Validate the shape and that each entry is a non-negative
+      # integer rather than dereferencing `.id` on what are actually numbers.
       if ! $jq -e '
         type == "object"
         and (.error == null)
@@ -117,20 +225,26 @@ let
           and ((.address | type) == "string")
           and ((.enabled | type) == "boolean")
           and ((.comment == null) or ((.comment | type) == "string"))
+          and ((.groups | type) == "array")
+          and all(.groups[]; ((. | type) == "number") and (. == (. | floor)) and (. >= 0))
         )
       ' >/dev/null <<< "$current_lists"; then
         echo "Unable to read current Pi-hole lists"
         exit 1
       fi
 
+      # Revalidate immediately before any destructive list mutation, so a
+      # concurrent group change cannot redirect a list to another cohort.
+      validateDeclaredGroups
+
       current_signature=$($jq -c '
-        [.lists[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end)}]
+        [.lists[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end), groups: (.groups | sort)}]
         | sort_by(.type, .address)
       ' <<< "$current_lists")
       desired_signature=$($jq -c '
-        [.[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end)}]
+        [.[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end), groups: (.groups | sort)}]
         | sort_by(.type, .address)
-      ' <<< "$desired_lists")
+      ' <<< "$desired_lists_resolved")
       if [ "$current_signature" = "$desired_signature" ] && [ ! -e "$pending_marker" ]; then
         echo "Pi-hole lists already match the declared configuration"
         return 0
@@ -140,6 +254,10 @@ let
         echo "Unable to create the Pi-hole list reconciliation marker"
         exit 1
       fi
+      # Revalidate immediately after the destructive batchDelete so a
+      # concurrent group change cannot influence the IDs each list POST
+      # would otherwise reuse.
+      validateDeclaredGroups
       lists_changed=true
       delete_payload=$($jq -c '[.lists[] | {item: .address, type: .type}]' <<< "$current_lists")
       if [ "$delete_payload" != "[]" ]; then
@@ -159,10 +277,19 @@ let
       fi
 
       ensureList() {
-        local payload="$1" response status result error id
-        # Strip .type from the POST body — Pi-hole v6 only needs type in the query.
-        local body
-        body=$($jq -c 'del(.type)' <<< "$payload")
+        local payload="$1" response status result error id body
+        # Re-resolve group names immediately before each POST, so a concurrent
+        # group change cannot redirect this list to an obsolete ID set.
+        validateDeclaredGroups
+        local resolved
+        resolved=$($jq -c --argjson gm "$group_name_to_id" '
+          .groups = ([.groups[]?] | map($gm[.] // error("unknown Pi-hole group: " + (. // "<null>"))))
+          | del(.type)
+        ' <<< "$payload") || {
+          echo "Pi-hole list references a group not present on this instance"
+          exit 1
+        }
+        body="$resolved"
         if response=$(PostFTLData "lists?type=$($jq -r '.type' <<< "$payload")" "$body" status); then
           :
         else
@@ -194,11 +321,14 @@ let
 
     verifyLists() {
       local actual
+      # Re-resolve names for every verification. A concurrent group change
+      # cannot turn stale numeric IDs into a successful reconciliation.
+      validateDeclaredGroups
       actual=$(GetFTLData "lists") || {
         echo "Unable to read Pi-hole lists for post-rebuild verification"
         exit 1
       }
-      $jq -e --argjson desired "$desired_lists" '
+      $jq -e --argjson desired "$desired_lists_resolved" '
         (type == "object" and (.error == null) and (.lists | type == "array"))
         and all(.lists[];
           (type == "object")
@@ -206,12 +336,14 @@ let
           and ((.address | type) == "string")
           and ((.enabled | type) == "boolean")
           and ((.comment == null) or ((.comment | type) == "string"))
+          and ((.groups | type) == "array")
+          and all(.groups[]; ((. | type) == "number") and (. == (. | floor)) and (. >= 0))
         )
         and (
-          ([.lists[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end)}]
+          ([.lists[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end), groups: (.groups | sort)}]
            | sort_by(.type, .address))
           == ($desired
-              | map({type, address, enabled, comment: (if .comment == null then "" else .comment end)})
+              | map({type, address, enabled, comment: (if .comment == null then "" else .comment end), groups: (.groups | sort)})
               | sort_by(.type, .address))
         )
       ' <<< "$actual" >/dev/null || {
@@ -237,6 +369,46 @@ in
 {
   options.services.pihole-native = {
     enable = lib.mkEnableOption "native Pi-hole FTL and Web services";
+
+    lists = lib.mkOption {
+      type = with lib.types; listOf (lib.types.submodule {
+        options = {
+          url = lib.mkOption {
+            type = lib.types.str;
+            description = "URL of the domain list.";
+          };
+          type = lib.mkOption {
+            type = lib.types.enum [ "allow" "block" ];
+            default = "block";
+            description = "Whether domains on this list are explicitly allowed or blocked.";
+          };
+          enabled = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = "Whether this list is enabled.";
+          };
+          description = lib.mkOption {
+            type = lib.types.str;
+            default = "";
+            description = "Description of the list.";
+          };
+          groups = lib.mkOption {
+            type = with lib.types; listOf (lib.types.enum [ "Default" "normal" "kids" "unfiltered" ]);
+            default = [ "Default" ];
+            description = "Pi-hole groups this list applies to. Must match group names declared in inventory policy.groups.";
+          };
+        };
+      });
+      default = [ ];
+      description = "Domain lists synced to both Pi-hole instances, with per-list group assignment.";
+      example = [
+        {
+          url = "https://big.oisd.nl";
+          description = "OISD big — comprehensive ad/tracker/malware list";
+          groups = [ "Default" "normal" "kids" ];
+        }
+      ];
+    };
 
     interface = lib.mkOption {
       type = lib.types.str;
@@ -416,7 +588,7 @@ in
         message = "services.pihole-native.apiPasswordEnvironmentFile is required when Web/API is bound beyond loopback.";
       }
       {
-        assertion = lib.all (list: builtins.match ".*://[^/]*@.*" list.url == null) ftl.lists;
+        assertion = lib.all (list: builtins.match ".*://[^/]*@.*" list.url == null) cfg.lists;
         message = "Pi-hole list URLs must not contain embedded credentials.";
       }
     ];
@@ -425,7 +597,12 @@ in
       enable = true;
       privacyLevel = cfg.privacyLevel;
       openFirewallDNS = cfg.openFirewallDNS;
-      # Do not use openFirewallWebserver — pihole-web.nix sets
+      # NOTE: list loading is handled entirely by our setup script (which reads
+      # services.pihole-native.lists, a typed option that carries group
+      # assignments). We intentionally do NOT bind native lists into
+      # services.pihole-ftl.lists because the upstream option type rejects the
+      # `groups` field. The upstream module's own list loader is overridden by
+      # our mkForce setup script below.
       # settings.webserver.port to "host:port" which breaks the NixOS
       # firewall parser's toInt call. Instead, open the port directly.
       openFirewallWebserver = false;
@@ -471,6 +648,13 @@ in
           app_sudo = false;
         };
       };
+    };
+
+    # Immutable Pi-hole-local apply wrapper. It reads the SOPS runtime secret
+    # only on the target; Hermes sends inventory and the secret file path.
+    environment.etc."pihole/live-policy-apply" = {
+      source = "${policyApply}/bin/pihole-policy-apply";
+      mode = "0555";
     };
 
     systemd.services.pihole-ftl.serviceConfig.EnvironmentFile =

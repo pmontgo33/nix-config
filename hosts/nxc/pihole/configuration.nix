@@ -55,14 +55,34 @@
     openFirewallDNS = true;
   };
 
-  services.pihole-ftl.lists = [
+  services.pihole-native.lists = [
+    # Global baseline — applied to all three cohorts.
     {
       url = "https://big.oisd.nl";
       description = "OISD big — comprehensive ad/tracker/malware list";
+      groups = [ "Default" "normal" "kids" ];
     }
     {
       url = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/pro.txt";
       description = "Hagezi Pro — balanced DNS blocklist with malware coverage";
+      groups = [ "Default" "normal" "kids" ];
+    }
+
+    # Kids-only — applied only to clients in the kids group.
+    {
+      url = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/nsfw.txt";
+      description = "Hagezi NSFW — adult content blocklist";
+      groups = [ "kids" ];
+    }
+    {
+      url = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/doh-vpn-proxy-bypass.txt";
+      description = "Hagezi DoH/VPN/TOR/Proxy bypass blocklist";
+      groups = [ "kids" ];
+    }
+    {
+      url = "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/gambling.mini.txt";
+      description = "Hagezi Gambling (mini) blocklist";
+      groups = [ "kids" ];
     }
   ];
 

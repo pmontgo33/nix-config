@@ -232,7 +232,11 @@ def _normalize_clients(data: dict[str, Any]) -> tuple[list[dict[str, Any]], set[
         _require(group in {"normal", "kids"}, "Pi-hole client group must be normal or kids")
         groups.add(group)
         _text(client.get("device"), "Pi-hole client device")
-        _text(client.get("address"), "Pi-hole client address")
+        # MAC-derived Pi-hole identities do not require a DHCP reservation.
+        # Keep an explicit null address valid, while still rejecting malformed
+        # non-null addresses from the rendered inventory.
+        if client["address"] is not None:
+            _text(client["address"], "Pi-hole client address")
         payload = {
             "key": key,
             "clientRef": ref,

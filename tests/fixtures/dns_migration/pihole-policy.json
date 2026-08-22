@@ -5,7 +5,7 @@
   "unresolvedIdentityRefs": [],
   "piholeClients": [
     {
-      "clientRef": "identityRef:lan-test-server",
+      "clientRef": "identityRef:test-server",
       "identifier": "fixture-client-alpha",
       "status": "resolved",
       "device": "test-server",
@@ -14,7 +14,7 @@
       "group": "normal"
     },
     {
-      "clientRef": "identityRef:lan-test-tablet",
+      "clientRef": "identityRef:test-tablet",
       "identifier": "fixture-client-beta",
       "status": "resolved",
       "device": "test-tablet",
@@ -48,8 +48,8 @@
       "kids": {"description": "Kids clients"}
     },
     "groupAssignments": {
-      "identityRef:lan-test-server": "normal",
-      "identityRef:lan-test-tablet": "kids"
+      "identityRef:test-server": "normal",
+      "identityRef:test-tablet": "kids"
     },
     "localDns": [],
     "rules": {"allow": [], "block": []}

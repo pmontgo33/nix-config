@@ -256,6 +256,16 @@
         };
       };
 
+      emma-book = {
+        network = {
+          hostname = "emma-book";
+          address = null;
+          identityRef = "emma-book";
+          interface = "guest";
+          piholeGroup = "kids";
+        };
+      };
+
     };
 
     localDns = {

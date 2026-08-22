@@ -486,37 +486,64 @@ def validate_inventory(inventory: dict[str, Any]) -> dict[str, Any]:
         _require(isinstance(network_value, dict), f"device {device_name}.network is required")
         network = network_value
         _ensure_keys(network, NETWORK_KEYS, f"devices.{device_name}.network")
+        _require("address" in network, f"devices.{device_name}.network.address is required")
         interface = network.get("interface")
         _require(isinstance(interface, str) and interface in ALLOWED_INTERFACES, f"invalid device interface: {device_name}")
         _require(interface in profile_networks, f"device interface has no matching network profile: {device_name}")
-        address = _ipv4(network.get("address"), f"devices.{device_name}.network.address")
-        _require(address in profile_networks[interface], f"device address is outside profile subnet: {device_name}")
-        address_text = str(address)
-        _require(address_text not in addresses, f"duplicate address {address_text}: {device_name} and {addresses.get(address_text)}")
-        addresses[address_text] = device_name
-        device_addresses[device_name] = address_text
-        identity_ref = network.get("identityRef")
-        _require(bool(isinstance(identity_ref, str) and IDENTITY_REF.fullmatch(identity_ref)), f"invalid identityRef: {device_name}")
-        _require(identity_ref not in identity_refs, f"duplicate identityRef {identity_ref}: {device_name} and {identity_refs.get(identity_ref)}")
-        identity_refs[identity_ref] = device_name
-        group = network.get("piholeGroup")
-        _require(bool(group in ALLOWED_GROUPS), f"invalid piholeGroup: {device_name}")
-        hostname = network.get("hostname")
-        if hostname is not None:
-            _require(isinstance(hostname, str) and hostname, f"invalid hostname: {device_name}")
-            _require(hostname not in hostnames, f"duplicate hostname {hostname}: {device_name} and {hostnames.get(hostname)}")
-            hostnames[hostname] = device_name
-        range_from, range_to = profile_ranges[interface]
-        if range_from <= address <= range_to:
-            pool_warnings.append({"device": device_name, "address": address_text, "interface": interface, "warning": "reservation address is inside dynamic DHCP range; identity resolution is mandatory before apply"})
-        reservations.append({
-            "device": device_name,
-            "hostname": hostname,
-            "address": address_text,
-            "identityRef": identity_ref,
-            "interface": interface,
-            "piholeGroup": group,
-        })
+        raw_address = network.get("address")
+        if raw_address is None:
+            address = None
+            address_text = None
+            identity_ref = network.get("identityRef")
+            _require(bool(isinstance(identity_ref, str) and IDENTITY_REF.fullmatch(identity_ref)), f"invalid identityRef: {device_name}")
+            _require(identity_ref not in identity_refs, f"duplicate identityRef {identity_ref}: {device_name} and {identity_refs.get(identity_ref)}")
+            identity_refs[identity_ref] = device_name
+            group = network.get("piholeGroup")
+            _require(bool(group in ALLOWED_GROUPS), f"invalid piholeGroup: {device_name}")
+            hostname = network.get("hostname")
+            if hostname is not None:
+                _require(isinstance(hostname, str) and hostname, f"invalid hostname: {device_name}")
+                _require(hostname not in hostnames, f"duplicate hostname {hostname}: {device_name} and {hostnames.get(hostname)}")
+                hostnames[hostname] = device_name
+            reservations.append({
+                "device": device_name,
+                "hostname": hostname,
+                "address": None,
+                "identityRef": identity_ref,
+                "interface": interface,
+                "piholeGroup": group,
+                "_hasStaticAddress": False,
+            })
+        else:
+            address = _ipv4(raw_address, f"devices.{device_name}.network.address")
+            _require(address in profile_networks[interface], f"device address is outside profile subnet: {device_name}")
+            address_text = str(address)
+            _require(address_text not in addresses, f"duplicate address {address_text}: {device_name} and {addresses.get(address_text)}")
+            addresses[address_text] = device_name
+            device_addresses[device_name] = address_text
+            identity_ref = network.get("identityRef")
+            _require(bool(isinstance(identity_ref, str) and IDENTITY_REF.fullmatch(identity_ref)), f"invalid identityRef: {device_name}")
+            _require(identity_ref not in identity_refs, f"duplicate identityRef {identity_ref}: {device_name} and {identity_refs.get(identity_ref)}")
+            identity_refs[identity_ref] = device_name
+            group = network.get("piholeGroup")
+            _require(bool(group in ALLOWED_GROUPS), f"invalid piholeGroup: {device_name}")
+            hostname = network.get("hostname")
+            if hostname is not None:
+                _require(isinstance(hostname, str) and hostname, f"invalid hostname: {device_name}")
+                _require(hostname not in hostnames, f"duplicate hostname {hostname}: {device_name} and {hostnames.get(hostname)}")
+                hostnames[hostname] = device_name
+            range_from, range_to = profile_ranges[interface]
+            if range_from <= address <= range_to:
+                pool_warnings.append({"device": device_name, "address": address_text, "interface": interface, "warning": "reservation address is inside dynamic DHCP range; identity resolution is mandatory before apply"})
+            reservations.append({
+                "device": device_name,
+                "hostname": hostname,
+                "address": address_text,
+                "identityRef": identity_ref,
+                "interface": interface,
+                "piholeGroup": group,
+                "_hasStaticAddress": True,
+            })
 
         device_services = device.get("services", {})
         _require(isinstance(device_services, dict), f"device {device_name}.services must be an object")

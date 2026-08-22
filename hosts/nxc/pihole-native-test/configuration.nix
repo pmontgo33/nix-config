@@ -38,10 +38,11 @@
     openFirewallDNS = true;
   };
 
-  services.pihole-ftl.lists = [
+  services.pihole-native.lists = [
     {
       url = "file://${pkgs.stevenblack-blocklist}/hosts";
       description = "Native NixOS Pi-hole smoke-test adlist";
+      groups = [ "Default" ];
     }
   ];
 

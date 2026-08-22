@@ -107,7 +107,7 @@ def render(data: dict[str, Any]) -> dict[str, Any]:
         by_interface.setdefault(interface, []).append(reservation)
 
     rendered_profiles = []
-    emitted_refs: list[str] = []
+    emitted_identity_refs: list[str] = []
     for profile_name, profile_value in sorted(profiles.items()):
         if not isinstance(profile_value, dict):
             raise PlanError(f"network profile is not an object: {profile_name}")
@@ -115,10 +115,13 @@ def render(data: dict[str, Any]) -> dict[str, Any]:
         for field in ("interface", "subnet", "gateway", "dhcpRange", "dnsDuringPhase1"):
             if field not in profile:
                 raise PlanError(f"network profile {profile_name} is missing {field}")
+        # MAC-only devices carry `address: null` and are not DHCP reservations;
+        # they are managed through Pi-hole client identity only.
         reservations_for_profile = sorted(
-            by_interface.get(profile_name, []), key=lambda item: item["address"]
+            (item for item in by_interface.get(profile_name, []) if item["address"] is not None),
+            key=lambda item: item["device"],
         )
-        emitted_refs.extend(item["identityRef"] for item in reservations_for_profile)
+        emitted_identity_refs.extend(item["identityRef"] for item in reservations_for_profile)
         rendered_profiles.append(
             {
                 "profile": profile_name,
@@ -141,7 +144,13 @@ def render(data: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
-    if sorted(emitted_refs) != sorted(item["identityRef"] for item in reservations):
+    # DHCP reservations are emitted only for entries with a static address.
+    # MAC-only devices (address: null) are managed by Pi-hole client identity
+    # and are explicitly excluded here.
+    expected_identity_refs = {
+        item["identityRef"] for item in reservations if item["address"] is not None
+    }
+    if set(emitted_identity_refs) != expected_identity_refs:
         raise PlanError("planner did not emit every reservation exactly once")
 
     return {

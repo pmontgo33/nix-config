@@ -41,7 +41,7 @@ def _read_declared_lists() -> list[dict]:
             "nix", "eval", "--json",
             "--extra-experimental-features", "nix-command flakes",
             "--impure",
-            ".#nixosConfigurations.pihole1.config.services.pihole-ftl.lists",
+            ".#nixosConfigurations.pihole1.config.services.pihole-native.lists",
         ],
         cwd=ROOT, capture_output=True, text=True, timeout=240,
     )
@@ -62,7 +62,34 @@ class NixSetupScriptBehaviourTests(unittest.TestCase):
         self.assertEqual(urls, {
             "https://big.oisd.nl",
             "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/pro.txt",
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/nsfw.txt",
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/doh-vpn-proxy-bypass.txt",
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/gambling.mini.txt",
         })
+
+    def test_declared_lists_carry_group_assignments(self):
+        by_url = {entry["url"]: entry for entry in self.declared_lists}
+        # Global lists apply to Default + normal + kids
+        for global_url in (
+            "https://big.oisd.nl",
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/pro.txt",
+        ):
+            self.assertEqual(
+                sorted(by_url[global_url]["groups"]),
+                ["Default", "kids", "normal"],
+                msg=f"global list {global_url} must apply to all groups",
+            )
+        # Kids-only lists apply to kids only
+        for kids_url in (
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/nsfw.txt",
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/doh-vpn-proxy-bypass.txt",
+            "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/dnsmasq/gambling.mini.txt",
+        ):
+            self.assertEqual(
+                by_url[kids_url]["groups"],
+                ["kids"],
+                msg=f"kids-only list {kids_url} must apply to kids group only",
+            )
 
     def test_local_lists_are_preflighted_before_api_login(self):
         preflight_pos = self.script_text.index(
@@ -106,11 +133,40 @@ class NixSetupScriptBehaviourTests(unittest.TestCase):
         # VerifyLists is called both before and after gravity.
         self.assertGreaterEqual(self.script_text.count("verifyLists"), 3)
 
+    def test_group_preflight_runs_before_initial_gravity(self):
+        group_preflight_pos = self.script_text.index("validateDeclaredGroups\n\nif [ ! -f")
+        initial_gravity_pos = self.script_text.index("$pihole -g")
+        self.assertLess(group_preflight_pos, initial_gravity_pos)
+        self.assertIn("unexpected or ambiguous shape", self.script_text)
+        self.assertIn("unique | length", self.script_text)
+        verify_body = self.script_text.split("verifyLists() {", 1)[1].split("reconcileLists", 1)[0]
+        self.assertIn("validateDeclaredGroups", verify_body)
+
+    def test_setup_acquires_policy_lock_file(self):
+        self.assertIn("acquirePolicyLock", self.script_text)
+        self.assertIn(".pihole-policy.lock", self.script_text)
+
     def test_marker_blocks_noop_when_present(self):
         # If signatures match but a marker exists, we must still reset/rebuild.
         self.assertIn('[ ! -e "$pending_marker" ]', self.script_text)
 
-    def test_no_url_credentials_in_declared_lists(self):
+    def test_setup_script_resolves_group_names_to_ids(self):
+        # The reconciler must resolve declared group names to live group IDs
+        # before sending list POST bodies and computing signatures.
+        self.assertIn("GetFTLData \"groups\"", self.script_text)
+        self.assertIn("group_name_to_id", self.script_text)
+        self.assertIn("desired_lists_resolved", self.script_text)
+        # The POST body must include groups (as resolved IDs), not raw names.
+        self.assertIn("groups = ([.groups[]?] | map($gm[.]", self.script_text)
+        # Unknown group references must fail closed.
+        self.assertIn("unknown Pi-hole group", self.script_text)
+
+    def test_setup_script_signature_and_verifier_include_groups(self):
+        # Both the reconciliation signature and the post-rebuild verifier must
+        # compare the groups arrays, not just type/address/enabled/comment.
+        # Pi-hole v6 returns groups as integer IDs, so both sides use the same
+        # plain `sort` — no `.id` dereference needed.
+        self.assertIn("groups: (.groups | sort)", self.script_text)
         for entry in self.declared_lists:
             self.assertIsNone(
                 re.match(r".*://[^/]*@.*", entry["url"]),
