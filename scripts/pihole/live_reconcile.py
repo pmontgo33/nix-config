@@ -21,21 +21,18 @@ OWNER = "shared-pihole-policy"
 OWNER_MARKER = "[owner=shared-pihole-policy]"
 APPLY_CONFIRMATION = "APPLY_SHARED_PIHOLE_POLICY"
 BASELINE_BASE = {"dns": {"upstreams": ["192.168.86.1#5353"], "interface": "eth0", "queryLogging": True}, "database": {"maxDBdays": 91}}
-_ADLIST_TYPES = frozenset({"block", "allow"})
 _DESIRED_FIELDS = {
     "groups": frozenset({"name", "description", "enabled"}),
-    "adlists": frozenset({"address", "description", "enabled", "type", "groups"}),
     "clients": frozenset({"identifier", "group"}),
 }
 _OBSERVED_FIELDS = {
     "groups": frozenset({"id", "name", "comment", "enabled", "date_added", "date_modified"}),
-    "lists": frozenset({"id", "address", "comment", "type", "groups", "enabled", "date_added", "date_modified", "date_updated", "number", "invalid_domains", "abp_entries", "status"}),
     "clients": frozenset({"id", "client", "comment", "groups", "name", "date_added", "date_modified"}),
     "domains": frozenset({"id", "domain", "comment", "type", "enabled", "groups", "date_added", "date_modified"}),
 }
-_READ_ENDPOINTS = (("config", "/api/config"), ("groups", "/api/groups"), ("lists", "/api/lists"), ("domains", "/api/domains"), ("clients", "/api/clients"), ("version", "/api/info/version"))
+_READ_ENDPOINTS = (("config", "/api/config"), ("groups", "/api/groups"), ("domains", "/api/domains"), ("clients", "/api/clients"), ("version", "/api/info/version"))
 _READ_PATHS = frozenset(path for _, path in _READ_ENDPOINTS)
-_COLLECTIONS = frozenset({"groups", "lists", "domains", "clients"})
+_COLLECTIONS = frozenset({"groups", "domains", "clients"})
 _CONFIG_FIELDS = frozenset({"dns", "dhcp", "ntp", "resolver", "database", "webserver", "files", "misc", "debug"})
 _VERSION_FIELDS = frozenset({"core", "web", "ftl", "docker"})
 _CONFIG_NESTED_FIELDS = {
@@ -161,22 +158,8 @@ def _desired(inventory: Any) -> dict[str, Any]:
         enabled = raw.get("enabled", True)
         _require(isinstance(enabled, bool), "malformed policy inventory")
         groups.append({"name": name, "description": _text(raw.get("description", ""), "malformed policy", empty=True), "enabled": enabled})
+    _require(inventory["adlists"] == [], "adlists are owned by services.pihole-ftl.lists")
     adlists: list[dict[str, Any]] = []
-    addresses: set[str] = set()
-    for raw in inventory["adlists"]:
-        _require(isinstance(raw, dict), "malformed policy inventory")
-        _require(set(raw) <= _DESIRED_FIELDS["adlists"], "malformed policy inventory")
-        address = _text(raw.get("address"), "malformed policy")
-        _require(address not in addresses, "ambiguous policy inventory")
-        addresses.add(address)
-        enabled = raw.get("enabled", True)
-        _require(isinstance(enabled, bool), "malformed policy inventory")
-        groups_value = raw.get("groups", [])
-        _require(isinstance(groups_value, list) and all(isinstance(item, str) for item in groups_value), "malformed policy inventory")
-        _require(set(groups_value) <= names, "malformed policy inventory")
-        list_type = _text(raw.get("type", "block"), "malformed policy")
-        _require(list_type in _ADLIST_TYPES, "unsupported adlist type")
-        adlists.append({"address": address, "description": _text(raw.get("description", ""), "malformed policy", empty=True), "enabled": enabled, "type": list_type, "groups": list(groups_value)})
     clients: list[dict[str, Any]] = []
     identifiers: set[str] = set()
     for raw in inventory["clients"]:
@@ -308,11 +291,6 @@ def _validate_item(item: dict[str, Any], name: str, *, complete: bool) -> None:
             _require(isinstance(item[field], int) and not isinstance(item[field], bool) and item[field] >= 0, "malformed Pi-hole state")
     if name == "groups" and "name" in item:
         _text(item["name"], "malformed Pi-hole state")
-    if name == "lists":
-        if "address" in item:
-            _text(item["address"], "malformed Pi-hole state")
-        if "type" in item:
-            _require(_text(item["type"], "malformed Pi-hole state") in _ADLIST_TYPES, "malformed Pi-hole state")
     if name == "clients" and "client" in item:
         _text(item["client"], "malformed Pi-hole state")
     if "groups" in item:
@@ -351,14 +329,17 @@ def _collection(payload: Any, name: str) -> list[dict[str, Any]]:
 def _state(raw: Any) -> dict[str, Any]:
     _require(isinstance(raw, dict), "malformed Pi-hole state")
     _finite(raw)
-    _require(set(raw) == {"config", "groups", "lists", "domains", "clients", "version"}, "malformed Pi-hole state")
+    allowed = frozenset({"config", "groups", "domains", "clients", "version"})
+    _require(frozenset(raw) in {allowed, allowed | {"lists"}}, "malformed Pi-hole state")
+    if "lists" not in raw:
+        raw = {**raw, "lists": []}
     config = raw["config"]
-    version = raw["version"]
     if isinstance(config, dict) and "config" in config:
         _require(set(config) <= {"config", "took"} and isinstance(config["config"], dict), "malformed Pi-hole state")
         if "took" in config:
             _validate_took(config["took"])
         config = config["config"]
+    version = raw["version"]
     if isinstance(version, dict) and "version" in version:
         _require(set(version) <= {"version", "took"} and isinstance(version["version"], dict), "malformed Pi-hole state")
         if "took" in version:
@@ -403,14 +384,6 @@ def _same_group(wanted: dict[str, Any], current: dict[str, Any], owner_token: st
     return current.get("name") == wanted["name"] and current.get("comment") == _comment(wanted["description"], owner_token) and current.get("enabled") == wanted["enabled"]
 
 
-def _same_list(wanted: dict[str, Any], current: dict[str, Any], group_ids: dict[str, int], owner_token: str | None = None) -> bool:
-    try:
-        expected_groups = [group_ids[name] for name in wanted["groups"]]
-    except KeyError:
-        return False
-    return current.get("address") == wanted["address"] and current.get("comment") == _comment(wanted["description"], owner_token) and current.get("enabled") == wanted["enabled"] and current.get("type") == wanted["type"] and current.get("groups") == expected_groups
-
-
 def _same_client(wanted: dict[str, Any], current: dict[str, Any], ids: dict[str, int], owner_token: str | None = None) -> bool:
     expected = ids.get(wanted["group"])
     groups = current.get("groups", [])
@@ -447,30 +420,11 @@ def _operations(inventory: Any, observed: Any, owner_token: str | None = None) -
         if item["name"] not in desired_group_names and _managed(item.get("comment"), owner_token):
             stale_id = _safe_id(item["id"])
             _require(stale_id != 0, "reserved Pi-hole group cannot be deleted")
-            for family in ("lists", "clients"):
+            for family in ("clients",):
                 for reference in current[family]:
                     if not _managed(reference.get("comment")) and any(_safe_id(value) == stale_id for value in reference.get("groups", [])):
                         raise _error("managed group is referenced by an unmanaged object")
             operations.append({"action": "delete", "family": "groups", "current": item})
-    lists_by_identity: dict[tuple[str, str], dict[str, Any]] = {}
-    for item in current["lists"]:
-        address = _text(item.get("address"), "malformed Pi-hole state")
-        list_type = _text(item.get("type"), "malformed Pi-hole state")
-        identity = (address, list_type)
-        _require(identity not in lists_by_identity, "malformed Pi-hole state")
-        lists_by_identity[identity] = item
-    desired_identities = {(item["address"], item["type"]) for item in desired["adlists"]}
-    for wanted in desired["adlists"]:
-        item = lists_by_identity.get((wanted["address"], wanted["type"]))
-        if item is None:
-            operations.append({"action": "create", "family": "lists", "desired": wanted})
-        elif not _managed(item.get("comment"), owner_token):
-            raise _error("unmanaged object conflicts with desired policy")
-        elif not _same_list(wanted, item, group_ids, owner_token):
-            operations.append({"action": "update", "family": "lists", "desired": wanted, "current": item})
-    for item in current["lists"]:
-        if (item["address"], item["type"]) not in desired_identities and _managed(item.get("comment"), owner_token):
-            operations.append({"action": "delete", "family": "lists", "current": item})
     clients_by_identifier: dict[str, dict[str, Any]] = {}
     for item in current["clients"]:
         identifier = _text(item.get("client"), "malformed Pi-hole state")
@@ -488,14 +442,14 @@ def _operations(inventory: Any, observed: Any, owner_token: str | None = None) -
     for item in current["clients"]:
         if item["client"] not in desired_identifiers and _managed(item.get("comment"), owner_token):
             operations.append({"action": "delete", "family": "clients", "current": item})
-    operations.sort(key=lambda x: ({"groups": 0, "lists": 1, "clients": 2}[x["family"]], {"create": 0, "update": 1, "delete": 2}[x["action"]], x.get("desired", {}).get("name", x.get("desired", {}).get("address", x["family"]))))
+    operations.sort(key=lambda x: ({"groups": 0, "clients": 1}[x["family"]], {"create": 0, "update": 1, "delete": 2}[x["action"]], x.get("desired", {}).get("name", x.get("desired", {}).get("address", x["family"]))))
     return current, operations
 
 
 def _safe_plan(operations: list[dict[str, Any]], current: dict[str, Any], owner_token: str | None = None) -> dict[str, Any]:
     actions = [{"action": x["action"], "family": x["family"], "managed": True} for x in operations]
     preserved: list[dict[str, Any]] = []
-    for family in ("groups", "lists", "clients"):
+    for family in ("groups", "clients"):
         for item in current[family]:
             if not _managed(item.get("comment"), owner_token):
                 preserved.append({"family": family, "managed": False, "reason": "unmanaged-object"})
@@ -524,12 +478,11 @@ def _allowed(method: str, path: str) -> bool:
     if method == "GET":
         return path in _READ_PATHS
     if method == "POST":
-        return path in {"/api/auth", "/api/groups", "/api/clients"} or bool(re.fullmatch(r"/api/lists\?type=(?:block|allow)", path))
+        return path in {"/api/auth", "/api/groups", "/api/clients"}
     if method in {"PUT", "DELETE"}:
         return bool(
             re.fullmatch(r"/api/groups/[^/?#]+", path)
             or re.fullmatch(r"/api/clients/[^/?#]+", path)
-            or re.fullmatch(r"/api/lists/[^/?#]+\?type=(?:block|allow)", path)
         )
     return False
 
@@ -583,7 +536,7 @@ def _authenticate(transport: Any, credential_callback: Callable[[], str]) -> str
 def _read_current(transport: Any, sid: str, *, guarded: bool = False, origin: str | None = None) -> dict[str, Any]:
     headers = {"X-FTL-SID": sid, "Cookie": f"sid={sid}"}
     raw = {family: _request(transport, "GET", path, headers=headers, guarded=guarded, origin=origin) for family, path in _READ_ENDPOINTS}
-    return _state({"config": raw["config"], "groups": _collection(raw["groups"], "groups"), "lists": _collection(raw["lists"], "lists"), "domains": _collection(raw["domains"], "domains"), "clients": _collection(raw["clients"], "clients"), "version": raw["version"]})
+    return _state({"config": raw["config"], "groups": _collection(raw["groups"], "groups"), "lists": [], "domains": _collection(raw["domains"], "domains"), "clients": _collection(raw["clients"], "clients"), "version": raw["version"]})
 
 
 def _created_id(response: Any, family: str) -> int:
@@ -675,7 +628,7 @@ def reconcile_live(inventory: Any, *, credential_callback: Callable[[], str], tr
     def apply_operations() -> None:
         created_groups: dict[str, int] = {}
         group_ids = _group_ids(current)
-        apply_order = {("groups", "create"): 0, ("groups", "update"): 1, ("lists", "create"): 2, ("lists", "update"): 3, ("clients", "create"): 4, ("clients", "update"): 5, ("clients", "delete"): 6, ("lists", "delete"): 7, ("groups", "delete"): 8}
+        apply_order = {("groups", "create"): 0, ("groups", "update"): 1, ("clients", "create"): 2, ("clients", "update"): 3, ("clients", "delete"): 4, ("groups", "delete"): 5}
         for op in sorted(operations, key=lambda item: apply_order[(item["family"], item["action"])]):
             family, action = op["family"], op["action"]
             wanted = cast(dict[str, Any], op.get("desired"))
@@ -691,14 +644,6 @@ def reconcile_live(inventory: Any, *, credential_callback: Callable[[], str], tr
                     _validate_write_response(write("PUT", f"/api/groups/{quote(wanted['name'], safe='')}", {"name": wanted["name"], "comment": _comment(wanted["description"], owner_token), "enabled": wanted["enabled"]}), "groups")
                 else:
                     _validate_write_response(write("DELETE", f"/api/groups/{quote(existing['name'], safe='')}") , "groups")
-            elif family == "lists":
-                if action == "create":
-                    response = write("POST", f"/api/lists?type={wanted['type']}", {"address": wanted["address"], "comment": _comment(wanted["description"], owner_token), "groups": [group_ids[name] for name in wanted["groups"]], "enabled": wanted["enabled"]})
-                    _created_id(response, "lists")
-                elif action == "update":
-                    _validate_write_response(write("PUT", f"/api/lists/{quote(existing['address'], safe='')}?type={wanted['type']}", {"comment": _comment(wanted["description"], owner_token), "groups": [group_ids[name] for name in wanted["groups"]], "enabled": wanted["enabled"]}), "lists")
-                else:
-                    _validate_write_response(write("DELETE", f"/api/lists/{quote(existing['address'], safe='')}?type={existing['type']}"), "lists")
             elif family == "clients":
                 if action in {"create", "update"}:
                     payload = {"comment": _owner_comment(owner_token), "groups": [group_ids[wanted["group"]]]}

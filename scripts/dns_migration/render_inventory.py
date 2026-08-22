@@ -304,17 +304,26 @@ def _validate_policy(inventory: dict[str, Any]) -> dict[str, Any]:
     _require(set(adlists) == {"standard", "kids"}, "policy.adlists must contain standard and kids lists only")
     standard = adlists["standard"]
     kids = adlists["kids"]
-    _require(isinstance(standard, list) and len(standard) == 1, "policy.adlists.standard must contain the baseline list only")
-    _require(kids == [], "policy.adlists.kids must be empty for the baseline policy")
-    adlist = standard[0]
-    _require(isinstance(adlist, dict), "policy.adlists.standard entry must be an object")
-    _ensure_keys(adlist, POLICY_ADLIST_KEYS, "inventory.policy.adlists.standard[0]")
-    _require(set(adlist) == {"address", "enabled", "description"}, "baseline adlist has unsupported or missing fields")
-    _require(adlist["address"] == POLICY_ADLIST_ADDRESS, "policy adlist must use the existing shared baseline list")
-    _require(adlist["enabled"] is True, "baseline adlist must be enabled")
-    _require(adlist["description"] == POLICY_ADLIST_DESCRIPTION, "baseline adlist description does not match the shared baseline")
-    _policy_text(adlist["address"], "policy.adlists.standard[0].address")
-    _policy_text(adlist["description"], "policy.adlists.standard[0].description")
+    _require(isinstance(standard, list) and isinstance(kids, list), "policy adlists must be lists")
+    _require(kids == [], "policy.adlists.kids must be empty")
+    _require(standard == [] or len(standard) == 1, "policy.adlists.standard must be empty or contain the legacy baseline list")
+    # The Pi-hole Nix module owns all adlists. Discard the legacy baseline
+    # entry from the policy inventory so live reconciliation never sees
+    # an authoritative overlap with services.pihole-ftl.lists. When the
+    # inventory still carries the legacy baseline entry, validate it is
+    # exactly the canonical one and emit an empty list; otherwise reject
+    # it so a non-canonical adlist cannot silently be dropped.
+    if standard:
+        adlist = standard[0]
+        _require(isinstance(adlist, dict), "policy.adlists.standard entry must be an object")
+        _ensure_keys(adlist, POLICY_ADLIST_KEYS, "inventory.policy.adlists.standard[0]")
+        _require(set(adlist) == {"address", "enabled", "description"}, "baseline adlist has unsupported or missing fields")
+        _require(adlist["address"] == POLICY_ADLIST_ADDRESS, "policy adlist must use the existing shared baseline list")
+        _require(adlist["enabled"] is True, "baseline adlist must be enabled")
+        _require(adlist["description"] == POLICY_ADLIST_DESCRIPTION, "baseline adlist description does not match the shared baseline")
+        _policy_text(adlist["address"], "policy.adlists.standard[0].address")
+        _policy_text(adlist["description"], "policy.adlists.standard[0].description")
+    normalized_adlists: list[dict[str, Any]] = []
 
     groups = policy["groups"]
     _require(isinstance(groups, dict) and set(groups) == {"normal", "kids"}, "policy.groups must contain normal and kids only")
@@ -345,7 +354,7 @@ def _validate_policy(inventory: dict[str, Any]) -> dict[str, Any]:
             "queryLogging": base["queryLogging"],
             "retention": base["retention"],
         },
-        "adlists": {"standard": [dict(adlist)], "kids": []},
+        "adlists": {"standard": normalized_adlists, "kids": []},
         "groups": normalized_groups,
         "groupAssignments": {},
         "localDns": [],

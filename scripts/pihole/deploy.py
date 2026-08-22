@@ -20,6 +20,7 @@ HEALTH_URL = "http://{ip}:8080/api/auth"
 REBUILD_TIMEOUT = 600
 CURL_TIMEOUT = 10
 HEALTH_RETRIES = 10
+SETUP_TIMEOUT = 300
 HEALTH_SLEEP = 3
 RECONCILER = REPO / "scripts" / "pihole" / "live_reconcile.py"
 
@@ -49,6 +50,54 @@ def deploy(host):
             log(host, f"stderr: {result.stderr[-300:]}")
         return False
     log(host, "Build OK")
+
+    # Run the declarative Pi-hole setup reconciler explicitly. NixOS does not
+    # reliably rerun an inactive oneshot unit when only its generated script
+    # changes, so the deployment wrapper must invoke it and verify completion.
+    log(host, "Reconciling Pi-hole lists and gravity...")
+    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+    target = f"root@{host}"
+    stop_cmd = ["ssh", *ssh_opts, target, "systemctl", "stop",
+                "pihole-ftl-setup.service"]
+    reset_cmd = ["ssh", *ssh_opts, target, "systemctl", "reset-failed",
+                 "pihole-ftl-setup.service"]
+    restart_cmd = ["ssh", *ssh_opts, target, "systemctl", "restart",
+                   "pihole-ftl-setup.service"]
+    # Always stop and reset the unit first so a stale remote job cannot
+    # block a fresh restart, and so a timeout can clean up safely.
+    def _bounded(cmd):
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=SETUP_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            log(host, f"Timed out while running: {' '.join(cmd[-3:])}")
+            return None
+        except Exception as exc:
+            log(host, f"Failed to run {' '.join(cmd[-3:])}: {exc}")
+            return None
+
+    _bounded(stop_cmd)
+    _bounded(reset_cmd)
+    try:
+        result = subprocess.run(restart_cmd, capture_output=True, text=True, timeout=SETUP_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        log(host, "Pi-hole setup reconciliation timed out; stopping the unit and failing deployment")
+        # Catch every failure so a stuck remote unit does not block cleanup.
+        _bounded(stop_cmd)
+        _bounded(reset_cmd)
+        _bounded(["ssh", *ssh_opts, target, "systemctl", "kill", "--signal=TERM",
+                  "pihole-ftl-setup.service"])
+        _bounded(["ssh", *ssh_opts, target, "systemctl", "kill", "--signal=KILL",
+                  "pihole-ftl-setup.service"])
+        return False
+    if result.returncode != 0:
+        log(host, f"Pi-hole setup reconciliation FAILED (exit {result.returncode})")
+        if result.stderr:
+            log(host, f"stderr: {result.stderr[-300:]}")
+        # Reset the failed state so a future deploy attempt is not blocked.
+        _bounded(reset_cmd)
+        return False
+    log(host, "Pi-hole setup reconciliation OK")
 
     # Health check
     url = HEALTH_URL.format(ip=ip)

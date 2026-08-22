@@ -12,6 +12,14 @@ let
       comment = list.description;
     }
   ) ftl.lists;
+  listManifest = builtins.toJSON (map (
+    list: {
+      type = list.type;
+      enabled = list.enabled;
+      address = list.url;
+      comment = list.description;
+    }
+  ) ftl.lists);
   setupScript = ''
     # This intentionally mirrors the pinned NixOS 26.05 native setup behavior
     # while making list registration idempotent. Re-review this override when
@@ -24,8 +32,22 @@ let
     mktemp="${lib.getExe' pkgs.coreutils "mktemp"}"
     mv="${lib.getExe' pkgs.coreutils "mv"}"
     rm="${lib.getExe' pkgs.coreutils "rm"}"
+    install="${lib.getExe' pkgs.coreutils "install"}"
     macvendor_url=${lib.escapeShellArg ftl.macvendorURL}
+    desired_lists=${lib.escapeShellArg listManifest}
+    pending_marker="${ftl.stateDirectory}/.pihole-ftl-lists-pending"
+    lists_changed=false
     any_failed=0
+
+    # Validate local file-backed lists before any destructive API operation.
+    while IFS= read -r file_url; do
+      [ -z "$file_url" ] && continue
+      file_path="''${file_url#file://}"
+      if [ ! -f "$file_path" ] || [ ! -r "$file_path" ] || [ ! -s "$file_path" ]; then
+        echo "A declared local Pi-hole list is missing, unreadable, or empty"
+        exit 1
+      fi
+    done < <($jq -r '.[] | select(.address | startswith("file://")) | .address' <<< "$desired_lists")
 
     macvendor_tmp=$($mktemp "${ftl.stateDirectory}/macvendor.db.XXXXXX")
     trap '$rm -f "$macvendor_tmp"' EXIT
@@ -77,83 +99,138 @@ let
 
     LoginAPI
 
-    ensureList() {
-      local payload="$1" type address desired_enabled desired_comment list_data existing result error id post_response post_status
-      type=$($jq -r '.type' <<< "$payload")
-      address=$($jq -r '.address' <<< "$payload")
-      desired_enabled=$($jq -r '.enabled' <<< "$payload")
-      desired_comment=$($jq -r '.comment' <<< "$payload")
-      if list_data=$(GetFTLData "lists?type=$type"); then
+    reconcileLists() {
+      local current_lists current_signature desired_signature delete_payload response status result error id
+      if current_lists=$(GetFTLData "lists"); then
         :
       else
-        echo "Unable to read Pi-hole lists for type $type"
-        any_failed=1
-        return 0
+        echo "Unable to read current Pi-hole lists"
+        exit 1
       fi
-      if ! $jq -e 'type == "object" and (.error == null) and (.lists | type == "array")' >/dev/null <<< "$list_data"; then
-        echo "Unable to read Pi-hole lists for type $type"
-        any_failed=1
+      if ! $jq -e '
+        type == "object"
+        and (.error == null)
+        and (.lists | type == "array")
+        and all(.lists[];
+          (type == "object")
+          and ((.type | type) == "string")
+          and ((.address | type) == "string")
+          and ((.enabled | type) == "boolean")
+          and ((.comment == null) or ((.comment | type) == "string"))
+        )
+      ' >/dev/null <<< "$current_lists"; then
+        echo "Unable to read current Pi-hole lists"
+        exit 1
+      fi
+
+      current_signature=$($jq -c '
+        [.lists[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end)}]
+        | sort_by(.type, .address)
+      ' <<< "$current_lists")
+      desired_signature=$($jq -c '
+        [.[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end)}]
+        | sort_by(.type, .address)
+      ' <<< "$desired_lists")
+      if [ "$current_signature" = "$desired_signature" ] && [ ! -e "$pending_marker" ]; then
+        echo "Pi-hole lists already match the declared configuration"
         return 0
       fi
 
-      if existing=$($jq -r --arg address "$address" \
-        --arg enabled "$desired_enabled" --arg comment "$desired_comment" \
-        '.lists[]? | select(.address == $address and (.enabled|tostring) == $enabled and (.comment // "") == $comment) | .id' <<< "$list_data"); then
-        if [ -n "$existing" ]; then
-          echo "List already present for type $type (ID $existing)"
-          return 0
+      if ! $install -D -m 0600 /dev/null "$pending_marker"; then
+        echo "Unable to create the Pi-hole list reconciliation marker"
+        exit 1
+      fi
+      lists_changed=true
+      delete_payload=$($jq -c '[.lists[] | {item: .address, type: .type}]' <<< "$current_lists")
+      if [ "$delete_payload" != "[]" ]; then
+        echo "Resetting Pi-hole lists to the declared configuration"
+        response=$(PostFTLData "lists:batchDelete" "$delete_payload" status) || {
+          echo "Pi-hole API request failed while resetting lists"
+          exit 1
+        }
+        status=''${response: -3}
+        case "$status" in
+          204) ;;
+          *)
+            echo "Pi-hole API returned HTTP $status while resetting lists"
+            exit 1
+            ;;
+        esac
+      fi
+
+      ensureList() {
+        local payload="$1" response status result error id
+        # Strip .type from the POST body — Pi-hole v6 only needs type in the query.
+        local body
+        body=$($jq -c 'del(.type)' <<< "$payload")
+        if response=$(PostFTLData "lists?type=$($jq -r '.type' <<< "$payload")" "$body" status); then
+          :
+        else
+          echo "Pi-hole API request failed while adding a declared list"
+          exit 1
         fi
-      fi
-
-      if existing=$($jq -r --arg address "$address" '.lists[]? | select(.address == $address) | .id' <<< "$list_data"); then
-        if [ -n "$existing" ]; then
-          echo "List policy drift detected for type $type (ID $existing)"
-          any_failed=1
-          return 0
+        status=''${response: -3}
+        result=''${response%???}
+        case "$status" in
+          2??) ;;
+          *)
+            echo "Pi-hole API returned HTTP $status while adding a declared list"
+            exit 1
+            ;;
+        esac
+        if ! $jq -e 'type == "object" and (.error == null)' >/dev/null <<< "$result"; then
+          echo "Pi-hole API rejected a declared list"
+          exit 1
         fi
-      fi
+        id=$($jq -r '.lists[]?.id // .list.id // empty' <<< "$result")
+        if [ -z "$id" ]; then
+          echo "Pi-hole API returned no list ID for a declared list"
+          exit 1
+        fi
+      }
 
-      echo "Adding list of type $type"
-      if post_response=$(PostFTLData "lists?type=$type" "$payload" status); then
-        :
-      else
-        echo "Pi-hole API request failed while adding a list of type $type"
-        any_failed=1
-        return 0
-      fi
-      post_status=''${post_response: -3}
-      result=''${post_response%???}
-      case "$post_status" in
-        2??) ;;
-        *)
-          echo "Pi-hole API returned HTTP $post_status while adding a list of type $type"
-          any_failed=1
-          return 0
-          ;;
-      esac
-      if ! $jq -e 'type == "object"' >/dev/null <<< "$result"; then
-        echo "Pi-hole API returned an invalid response for type $type"
-        any_failed=1
-        return 0
-      fi
-      error=$($jq '.error' <<< "$result")
-      if [[ "$error" != "null" ]]; then
-        echo "Pi-hole API rejected a list of type $type"
-        any_failed=1
-        return 0
-      fi
-
-      id=$($jq -r '.lists[]?.id // .list.id // empty' <<< "$result")
-      if [ -z "$id" ]; then
-        echo "Pi-hole API returned no list ID for type $type"
-        any_failed=1
-        return 0
-      fi
-      echo "Added list ID $id"
+      ${lib.concatMapStringsSep "\n" (payload: "ensureList ${lib.escapeShellArg payload}") listPayloads}
     }
 
-    ${lib.concatMapStringsSep "\n" (payload: "ensureList ${lib.escapeShellArg payload}") listPayloads}
-    $pihole -g
+    verifyLists() {
+      local actual
+      actual=$(GetFTLData "lists") || {
+        echo "Unable to read Pi-hole lists for post-rebuild verification"
+        exit 1
+      }
+      $jq -e --argjson desired "$desired_lists" '
+        (type == "object" and (.error == null) and (.lists | type == "array"))
+        and all(.lists[];
+          (type == "object")
+          and ((.type | type) == "string")
+          and ((.address | type) == "string")
+          and ((.enabled | type) == "boolean")
+          and ((.comment == null) or ((.comment | type) == "string"))
+        )
+        and (
+          ([.lists[] | {type, address, enabled, comment: (if .comment == null then "" else .comment end)}]
+           | sort_by(.type, .address))
+          == ($desired
+              | map({type, address, enabled, comment: (if .comment == null then "" else .comment end)})
+              | sort_by(.type, .address))
+        )
+      ' <<< "$actual" >/dev/null || {
+        echo "Pi-hole list state did not converge to the declared configuration"
+        exit 1
+      }
+    }
+
+    reconcileLists
+    if [ "$lists_changed" != true ]; then
+      exit $any_failed
+    fi
+    verifyLists
+    if ! $pihole -g; then
+      echo "Pi-hole gravity run failed; leaving the reconciliation marker for retry"
+      exit 1
+    fi
+    verifyLists
+    $rm -f "$pending_marker"
     exit $any_failed
   '';
 in
@@ -338,6 +415,10 @@ in
           || (cfg.apiPasswordEnvironmentFile != null && cfg.apiPasswordEnvironmentFile != "");
         message = "services.pihole-native.apiPasswordEnvironmentFile is required when Web/API is bound beyond loopback.";
       }
+      {
+        assertion = lib.all (list: builtins.match ".*://[^/]*@.*" list.url == null) ftl.lists;
+        message = "Pi-hole list URLs must not contain embedded credentials.";
+      }
     ];
 
     services.pihole-ftl = {
@@ -397,6 +478,9 @@ in
         (cfg.apiPasswordEnvironmentFile != null && cfg.apiPasswordEnvironmentFile != "")
         cfg.apiPasswordEnvironmentFile;
 
+    # Keep the setup unit enabled even when the declared list is empty so a
+    # stale runtime list is still removed by the next reconciliation.
+    systemd.services.pihole-ftl-setup.enable = lib.mkForce cfg.enable;
     systemd.services.pihole-ftl-setup.script = lib.mkForce setupScript;
 
     # Open the web interface port when binding beyond loopback.

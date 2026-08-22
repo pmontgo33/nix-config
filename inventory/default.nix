@@ -26,13 +26,7 @@
       };
 
       adlists = {
-        standard = [
-          {
-            address = "file:///var/lib/pihole/baseline.hosts";
-            enabled = true;
-            description = "Shared Pi-hole baseline adlist";
-          }
-        ];
+        standard = [ ];
         kids = [ ];
       };
 

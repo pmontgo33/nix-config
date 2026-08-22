@@ -35,11 +35,7 @@ class InventoryRenderingTests(unittest.TestCase):
                 "retention": 91,
             },
             "adlists": {
-                "standard": [{
-                    "address": "file:///var/lib/pihole/baseline.hosts",
-                    "enabled": True,
-                    "description": "Shared Pi-hole baseline adlist",
-                }],
+                "standard": [],
                 "kids": [],
             },
             "groups": {
