@@ -59,14 +59,33 @@ def _acquire_remote_lock(lock_path: str) -> int:
     the inode persists across writer invocations; only the flock is dropped.
     """
     import fcntl
+    import grp
     path = Path(lock_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o600)
+    # Open with explicit mode 0660 + group pihole so the setup service
+    # (which runs as the pihole user) can take the same flock. We use
+    # fchmod/fchown on the fd to bypass umask and any pre-existing mode
+    # left by a previous root-owned create. If the pihole group is not
+    # present (e.g. hermes-side test environments) we still set the mode
+    # so the file is world-readable-but-not-writable, which is enough
+    # for the current apply transaction and lets the setup service fix
+    # the group later.
+    fd = os.open(str(path), os.O_RDWR | os.O_CREAT, 0o660)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except (OSError, BlockingIOError):
         os.close(fd)
         raise RuntimeError(f"Pi-hole policy lock is held by another actor: {lock_path}")
+    try:
+        os.fchmod(fd, 0o660)
+        pihole_gid = grp.getgrnam("pihole").gr_gid
+    except KeyError:
+        pihole_gid = None
+    if pihole_gid is not None:
+        try:
+            os.fchown(fd, -1, pihole_gid)
+        except (OSError, PermissionError):
+            pass
     return fd
 
 
