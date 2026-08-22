@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -112,6 +113,25 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _ssh_apply(ssh_host: str, remote_path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Run the Pi-hole-local apply wrapper over SSH.
+
+    Unlike ``_ssh_dry_run`` (which expects a Python interpreter and a relative
+    PYTHONPATH), the apply wrapper is a sealed shell-application installed at
+    ``/etc/pihole/live-policy-apply``. We pipe the JSON payload over stdin and
+    parse the wrapper's single-line JSON response.
+    """
+    body = json.dumps(payload, indent=2, sort_keys=True)
+    remote_command = f"{remote_path}"
+    command = ["ssh", "-o", "BatchMode=yes", "-o", "LogLevel=ERROR", ssh_host, remote_command]
+    result = subprocess.run(command, input=body, capture_output=True, text=True, check=False)
+    dry._require(result.returncode == 0, f"remote apply wrapper exited {result.returncode}: {dry._sanitize(result.stderr)}")
+    dry._require(bool(result.stdout), "remote apply wrapper produced no output")
+    parsed = json.loads(result.stdout)
+    dry._require(type(parsed) is dict, "remote apply wrapper output must be an object")
+    return parsed
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
@@ -131,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         payload["lock_path"] = args.lock_path
         dry._safe_keys(payload)
-        result = dry._ssh_dry_run(ssh_host, remote_path, payload)
+        result = _ssh_apply(ssh_host, remote_path, payload)
         if result.get("apply") is not True or result.get("verified") is not True:
             raise OrchestratorError("remote policy apply did not verify convergence")
         sys.stdout.write(json.dumps(result, sort_keys=True) + "\n")

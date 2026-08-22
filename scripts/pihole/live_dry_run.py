@@ -34,6 +34,7 @@ The output is the structured dry-run plan as JSON on stdout.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -58,6 +59,18 @@ _TARGETS = frozenset({"pihole1", "pihole2"})
 _REMOTE_DEFAULT_PATH = "/var/lib/pihole/live_dry_run_remote.py"
 _PASSWORD_PATH = "/run/secrets.d/1/pihole-api-password"
 _SAFE_PATH_CHARS = re.compile(r"^[a-zA-Z0-9._/+-]+$")
+_SOPS_GLOB = "/nix/store/*-sops-*/bin/sops"
+
+
+def _resolve_sops() -> str:
+    sops = shutil.which("sops")
+    if sops is not None:
+        return sops
+    import glob
+    matches = sorted(glob.glob(_SOPS_GLOB))
+    if matches:
+        return matches[-1]
+    raise OrchestratorError("sops binary not found on PATH")
 
 
 class OrchestratorError(Exception):
@@ -145,8 +158,7 @@ def _validate_password_path(path_text: str) -> str:
 def _decrypt_identities(secret_path: Path, age_key_file: Path) -> dict[str, dict[str, str]]:
     _require(secret_path.exists(), f"secrets file does not exist: {secret_path}")
     _require(age_key_file.exists(), f"age key file does not exist: {age_key_file}")
-    sops = shutil.which("sops")
-    _require(sops is not None, "sops binary not found on PATH")
+    sops = _resolve_sops()
     env = os.environ.copy()
     env["SOPS_AGE_KEY_FILE"] = str(age_key_file)
     result = subprocess.run(
