@@ -146,7 +146,6 @@ let
   hermes-scripts = pkgs.runCommandLocal "hermes-scripts" { } ''
     mkdir -p $out
     install -m 0555 ${../../../scripts/bernie/model_worker.py} $out/model_worker.py
-    install -m 0555 ${../../../scripts/bernie/validate_lanes.py} $out/validate_lanes.py
   '';
   forgejo-credential-helper = pkgs.writeShellScript "forgejo-credential-helper" ''
     host=""
@@ -798,10 +797,6 @@ in
     "d /var/lib/hermes/.local 0700 hermes users -"
     "d /var/lib/hermes/.local/state 0700 hermes users -"
     "d /var/lib/hermes/.local/state/bernie-delegation 0700 hermes users -"
-    # Runtime lane-validation state written by bernie-lane-validation.service
-    # and read by the model worker. Owner-only; the worker fail-closes on
-    # bad metadata, malformed content, or a missing envelope.
-    "z /var/lib/hermes/.local/state/bernie-delegation/lane-validation.json 0600 hermes users -"
     "d /var/lib/hermes/.cache 0700 hermes users -"
     "d /var/lib/hermes/.hermes/mnemosyne 0750 hermes users -"
     "d /var/lib/hermes/.hermes/mnemosyne/data 0750 hermes users -"
@@ -815,43 +810,11 @@ in
     "z /var/lib/hermes/.hermes/mnemosyne/data/shared/mnemosyne.db-shm 0600 hermes users -"
   ];
 
-  # Periodic refresh of runtime lane-validation for Bernie's worker lanes.
-  # Each probe is one bounded read-only worker launch through the standard
-  # runner; failures leave lanes stale so dispatch stays fail-closed. The
-  # provider credential reaches probes only via the runner's private
-  # EnvironmentFile mechanism, exactly as in any worker launch.
-  systemd.services.bernie-lane-validation = {
-    description = "Refresh Bernie runtime lane validation probes";
-    wants = [ "network-online.target" ];
-    after = [ "network-online.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      User = "hermes";
-      Group = "users";
-      WorkingDirectory = "/var/lib/hermes";
-      EnvironmentFile = "/run/secrets/openclaw-env";
-      ExecStart =
-        let
-          berniePython = pkgs.python3.withPackages (ps: with ps; [ python-dotenv ]);
-        in
-        "${berniePython}/bin/python3 /var/lib/hermes/scripts/bernie/validate_lanes.py";
-      # Two eligible lanes at up to 900s each plus overhead.
-      TimeoutStartSec = "45min";
-      PrivateTmp = true;
-      NoNewPrivileges = true;
-    };
-  };
-
-  systemd.timers.bernie-lane-validation = {
-    description = "Periodic Bernie lane validation refresh";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "10min";
-      OnUnitActiveSec = "6h";
-      RandomizedDelaySec = "15min";
-      Persistent = true;
-    };
-  };
+  # bernie-lane-validation.service and bernie-lane-validation.timer were
+  # removed when the runtime lane-validation automation was shelved in favor
+  # of native Hermes delegate_task. The validator script is preserved at
+  # scripts/bernie/_shelved/validate_lanes.py and the systemd units can be
+  # restored by reverting that shelf PR.
 
   systemd.services.tasknotes-calendar-publish = {
     description = "Publish the validated TaskNotes calendar to Bifrost";
