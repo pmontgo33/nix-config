@@ -405,6 +405,19 @@ in
         };
       };
 
+      # Native delegate_task controls (Bernie's delegation path).
+      # Default worker model is governed by the workload-delegation
+      # skill's decision table and by individual delegating skills;
+      # these bounds enforce a hard ceiling on concurrency and depth.
+      # Bernie's SOUL.md (Quality and Orchestration) is the policy
+      # authority — these values must not silently grow without a
+      # separate plan and explicit authorization.
+      delegation = {
+        max_concurrent_children = 2;
+        max_spawn_depth = 1;
+        orchestrator_enabled = true;
+      };
+
       tts = {
         provider = "edge";
         edge.voice = "en-GB-RyanNeural";
