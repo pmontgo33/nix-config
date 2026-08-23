@@ -11,6 +11,15 @@ import sys
 import time
 from pathlib import Path
 
+# Allow `python3 scripts/pihole/deploy.py ...` to find the scripts package
+# without requiring PYTHONPATH to be set. The scripts/ directory layout
+# treats it as a package; tests use `from scripts.pihole import ...`.
+_SCRIPTS_PARENT = Path(__file__).resolve().parents[2]
+if str(_SCRIPTS_PARENT) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_PARENT))
+
+from scripts.pihole import deploy_transport  # noqa: E402
+
 REPO = Path("/var/lib/hermes/workspace/nix-config")
 HOSTS = {
     "pihole1": "192.168.86.101",
@@ -27,6 +36,11 @@ APPLY_CONFIRMATION = "APPLY_SHARED_PIHOLE_POLICY"
 APPLY_RUNNER = REPO / "scripts" / "pihole" / "live_apply.py"
 PIHOLE_API_ORIGIN = "http://127.0.0.1:8080"
 POLICY_LOCK_PATH = "/var/lib/pihole/.pihole-policy.lock"
+# Bounded retries for the `nixos-rebuild switch --target-host` step.
+# Tailscale restarts mid-build can drop the SSH transport AFTER
+# activation has landed; the recovery path verifies /run/current-system
+# instead of treating exit 255 as a hard failure.
+REBUILD_MAX_ATTEMPTS = 3
 
 
 def log(host, msg):
@@ -39,21 +53,34 @@ def deploy(host):
     ip = HOSTS[host]
     log(host, f"--- Deploying {host} ({ip}) ---")
 
-    # Build and switch
+    # Build and switch. The transport-recovery wrapper handles the
+    # Tailscale-restart case where exit 255 fires after a successful
+    # activation: it extracts the requested generation from rebuild
+    # output and verifies /run/current-system over a fresh SSH
+    # connection. Genuine failures are surfaced unchanged.
     log(host, "Running nixos-rebuild switch...")
-    result = subprocess.run(
-        ["nixos-rebuild", "switch",
-         "--flake", f"{REPO}#{host}",
-         "--target-host", f"root@{host}"],
+
+    def _rebuild_cmd():
+        return [
+            "nixos-rebuild", "switch",
+            "--flake", f"{REPO}#{host}",
+            "--target-host", f"root@{host}",
+        ]
+
+    ok, recovered_link = deploy_transport.run_rebuild_with_recovery(
+        host,
+        rebuild_cmd_factory=_rebuild_cmd,
+        max_attempts=REBUILD_MAX_ATTEMPTS,
         cwd=REPO,
-        capture_output=True, text=True, timeout=REBUILD_TIMEOUT,
+        timeout=REBUILD_TIMEOUT,
     )
-    if result.returncode != 0:
-        log(host, f"BUILD FAILED (exit {result.returncode})")
-        if result.stderr:
-            log(host, f"stderr: {result.stderr[-300:]}")
+    if not ok:
+        log(host, "BUILD FAILED (transport recovery exhausted or real failure)")
         return False
-    log(host, "Build OK")
+    if recovered_link is not None:
+        log(host, f"Build OK (recovered via /run/current-system == {recovered_link})")
+    else:
+        log(host, "Build OK")
 
     # A fresh host must expose a responsive local API before the owner-scoped
     # policy apply can create its groups and clients.
