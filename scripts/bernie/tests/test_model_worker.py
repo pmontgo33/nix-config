@@ -377,8 +377,18 @@ class WorkerContractTests(unittest.TestCase):
         if not path.is_file():
             self.skipTest("Nix registry source is not present in this checkout")
         registry = worker.load_registry(path)
-        self.assertEqual(worker.resolve_lane(registry, "general-tasks")["model"], "MiniMax-M3")
-        self.assertEqual(worker.resolve_lane(registry, "simple-tasks")["model"], "MiniMax-M2.7")
+        # The committed registry carries a point-in-time validation block that
+        # may be expired; the runtime validator owns freshness now. Assert
+        # structure and approved tuples with fresh validation injected.
+        for name, model in (("general-tasks", "MiniMax-M3"), ("simple-tasks", "MiniMax-M2.7")):
+            patched = json.loads(json.dumps(registry))
+            patched["lanes"][name]["validation"] = {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "test",
+            }
+            self.assertEqual(worker.resolve_lane(patched, name)["model"], model)
 
     def test_dry_run_does_not_spawn(self) -> None:
         registry = worker.load_registry(self.registry_path)
@@ -395,6 +405,277 @@ class WorkerContractTests(unittest.TestCase):
         popen.assert_not_called()
         self.assertTrue(result["dry_run"])
         self.assertEqual(result["argv"][result["argv"].index("--model") + 1], "MiniMax-M3")
+
+    def test_runtime_validation_refreshes_stale_registry_lane(self) -> None:
+        stale = json.loads(json.dumps(self.registry))
+        stale["lanes"]["general-tasks"]["validation"] = {
+            "status": "validated",
+            "validated_at": "2026-08-20T00:00:00+00:00",
+            "expires_at": "2026-08-21T00:00:00+00:00",
+            "evidence": "old",
+        }
+        fingerprint = worker._lane_fingerprint(stale["lanes"]["general-tasks"])
+        fresh = {
+            "general-tasks": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "fresh probe",
+                "registry_fingerprint": fingerprint,
+            }
+        }
+        merged = worker.apply_runtime_validation(stale, fresh)
+        lane = worker.resolve_lane(merged, "general-tasks")
+        self.assertEqual(lane["validation"]["evidence"], "fresh probe")
+
+    def test_runtime_validation_cannot_enable_disabled_lane(self) -> None:
+        records = {
+            "disabled-lane": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "forged",
+            }
+        }
+        merged = worker.apply_runtime_validation(self.registry, records)
+        with self.assertRaises(worker.WorkerError):
+            worker.resolve_lane(merged, "disabled-lane")
+
+    def test_runtime_validation_cannot_enable_nix_pending_lane(self) -> None:
+        pending = json.loads(json.dumps(self.registry))
+        pending["lanes"]["general-tasks"]["validation"] = {
+            "status": "pending",
+            "validated_at": None,
+            "expires_at": None,
+            "evidence": "never probed",
+        }
+        fingerprint = worker._lane_fingerprint(pending["lanes"]["general-tasks"])
+        records = {
+            "general-tasks": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "forged",
+                "registry_fingerprint": fingerprint,
+            }
+        }
+        merged = worker.apply_runtime_validation(pending, records)
+        with self.assertRaises(worker.WorkerError):
+            worker.resolve_lane(merged, "general-tasks")
+
+    def test_runtime_record_with_wrong_fingerprint_is_ignored(self) -> None:
+        stale = json.loads(json.dumps(self.registry))
+        stale["lanes"]["general-tasks"]["validation"] = {
+            "status": "validated",
+            "validated_at": "2026-08-20T00:00:00+00:00",
+            "expires_at": "2026-08-21T00:00:00+00:00",
+            "evidence": "old",
+        }
+        records = {
+            "general-tasks": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "forged for another route",
+                "registry_fingerprint": "0" * 64,
+            }
+        }
+        merged = worker.apply_runtime_validation(stale, records)
+        with self.assertRaises(worker.WorkerError):
+            worker.resolve_lane(merged, "general-tasks")
+
+    def test_runtime_validated_record_with_matching_fingerprint_refreshes(self) -> None:
+        stale = json.loads(json.dumps(self.registry))
+        stale["lanes"]["general-tasks"]["validation"] = {
+            "status": "validated",
+            "validated_at": "2026-08-20T00:00:00+00:00",
+            "expires_at": "2026-08-21T00:00:00+00:00",
+            "evidence": "old",
+        }
+        fingerprint = worker._lane_fingerprint(stale["lanes"]["general-tasks"])
+        records = {
+            "general-tasks": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "fresh probe",
+                "registry_fingerprint": fingerprint,
+            }
+        }
+        merged = worker.apply_runtime_validation(stale, records)
+        lane = worker.resolve_lane(merged, "general-tasks")
+        self.assertEqual(lane["validation"]["evidence"], "fresh probe")
+
+    def test_runtime_validation_cannot_change_model_tuple(self) -> None:
+        fingerprint = worker._lane_fingerprint(self.registry["lanes"]["general-tasks"])
+        records = {
+            "general-tasks": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "x",
+                "model": "evil-model",
+                "registry_fingerprint": fingerprint,
+            }
+        }
+        merged = worker.apply_runtime_validation(self.registry, records)
+        lane = worker.resolve_lane(merged, "general-tasks")
+        self.assertEqual(lane["model"], "MiniMax-M3")
+
+    def test_runtime_failure_marks_lane_pending_and_blocks_dispatch(self) -> None:
+        fingerprint = worker._lane_fingerprint(self.registry["lanes"]["general-tasks"])
+        records = {
+            "general-tasks": {
+                "status": "pending",
+                "validated_at": None,
+                "expires_at": None,
+                "evidence": "probe failed",
+                "registry_fingerprint": fingerprint,
+            }
+        }
+        merged = worker.apply_runtime_validation(self.registry, records)
+        lane = merged["lanes"]["general-tasks"]
+        self.assertEqual(lane["validation"]["status"], "pending")
+        self.assertIsNone(lane["validation"]["expires_at"])
+
+    def test_unreadable_or_insecure_runtime_state_fails_closed(self) -> None:
+        missing = self.root / "does-not-exist.json"
+        self.assertIsNone(worker.load_runtime_lane_validation(missing))
+        insecure = self.root / "insecure.json"
+        insecure.write_text(json.dumps({"schema_version": 1, "updated_at": worker._utc_now().isoformat(), "ttl_hours": 24, "lanes": {}}), encoding="utf-8")
+        os.chmod(insecure, 0o644)
+        self.assertIsNone(worker.load_runtime_lane_validation(insecure))
+        garbage = self.root / "garbage.json"
+        garbage.write_text("not json", encoding="utf-8")
+        os.chmod(garbage, 0o600)
+        self.assertIsNone(worker.load_runtime_lane_validation(garbage))
+
+    def test_invalid_envelope_metadata_fails_closed(self) -> None:
+        cases = [
+            {"lanes": {}},
+            {"schema_version": 2, "updated_at": worker._utc_now().isoformat(), "ttl_hours": 24, "lanes": {}},
+            {"schema_version": 1, "ttl_hours": 24, "lanes": {}},
+            {"schema_version": 1, "updated_at": "not-a-timestamp", "ttl_hours": 24, "lanes": {}},
+            {"schema_version": 1, "updated_at": worker._utc_now().isoformat(), "lanes": {}},
+            {"schema_version": 1, "updated_at": worker._utc_now().isoformat(), "ttl_hours": 500, "lanes": {}},
+            {"schema_version": 1, "updated_at": worker._utc_now().isoformat(), "ttl_hours": 24},
+            # bool masquerading as int (JSON true/false) must be rejected.
+            {"schema_version": True, "updated_at": worker._utc_now().isoformat(), "ttl_hours": 24, "lanes": {}},
+            {"schema_version": 1, "updated_at": worker._utc_now().isoformat(), "ttl_hours": True, "lanes": {}},
+        ]
+        for index, payload in enumerate(cases):
+            path = self.root / f"envelope-{index}.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            os.chmod(path, 0o600)
+            self.assertIsNone(worker.load_runtime_lane_validation(path), f"case {index} should fail closed")
+
+    def test_partial_runtime_state_fails_closed_per_lane(self) -> None:
+        # State containing only disabled-lane records must NOT leave
+        # general-tasks dispatchable on its static Nix validation block.
+        fingerprint = worker._lane_fingerprint(self.registry["lanes"]["disabled-lane"])
+        records = {
+            "disabled-lane": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "probe ok",
+                "registry_fingerprint": fingerprint,
+            }
+        }
+        merged = worker.apply_runtime_validation(self.registry, records)
+        with self.assertRaises(worker.WorkerError):
+            worker.resolve_lane(merged, "general-tasks")
+
+    def test_mismatched_fingerprint_record_fails_closed(self) -> None:
+        stale = json.loads(json.dumps(self.registry))
+        stale["lanes"]["general-tasks"]["validation"] = {
+            "status": "validated",
+            "validated_at": "2026-08-20T00:00:00+00:00",
+            "expires_at": "2026-08-21T00:00:00+00:00",
+            "evidence": "old",
+        }
+        records = {
+            "general-tasks": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                "evidence": "forged for another route",
+                "registry_fingerprint": "0" * 64,
+            }
+        }
+        merged = worker.apply_runtime_validation(stale, records)
+        with self.assertRaises(worker.WorkerError):
+            worker.resolve_lane(merged, "general-tasks")
+
+    def test_oversized_ttl_record_is_rejected(self) -> None:
+        fingerprint = worker._lane_fingerprint(self.registry["lanes"]["general-tasks"])
+        records = {
+            "general-tasks": {
+                "status": "validated",
+                "validated_at": worker._utc_now().isoformat(),
+                "expires_at": (worker._utc_now() + timedelta(hours=24 * 365)).isoformat(),
+                "evidence": "claims eternal validity",
+                "registry_fingerprint": fingerprint,
+            }
+        }
+        merged = worker.apply_runtime_validation(self.registry, records)
+        with self.assertRaises(worker.WorkerError):
+            worker.resolve_lane(merged, "general-tasks")
+
+    def test_pending_sentinel_evidence_cannot_be_promoted_to_validated(self) -> None:
+        fingerprint = worker._lane_fingerprint(self.registry["lanes"]["general-tasks"])
+        for evidence in (
+            "runtime validator marked lane general-tasks pending",
+            "validator probe refused for general-tasks: boom",
+            "validator probe failed run 20260822T000000Z-x: 429",
+        ):
+            records = {
+                "general-tasks": {
+                    "status": "validated",
+                    "validated_at": worker._utc_now().isoformat(),
+                    "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                    "evidence": evidence,
+                    "registry_fingerprint": fingerprint,
+                }
+            }
+            merged = worker.apply_runtime_validation(self.registry, records)
+            with self.assertRaises(worker.WorkerError, msg=evidence):
+                worker.resolve_lane(merged, "general-tasks")
+
+    def test_enabled_integer_one_does_not_enable_lane(self) -> None:
+        forged = json.loads(json.dumps(self.registry))
+        forged["lanes"]["general-tasks"]["enabled"] = 1
+        with self.assertRaises(worker.WorkerError):
+            worker.resolve_lane(forged, "general-tasks")
+
+    def test_missing_runtime_state_blocks_dispatch(self) -> None:
+        # Finding: absent/untrustworthy runtime state must refuse dispatch
+        # even when the Nix validation block itself is still fresh.
+        merged = worker.apply_runtime_validation(self.registry, None)
+        with self.assertRaises(worker.WorkerError):
+            worker.resolve_lane(merged, "general-tasks")
+
+    def test_valid_runtime_state_loads_lane_records(self) -> None:
+        path = self.root / "lane-validation.json"
+        payload = {
+            "schema_version": 1,
+            "updated_at": worker._utc_now().isoformat(),
+            "ttl_hours": 24,
+            "lanes": {
+                "general-tasks": {
+                    "status": "validated",
+                    "validated_at": worker._utc_now().isoformat(),
+                    "expires_at": (worker._utc_now() + timedelta(hours=1)).isoformat(),
+                    "evidence": "probe",
+                }
+            },
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        os.chmod(path, 0o600)
+        loaded = worker.load_runtime_lane_validation(path)
+        assert loaded is not None
+        self.assertIn("general-tasks", loaded)
+        self.assertEqual(loaded["general-tasks"]["evidence"], "probe")
 
 
 if __name__ == "__main__":

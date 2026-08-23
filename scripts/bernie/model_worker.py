@@ -39,6 +39,10 @@ DEFAULT_TIMEOUT_SECONDS = 900
 DEFAULT_MAX_CONCURRENCY = 3
 DEFAULT_STATE_DIR = Path("/var/lib/hermes/.local/state/bernie-delegation")
 DEFAULT_REGISTRY_PATH = Path("/etc/hermes/bernie/worker-registry.json")
+DEFAULT_LANE_VALIDATION_PATH = Path("/var/lib/hermes/.local/state/bernie-delegation/lane-validation.json")
+# Hard cap on any single runtime record's claimed validity window. The
+# validator writes 24h records; a record claiming more than this is rejected.
+_RUNTIME_VALIDATION_MAX_TTL_HOURS = 24
 AUTH_DOTENV_PATH = Path("/var/lib/hermes/.hermes/.env")
 HERMES_EXECUTABLE = Path("/run/current-system/sw/bin/hermes")
 SYSTEMD_RUN_EXECUTABLE = Path("/run/current-system/sw/bin/systemd-run")
@@ -162,7 +166,167 @@ def load_authoritative_registry() -> dict[str, Any]:
     return validate_registry(registry)
 
 
-def resolve_lane(registry: dict[str, Any], lane_name: str) -> dict[str, Any]:
+def load_runtime_lane_validation(path: Path | None = None) -> dict[str, dict[str, Any]] | None:
+    """Load runtime lane validation records written by the validator.
+
+    Returns ``None`` when the state file is missing, insecure, malformed, or
+    has an invalid envelope. Callers must treat ``None`` as "no runtime state"
+    and fail closed for freshness purposes.
+    """
+    path = path if path is not None else DEFAULT_LANE_VALIDATION_PATH
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError:
+        return None
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid() or metadata.st_mode & 0o077:
+            return None
+        with os.fdopen(fd, "r", encoding="utf-8") as stream:
+            fd = -1
+            data = json.load(stream)
+        if not isinstance(data, dict):
+            return None
+        schema_version = data.get("schema_version")
+        updated_at = data.get("updated_at")
+        ttl_hours = data.get("ttl_hours")
+        lanes = data.get("lanes")
+        # bool subclasses int in Python; reject it explicitly so JSON `true`
+        # cannot masquerade as schema_version 1 or a TTL value.
+        if isinstance(schema_version, bool) or not isinstance(schema_version, int) or schema_version != 1:
+            return None
+        _parse_timestamp(updated_at if isinstance(updated_at, str) else None, "runtime updated_at")
+        if isinstance(ttl_hours, bool) or not isinstance(ttl_hours, int) or not 1 <= ttl_hours <= 168:
+            return None
+        if not isinstance(lanes, dict):
+            return None
+        result: dict[str, dict[str, Any]] = {}
+        for name, record in lanes.items():
+            if isinstance(name, str) and isinstance(record, dict):
+                result[name] = record
+        return result
+    except (OSError, json.JSONDecodeError, WorkerError):
+        return None
+    finally:
+        if fd != -1:
+            os.close(fd)
+
+
+def apply_runtime_validation(registry: dict[str, Any], records: dict[str, dict[str, Any]] | None) -> dict[str, Any]:
+    """Overlay fresh runtime validation onto a registry copy.
+
+    Fail-closed rules:
+    - ``records is None`` means runtime state is absent or untrustworthy:
+      every dispatchable worker lane is marked pending so dispatch refuses.
+    - Every dispatchable worker lane starts as pending; only a valid,
+      fingerprint-matching runtime record can refresh it. Partial, stale,
+      or mismatched state therefore fails closed per lane.
+    - Only lanes whose Nix validation block is already ``validated`` can be
+      refreshed by runtime state. Runtime records cannot enable pending or
+      disabled lanes.
+    - Records are bound to the lane's provider/model/reasoning tuple via
+      ``registry_fingerprint``; a mismatching fingerprint is ignored.
+    - A validated runtime record must carry complete, well-formed timestamps.
+    - Runtime state can never alter provider/model/reasoning/limits.
+    """
+    merged = json.loads(json.dumps(registry))
+    # Capture the authoritative Nix-side validation status BEFORE any runtime
+    # overlay. Only lanes Nix already marks validated are refresh-eligible.
+    nix_validated: set[str] = {
+        name
+        for name, lane in merged["lanes"].items()
+        if isinstance(lane, dict)
+        and lane.get("role") == "worker"
+        and lane.get("dispatchable") is True
+        and isinstance(lane.get("validation"), dict)
+        and lane["validation"].get("status") == "validated"
+    }
+    pending_note = "no valid matching runtime validation record; dispatch refused until a validator probe passes"
+    for lane_name, lane in merged["lanes"].items():
+        if isinstance(lane, dict) and lane.get("role") == "worker" and lane.get("dispatchable") is True:
+            lane["validation"] = {
+                "status": "pending",
+                "validated_at": None,
+                "expires_at": None,
+                "evidence": pending_note if records is not None else "runtime validation state is missing or untrustworthy; dispatch refused until a validator probe passes",
+            }
+    if records is None:
+        return merged
+    for lane_name, record in records.items():
+        lane = merged["lanes"].get(lane_name)
+        if not isinstance(lane, dict):
+            continue
+        # Unconditional Nix gate: only Nix-validated lanes may be refreshed.
+        if lane_name not in nix_validated:
+            continue
+        if not isinstance(record.get("evidence"), str) or not record["evidence"]:
+            continue
+        record_status = record.get("status")
+        # A record claiming "validated" must not carry one of the runner's or
+        # validator's own refusal/pending sentinel notes as its evidence: those
+        # strings are generated for failed probes and can never be proof.
+        _refusal_prefixes = (
+            "no valid matching runtime validation record",
+            "runtime validator marked lane",
+            "runtime validation state is missing",
+            "validator probe refused for",
+            "validator probe failed run",
+        )
+        if record_status == "validated" and record["evidence"].startswith(_refusal_prefixes):
+            continue
+        expected_fingerprint = _lane_fingerprint(lane)
+        if expected_fingerprint is not None and record.get("registry_fingerprint") != expected_fingerprint:
+            continue
+        status = record_status
+        validation = {
+            "status": status,
+            "validated_at": record.get("validated_at"),
+            "expires_at": record.get("expires_at"),
+            "evidence": record["evidence"],
+        }
+        if status == "validated":
+            try:
+                validated_at = _parse_timestamp(validation["validated_at"], "runtime validated_at")
+                expires_at = _parse_timestamp(validation["expires_at"], "runtime expires_at")
+            except WorkerError:
+                continue
+            if validated_at > _utc_now() or expires_at <= validated_at:
+                continue
+            # TTL cap: a runtime record may never claim validity beyond the
+            # validator's declared window, regardless of its expires_at value.
+            max_ttl = dt.timedelta(hours=_RUNTIME_VALIDATION_MAX_TTL_HOURS)
+            if expires_at - validated_at > max_ttl:
+                continue
+            lane["validation"] = validation
+            continue
+        if status in ("pending", "invalid", None):
+            lane["validation"] = {
+                "status": "pending",
+                "validated_at": None,
+                "expires_at": None,
+                "evidence": f"runtime validator marked lane {lane_name} {status or 'unknown'}",
+            }
+    return merged
+
+
+def _lane_fingerprint(lane: dict[str, Any]) -> str | None:
+    """Stable identity of the Nix-approved route for binding runtime records."""
+    try:
+        payload = json.dumps(
+            {
+                "provider": lane["provider"],
+                "model": lane["model"],
+                "reasoning": lane["reasoning"],
+                "runner": lane["runner"],
+            },
+            sort_keys=True,
+        )
+    except (KeyError, TypeError):
+        return None
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def resolve_lane(registry: dict[str, Any], lane_name: str, allow_stale_validation: bool = False) -> dict[str, Any]:
     lane = registry["lanes"].get(lane_name)
     if not isinstance(lane, dict):
         raise WorkerError(f"unknown worker lane: {lane_name}")
@@ -170,7 +334,8 @@ def resolve_lane(registry: dict[str, Any], lane_name: str) -> dict[str, Any]:
         raise WorkerError(f"lane has an unapproved provider/model/reasoning tuple: {lane_name}")
     if lane.get("role") != "worker" or lane.get("dispatchable") is not True:
         raise WorkerError(f"lane is not dispatchable as a worker: {lane_name}")
-    if not lane.get("enabled", False):
+    # Explicit identity check: bool/int 1 must not pass as enabled.
+    if lane.get("enabled") is not True:
         raise WorkerError(f"worker lane is disabled: {lane_name}")
     if lane.get("runner") != "hermes_chat":
         raise WorkerError(f"lane is not supported by this runner: {lane_name}")
@@ -185,6 +350,11 @@ def resolve_lane(registry: dict[str, Any], lane_name: str) -> dict[str, Any]:
     if timeout > DEFAULT_TIMEOUT_SECONDS:
         raise WorkerError(f"lane timeout exceeds runner maximum: {lane_name}")
     validation = lane.get("validation")
+    if allow_stale_validation:
+        # Validator probes may run against lanes whose runtime freshness is
+        # stale, pending, or absent. The Nix-side structural contract above
+        # is still fully enforced; the validator writes fresh state itself.
+        return lane
     if not isinstance(validation, dict) or validation.get("status") != "validated":
         raise WorkerError(f"lane has no valid validation record: {lane_name}")
     validated_at = _parse_timestamp(validation.get("validated_at"), "validated_at")
@@ -835,14 +1005,18 @@ def _remove_credential_file(path: Path) -> bool:
     return True
 
 
-def _run_worker_with_registry(*, registry: dict[str, Any], lane_name: str, goal: str, context: str, repo: Path, dry_run: bool = False) -> dict[str, Any]:
+def _run_worker_with_registry(*, registry: dict[str, Any], lane_name: str, goal: str, context: str, repo: Path, dry_run: bool = False, probe_mode: bool = False) -> dict[str, Any]:
     validate_registry(registry)
     limits = registry["limits"]
     max_launches = _bounded_int(limits["max_launches_per_request"], "max_launches_per_request", 1, 6)
     max_retries = _bounded_int(limits["max_retries"], "max_retries", 0, 1)
     if 1 > max_launches:
         raise WorkerError("worker request exceeds the launch limit")
-    lane = resolve_lane(registry, lane_name)
+    # probe_mode relaxes only the runtime freshness gate (validation status /
+    # timestamps). Every structural check in resolve_lane — approved route,
+    # role=worker, dispatchable=true, enabled, read-only, empty toolsets —
+    # still applies. Only the validator may set probe_mode=True.
+    lane = resolve_lane(registry, lane_name, allow_stale_validation=probe_mode)
     workspace = validate_workspace(repo, registry)
     packet = build_packet(
         lane_name=lane_name,
@@ -997,15 +1171,23 @@ def _run_worker_with_registry(*, registry: dict[str, Any], lane_name: str, goal:
     return result
 
 
-def run_worker(*, lane_name: str, goal: str, context: str, repo: Path, dry_run: bool = False) -> dict[str, Any]:
-    """Dispatch only through the authoritative Nix registry."""
+def run_worker(*, lane_name: str, goal: str, context: str, repo: Path, dry_run: bool = False, probe_mode: bool = False) -> dict[str, Any]:
+    """Dispatch only through the authoritative Nix registry.
+
+    probe_mode=True skips the runtime freshness gate for validator probes;
+    all structural Nix checks remain enforced.
+    """
     return _run_worker_with_registry(
-        registry=load_authoritative_registry(),
+        registry=apply_runtime_validation(
+            load_authoritative_registry(),
+            load_runtime_lane_validation(),
+        ),
         lane_name=lane_name,
         goal=goal,
         context=context,
         repo=repo,
         dry_run=dry_run,
+        probe_mode=probe_mode,
     )
 
 
