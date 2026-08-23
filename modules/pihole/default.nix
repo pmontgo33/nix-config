@@ -85,7 +85,7 @@ let
     pihole="${lib.getExe ftl.piholePackage}"
     jq="${lib.getExe pkgs.jq}"
     curl="${lib.getExe pkgs.curl}"
-    dig="${lib.getExe' pkgs.bind "dig"}"
+    dig="${lib.getExe' pkgs.bind.dnsutils "dig"}"
     mktemp="${lib.getExe' pkgs.coreutils "mktemp"}"
     mv="${lib.getExe' pkgs.coreutils "mv"}"
     rm="${lib.getExe' pkgs.coreutils "rm"}"
