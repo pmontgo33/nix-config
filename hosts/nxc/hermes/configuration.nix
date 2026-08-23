@@ -423,10 +423,8 @@ in
       # subscription quota unless both routes fail.
       fallback_providers = [
         { provider = "opencode-go"; model = "minimax-m3"; }
-        # mimo-v2.5 (formerly deepseek-v4-flash) — higher opencode-go weekly
-        # quota for the same Flash-class role.
-        { provider = "opencode-go"; model = "mimo-v2.5"; }
         { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+        { provider = "opencode-go"; model = "mimo-v2.5"; }
       ];
 
       # Mixture of Agents presets. Five profiles, each tuned for a
