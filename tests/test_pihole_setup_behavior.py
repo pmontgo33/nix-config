@@ -179,25 +179,48 @@ class SetupScriptBehaviouralTests(unittest.TestCase):
 
         fake_dir = tmp / "fakepihole"
         fake_dir.mkdir()
-        # shim for mktemp, mv, rm, install
-        sh = f"""#!/bin/sh
+        # shim for mktemp, mv, rm, install, dig. The body cannot be an
+        # f-string because the awk pattern inside contains "${{...}}"
+        # delimiters that confuse Python's parser even though bash sees them
+        # as a literal regex; interpolate {state_path} separately.
+        sh_shim_template = """#!/bin/sh
 case "$(basename $0)" in
   mktemp) dir=$(dirname -- "$1" 2>/dev/null); [ -d "$dir" ] || mkdir -p "$dir"; exec /run/current-system/sw/bin/mktemp "$@" ;;
   mv) exec /run/current-system/sw/bin/mv "$@" ;;
   rm) exec /run/current-system/sw/bin/rm "$@" ;;
   install) exec /run/current-system/sw/bin/install "$@" ;;
+  dig)
+    # Emit a single fake API URL so the new inline readiness probe
+    # proceeds to the curl auth probe.
+    echo '"http://127.0.0.1:80/"'
+    exit 0
+    ;;
   curl)
-    # Pretend the mac vendor download always succeeds with a single 0-byte file.
-    out=$(echo "$@" | tr ' ' '\\n' | awk '/^-o$/{{getline x; print x; exit}}')
-    [ -n "$out" ] && [ -d "$(dirname "$out")" ] || mkdir -p "$(dirname "$out")"
-    : > "$out"
+    # Three call shapes in the rendered setup script:
+    #   1) macvendor download (uses -o $file)
+    #   2) inline readiness probe (uses -w ">>%{http_code}")
+    #   3) SOPS auth POST (uses -X POST)
+    if echo "$@" | grep -q -- '-X POST'; then
+      cat <<'JSON_EOF'
+{"session":{"valid":true,"totp":false,"sid":"test-sid","validity":600},"took":0.001}
+JSON_EOF
+      exit 0
+    fi
+    out=$(echo "$@" | tr ' ' '\n' | awk '/^-o$/{getline x; print x; exit}')
+    if [ -n "$out" ]; then
+      [ -d "$(dirname "$out")" ] || mkdir -p "$(dirname "$out")"
+      : > "$out"
+      exit 0
+    fi
+    printf '>>401'
     exit 0
     ;;
   kill) exit 0 ;;
 esac
 exit 0
 """
-        for tool in ("mktemp", "mv", "rm", "install", "curl", "kill"):
+        sh = sh_shim_template  # no interpolation needed
+        for tool in ("mktemp", "mv", "rm", "install", "curl", "dig", "kill"):
             _write_executable(fake_dir / tool, sh)
 
         # Shim systemctl so the FTL process ID check returns 1 (non-zero
@@ -367,7 +390,7 @@ exit_test_api() { return 0; }
         # Replace every nix store path that points to one of the tools we
         # want to shim. The Nix module hard-codes absolute paths for
         # mktemp/mv/rm/install/curl/kill, and systemctl is invoked inline.
-        for tool in ("mktemp", "mv", "rm", "install", "curl", "kill",
+        for tool in ("mktemp", "mv", "rm", "install", "curl", "dig", "kill",
                      "systemctl"):
             script_text = re.sub(
                 rf'/nix/store/[^"\s]*/bin/{tool}',
