@@ -85,6 +85,7 @@ let
     pihole="${lib.getExe ftl.piholePackage}"
     jq="${lib.getExe pkgs.jq}"
     curl="${lib.getExe pkgs.curl}"
+    dig="${lib.getExe' pkgs.bind "dig"}"
     mktemp="${lib.getExe' pkgs.coreutils "mktemp"}"
     mv="${lib.getExe' pkgs.coreutils "mv"}"
     rm="${lib.getExe' pkgs.coreutils "rm"}"
@@ -131,12 +132,58 @@ let
       fi
     fi
 
+    # Source api.sh for the helpers we actually use (GetFTLData, PostFTLData,
+    # LogoutAPI) but NOT TestAPIAvailability or LoginAPI: the upstream
+    # helpers exit the shell on failure, which would defeat our retry loop
+    # and bypass our SOPS auth branch.
     . ${ftl.piholePackage}/share/pihole/advanced/Scripts/api.sh
     . ${ftl.piholePackage}/share/pihole/advanced/Scripts/utils.sh
 
+    # Inline Pi-hole API readiness check, modelled on upstream
+    # `TestAPIAvailability` but returning a clean 0/1 status so it can
+    # participate in a retry loop without exiting the oneshot. Discovers
+    # the FTL-reported API URLs via the CHAOS TXT record `local.api.ftl`
+    # and probes each URL with curl; sets $API_URL and $needAuth in the
+    # calling shell on success. We hardcode the DNS port to 53 because
+    # upstream's TestAPIAvailability also defaults to the FTL-published
+    # port, which is 53 unless the operator reconfigured it, and the
+    # helper that reads FTL's config (`getFTLConfigValue`) is only
+    # defined inside `TestAPIAvailability` itself. Using `dig +short -p 53`
+    # avoids the awk/PATH complication Luna flagged while still working
+    # against the standard FTL configuration.
+    checkPiHoleApiReady() {
+      local api_urls url auth_response auth_status
+      api_urls=$($dig +short -p 53 chaos txt local.api.ftl @127.0.0.1) || return 1
+      if [ -z "$api_urls" ] || [ "''${api_urls#;;}" != "$api_urls" ]; then
+        return 1
+      fi
+      for url in $api_urls; do
+        url="''${url%\"}"
+        url="''${url#\"}"
+        auth_response=$($curl --connect-timeout 2 -skS -w ">>%{http_code}" "''${url}auth" 2>/dev/null) || continue
+        auth_status=''${auth_response#*>>}
+        case "$auth_status" in
+          200)
+            API_URL="$url"
+            needAuth=false
+            return 0
+            ;;
+          401)
+            API_URL="$url"
+            needAuth=true
+            return 0
+            ;;
+          *)
+            continue
+            ;;
+        esac
+      done
+      return 1
+    }
+
     api_ready=false
     for _ in 1 2 3; do
-      if (TestAPIAvailability); then
+      if checkPiHoleApiReady; then
         api_ready=true
         break
       fi
@@ -148,7 +195,45 @@ let
       exit 1
     fi
 
-    LoginAPI
+    # Authenticate using the SOPS-rendered runtime API credential when the
+    # EnvironmentFile mounted by pihole-ftl-setup.service provides one.
+    # Otherwise fall back to Pi-hole's upstream LoginAPI path (CLI password,
+    # loopback disposable, or pre-rotation state). This restores a single
+    # credential source-of-truth without breaking the disposable-test path.
+    # The password is encoded into the JSON body via `jq --arg` so quotes,
+    # backslashes, and control characters in the credential cannot inject
+    # JSON structure or alter the request payload.
+    if [ -n "''${FTLCONF_webserver_api_password:-}" ] && [ "''${needAuth:-false}" = true ]; then
+      auth_body=$($jq -nc --arg p "$FTLCONF_webserver_api_password" \
+        '{password: $p, totp: null}') || {
+          echo "Failed to build Pi-hole authentication payload"
+          exit 1
+        }
+      auth_response=$($curl --connect-timeout 2 -skS -X POST "''${API_URL}auth" \
+        -H "Accept: application/json" \
+        -H "Content-Type: application/json" \
+        --data "$auth_body") || {
+          echo "Pi-hole API authentication request failed"
+          exit 1
+        }
+      auth_session=$($jq -c '.session // empty' <<< "$auth_response" 2>/dev/null) || {
+        echo "Pi-hole authentication response was not valid JSON"
+        exit 1
+      }
+      if [ "$($jq -r '.valid // false' <<< "$auth_session")" != "true" ]; then
+        echo "Pi-hole authentication failed using the SOPS API credential"
+        exit 1
+      fi
+      SID=$($jq -r '.sid // empty' <<< "$auth_session")
+      if [ -z "$SID" ]; then
+        echo "Pi-hole authentication succeeded without a session id"
+        exit 1
+      fi
+      validSession=true
+      export SID validSession
+    else
+      LoginAPI
+    fi
 
     # Group membership is policy-owned runtime state. Resolve the declared
     # names only after API authentication, and fail before gravity or list
@@ -675,6 +760,15 @@ in
     # stale runtime list is still removed by the next reconciliation.
     systemd.services.pihole-ftl-setup.enable = lib.mkForce cfg.enable;
     systemd.services.pihole-ftl-setup.script = lib.mkForce setupScript;
+    # Mount the same SOPS-rendered runtime API credential that pihole-ftl
+    # uses, so the setup oneshot authenticates with the same source-of-truth
+    # password. Without this, the setup script falls back to Pi-hole's
+    # auto-generated /etc/pihole/cli_pw, which never matches the SOPS
+    # credential and causes the list/gravity reconcile to fail.
+    systemd.services.pihole-ftl-setup.serviceConfig.EnvironmentFile =
+      lib.optional
+        (cfg.apiPasswordEnvironmentFile != null && cfg.apiPasswordEnvironmentFile != "")
+        cfg.apiPasswordEnvironmentFile;
 
     # Open the web interface port when binding beyond loopback.
     # Cannot use pihole-ftl's openFirewallWebserver because pihole-web.nix
