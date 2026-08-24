@@ -5,14 +5,15 @@ This CLI is the only caller of the Pi-hole-side wrapper
 ``scripts/pihole/live_dry_run_remote.py``.  It performs four operations:
 
 1. Render the offline inventory (``scripts/dns_migration/render_inventory.py``).
-2. Decrypt ``secrets/pihole-identities.yaml`` using the dedicated Hermes age
-   key (``SOPS_AGE_KEY_FILE``) and resolve every client reference.
+2. Resolve the rendered identity mapping on the target host and resolve every
+   client reference.
 3. Render the offline policy (``scripts/pihole/policy_reconcile.py``) and
    adapt it to the ``live_reconcile._desired`` shape
    (``scripts/pihole/live_adapter.py``).
-4. SSH the adapted inventory plus the runtime SOPS tmpfile path of the
-   Pi-hole API password into the remote wrapper.  The wrapper never logs or
-   echoes the password; the orchestrator never reads it.
+4. Resolve the per-activation sops-nix identity and API-password files on the
+   target host, read only the identity mapping into memory, and SSH the adapted
+   inventory plus the API-password path into the remote wrapper. The wrapper
+   never logs or echoes the password; the orchestrator never reads it.
 
 The orchestrator is offline and dry-run only: ``live_reconcile.reconcile_live``
 is invoked with ``apply=False``.  No mutation is performed.
@@ -21,12 +22,10 @@ Usage:
 
     scripts/pihole/live_dry_run.py \
         --target pihole1 \
-        [--origin http://127.0.0.1:80] \
+        [--origin http://127.0.0.1:8080] \
         [--ssh-host root@pihole1] \
-        [--remote-path /var/lib/pihole/live_dry_run_remote.py] \
-        [--inventory-nix inventory/default.nix] \
-        [--secrets secrets/pihole-identities.yaml] \
-        [--age-key-file /var/lib/hermes/.config/sops/age/pihole-identities.txt]
+        [--remote-path /etc/pihole/live-policy-apply] \
+        [--inventory-nix inventory/default.nix]
 
 The output is the structured dry-run plan as JSON on stdout.
 """
@@ -34,11 +33,8 @@ The output is the structured dry-run plan as JSON on stdout.
 from __future__ import annotations
 
 import argparse
-import glob
 import json
-import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -57,22 +53,12 @@ _SAFE_KEY = re.compile(r"^[a-zA-Z0-9._:/-]+$")
 _VALID_HOST_LABEL = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$")
 _TARGETS = frozenset({"pihole1", "pihole2"})
 _REMOTE_DEFAULT_PATH = "/etc/pihole/live-policy-apply"
-# Dry-run still expects this default, but the apply orchestrator resolves
-# the live per-activation path itself before sending the payload.
+# The live per-activation path is resolved on the target before the payload is
+# sent; this value supplies only the secret basename for that lookup.
 _PASSWORD_PATH = "/run/secrets.d/pihole-api-password"
 _SAFE_PATH_CHARS = re.compile(r"^[a-zA-Z0-9._/+-]+$")
-_SOPS_GLOB = "/nix/store/*-sops-*/bin/sops"
-
-
-def _resolve_sops() -> str:
-    sops = shutil.which("sops")
-    if sops is not None:
-        return sops
-    import glob
-    matches = sorted(glob.glob(_SOPS_GLOB))
-    if matches:
-        return matches[-1]
-    raise OrchestratorError("sops binary not found on PATH")
+_IDENTITY_REF_LINE = re.compile(r"^ {4}identityRef:([A-Za-z0-9][A-Za-z0-9._+-]{0,63}):$")
+_MAC_LINE = re.compile(r"^ {8}mac:\s*([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})$")
 
 
 class OrchestratorError(Exception):
@@ -98,13 +84,11 @@ def _safe_keys(value: Any) -> None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", required=True, choices=sorted(_TARGETS), help="Pi-hole target to dry-run against")
-    parser.add_argument("--origin", default="http://127.0.0.1:80", help="Pi-hole API origin reachable from inside the Pi-hole")
+    parser.add_argument("--origin", default="http://127.0.0.1:8080", help="Pi-hole API origin reachable from inside the Pi-hole")
     parser.add_argument("--ssh-host", default=None, help="ssh host (default: root@<target>)")
     parser.add_argument("--remote-path", default=_REMOTE_DEFAULT_PATH, help="Absolute path where the remote wrapper is installed on the Pi-hole")
     parser.add_argument("--inventory-nix", type=Path, default=REPO_ROOT / "inventory" / "default.nix")
-    parser.add_argument("--secrets", type=Path, default=REPO_ROOT / "secrets" / "pihole-identities.yaml")
-    parser.add_argument("--age-key-file", type=Path, default=Path("/var/lib/hermes/.config/sops/age/pihole-identities.txt"))
-    parser.add_argument("--password-path", default=_PASSWORD_PATH, help="Runtime SOPS tmpfile path on the Pi-hole containing the API password")
+    parser.add_argument("--password-path", default=_PASSWORD_PATH, help="Rendered API-password path or basename on the Pi-hole")
     return parser
 
 
@@ -157,44 +141,53 @@ def _validate_password_path(path_text: str) -> str:
     return path_text
 
 
-def _decrypt_identities(secret_path: Path, age_key_file: Path) -> dict[str, dict[str, str]]:
-    _require(secret_path.exists(), f"secrets file does not exist: {secret_path}")
-    _require(age_key_file.exists(), f"age key file does not exist: {age_key_file}")
-    sops = _resolve_sops()
-    env = os.environ.copy()
-    env["SOPS_AGE_KEY_FILE"] = str(age_key_file)
-    result = subprocess.run(
-        [sops, "--decrypt", str(secret_path)],
-        capture_output=True,
-        text=True,
-        env=env,
-        check=False,
+def _require_same_secret_generation(password_path: str, identities_path: str) -> None:
+    _require(
+        Path(password_path).parent == Path(identities_path).parent,
+        "rendered secret generation changed during resolution",
     )
-    _require(result.returncode == 0, f"sops decrypt failed: {_sanitize(result.stderr)}")
-    identities = _parse_identity_yaml(result.stdout)
-    _require(type(identities) is dict and len(identities) > 0, "identity mapping is empty")
-    return identities
 
 
 def _parse_identity_yaml(text: str) -> dict[str, dict[str, str]]:
+    _require(type(text) is str, "identity mapping must be text")
     identities: dict[str, dict[str, str]] = {}
     current: str | None = None
+    saw_root = False
+    in_sops_metadata = False
     for raw in text.splitlines():
         line = raw.rstrip()
         if not line:
             continue
-        stripped = line.strip()
-        if stripped.startswith("identityRef:") and line.endswith(":"):
-            current = stripped[:-1].split(":", 1)[1]
-            identities[current] = {}
+        if in_sops_metadata:
             continue
-        if current is not None and stripped.startswith("mac:"):
-            identities[current]["mac"] = stripped.split(":", 1)[1].strip()
+        if line == "sops:":
+            _require(saw_root and bool(identities), "identity mapping has an invalid sops section")
+            in_sops_metadata = True
+            current = None
             continue
-        if line.startswith("identities:"):
+        if not saw_root:
+            _require(line == "identities:", "identity mapping root must be identities")
+            saw_root = True
             continue
-    if not identities:
+        identity_match = _IDENTITY_REF_LINE.fullmatch(line)
+        if identity_match:
+            identity_name = identity_match.group(1)
+            current = identity_name
+            if identity_name in identities:
+                raise OrchestratorError("identity mapping contains a duplicate identity ref")
+            identities[identity_name] = {}
+            continue
+        mac_match = _MAC_LINE.fullmatch(line)
+        if mac_match and current is not None:
+            if "mac" in identities[current]:
+                raise OrchestratorError("identity mapping contains a duplicate MAC entry")
+            identities[current]["mac"] = mac_match.group(1)
+            continue
+        raise OrchestratorError("identity mapping contains an invalid entry")
+    if not saw_root or not identities:
         raise OrchestratorError("identity mapping is empty")
+    if any(not entry.get("mac") for entry in identities.values()):
+        raise OrchestratorError("identity mapping contains an incomplete entry")
     return identities
 
 
@@ -225,13 +218,27 @@ def main(argv: list[str] | None = None) -> int:
         origin, _ = _validate_origin(args.origin)
         ssh_host = _validate_ssh_host(args.ssh_host or f"root@{target}", target=target)
         remote_path = _validate_remote_path(args.remote_path)
-        password_path = _validate_password_path(args.password_path)
+        _validate_password_path(args.password_path)
         _safe_keys({"target": target})
 
         rendered_inventory = inventory_renderer.render(inventory_renderer.load_source(args.inventory_nix, None))
         _safe_keys(rendered_inventory)
 
-        identities = _decrypt_identities(args.secrets, args.age_key_file)
+        # Keep the dry-run CLI on the same remote-rendered secret boundary as
+        # live_apply without importing the apply module during module import.
+        from scripts.pihole import live_apply
+        try:
+            password_path = live_apply._resolve_secrets_path(ssh_host, Path(args.password_path).name)
+            identities_path = live_apply._resolve_secrets_path(ssh_host, "pihole-identities")
+            _require_same_secret_generation(password_path, identities_path)
+            identities_text = live_apply._read_remote_secret(ssh_host, identities_path)
+        except (live_apply.OrchestratorError, live_apply.dry.OrchestratorError) as exc:
+            # When this file is launched directly, live_apply imports the
+            # package copy of this module. Normalize its subclass back to the
+            # active CLI's error type so failures remain sanitized and
+            # traceback-free.
+            raise OrchestratorError(str(exc)) from None
+        identities = _parse_identity_yaml(identities_text)
         _safe_keys(identities)
 
         resolved = adapter.resolve_identities(rendered_inventory, identities)

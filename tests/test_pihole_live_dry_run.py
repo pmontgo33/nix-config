@@ -1,36 +1,6 @@
-import json
 import unittest
 
 from scripts.pihole import live_dry_run as orchestrator
-
-
-class SopsResolutionTests(unittest.TestCase):
-    def test_resolve_sops_uses_path_when_available(self):
-        from scripts.pihole import live_dry_run as orchestrator
-        import unittest.mock as mock
-        with mock.patch.object(orchestrator.shutil, "which", return_value=None), \
-             mock.patch.object(orchestrator.os.path, "exists", return_value=True), \
-             mock.patch.object(orchestrator.glob, "glob",
-                               return_value=["/nix/store/abc-sops-3.13.2/bin/sops"]):
-            self.assertEqual(
-                orchestrator._resolve_sops(),
-                "/nix/store/abc-sops-3.13.2/bin/sops",
-            )
-
-    def test_resolve_sops_prefers_path_env(self):
-        from scripts.pihole import live_dry_run as orchestrator
-        import unittest.mock as mock
-        with mock.patch.object(orchestrator.shutil, "which",
-                              return_value="/usr/bin/sops"):
-            self.assertEqual(orchestrator._resolve_sops(), "/usr/bin/sops")
-
-    def test_resolve_sops_raises_when_unavailable(self):
-        from scripts.pihole import live_dry_run as orchestrator
-        import unittest.mock as mock
-        with mock.patch.object(orchestrator.shutil, "which", return_value=None), \
-             mock.patch.object(orchestrator.glob, "glob", return_value=[]):
-            with self.assertRaises(orchestrator.OrchestratorError):
-                orchestrator._resolve_sops()
 
 
 class OriginValidationTests(unittest.TestCase):
@@ -127,6 +97,21 @@ class PasswordPathValidationTests(unittest.TestCase):
             orchestrator._validate_password_path("secrets/pihole-api-password")
 
 
+class SecretGenerationTests(unittest.TestCase):
+    def test_accepts_paths_from_same_activation(self):
+        orchestrator._require_same_secret_generation(
+            "/run/secrets.d/12/pihole-api-password",
+            "/run/secrets.d/12/pihole-identities",
+        )
+
+    def test_rejects_paths_from_different_activations(self):
+        with self.assertRaises(orchestrator.OrchestratorError):
+            orchestrator._require_same_secret_generation(
+                "/run/secrets.d/12/pihole-api-password",
+                "/run/secrets.d/13/pihole-identities",
+            )
+
+
 class IdentityYamlParserTests(unittest.TestCase):
     def test_parses_identity_mapping(self):
         text = (
@@ -144,6 +129,21 @@ class IdentityYamlParserTests(unittest.TestCase):
     def test_rejects_unrelated_payload(self):
         with self.assertRaises(orchestrator.OrchestratorError):
             orchestrator._parse_identity_yaml("just plain text without any identities block")
+
+    def test_rejects_malformed_identity_shape(self):
+        with self.assertRaises(orchestrator.OrchestratorError):
+            orchestrator._parse_identity_yaml(
+                "identities:\n"
+                "    identityRef:alpha:\n"
+                "        mac: not-a-mac\n"
+            )
+
+    def test_rejects_identity_entry_without_mac(self):
+        with self.assertRaises(orchestrator.OrchestratorError):
+            orchestrator._parse_identity_yaml(
+                "identities:\n"
+                "    identityRef:alpha:\n"
+            )
 
 
 if __name__ == "__main__":
