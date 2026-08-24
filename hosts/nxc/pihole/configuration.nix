@@ -22,6 +22,36 @@
     group = "root";
   };
 
+  # Per-host decrypted copy of secrets/pihole-identities.yaml. sops-nix renders
+  # it to /run/secrets.d/<N>/pihole-identities on every activation; the
+  # hermes-side orchestrator resolves the live per-activation path over SSH
+  # (fish-safe via _resolve_secrets_path) and reads the plaintext MAC list from
+  # there. This mirrors the API-password shape: same mode/owner/group, no
+  # plaintext secret on disk outside the runtime path, and no dependency on
+  # `sops` on the hermes PATH. PR #236 originally opened the way for sops-nix
+  # on these hosts; this entry extends that pattern to the identities file.
+  #
+  # `sopsFile` must be explicit because the host's defaultSopsFile
+  # (secrets/secrets.yaml) does not contain a `pihole-identities:` key; the
+  # identities mapping lives in its own dedicated file.
+  #
+  # `key` is intentionally left empty. sops-nix validates the value of any
+  # named `key` and rejects nested mappings (the identities file's
+  # `identities:` value is a mapping, not a string), so a non-empty `key`
+  # fails the manifest validator with "the value of key '...' is not a
+  # string". An empty `key` makes sops-nix render the whole decrypted YAML
+  # file as-is; the orchestrator's `_parse_identity_yaml` parser (in
+  # `live_dry_run.py`, unchanged here) scans for `identityRef:` / `mac:`
+  # lines and silently ignores the `identities:` and `sops:` wrapper
+  # lines.
+  sops.secrets."pihole-identities" = {
+    sopsFile = ../../../secrets/pihole-identities.yaml;
+    key = "";
+    mode = "0400";
+    owner = "root";
+    group = "root";
+  };
+
   sops.templates."pihole-api-env" = {
     content = ''
       FTLCONF_webserver_api_password=${config.sops.placeholder."pihole-api-password"}
