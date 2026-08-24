@@ -189,7 +189,11 @@ class SwitchDnsPathApiShapeTests(unittest.TestCase):
                         "destination_port": rule["destination_port"],
                         "target": rule["target"],
                         "target_port": rule["target_port"],
-                        "natreflection": rule["natreflection"],
+                        # natreflection is not a model column on 26.1.11_6
+                        # source_nat; _build_bypass_rule_payload omits it
+                        # and the live search row omits it too. Do not echo
+                        # the key here or the post-apply read-back will
+                        # drift from the live shape.
                         "enabled": rule["enabled"],
                     }
                 )
@@ -628,7 +632,8 @@ class SwitchDnsPathApiShapeTests(unittest.TestCase):
                                 "destination_port": rule["destination_port"],
                                 "target": rule["target"],
                                 "target_port": rule["target_port"],
-                                "natreflection": rule["natreflection"],
+                                # natreflection omitted: 26.1.11_6
+                                # source_nat search row has no such key.
                                 "enabled": rule["enabled"],
                             }
                         )
@@ -766,6 +771,164 @@ class SwitchDnsPathApiShapeTests(unittest.TestCase):
             with self.assertRaises(switch_dns_path.BypassError) as ctx:
                 switch_dns_path.status_bypass(**self.api_kwargs())
         self.assertIn("source", str(ctx.exception))
+
+    # ---- P1.3b: natreflection is OPTIONAL on 26.1.11_6 source_nat search row
+    #
+    # The live ``/api/firewall/source_nat/search_rule`` endpoint does NOT
+    # include a ``natreflection`` key (verified 2026-08-24). Sending the
+    # field to ``add_rule`` is silently accepted but the value is dropped
+    # from the read-back, which made the post-install validator in
+    # PR #253 filter every newly added rule out. These tests pin the
+    # three live shapes (missing, "disable", "enable") and the
+    # payload-builder contract so a future OPNsense firmware change can
+    # only break the validator by intentionally flipping the field.
+
+    def test_search_row_missing_natreflection_passes(self):
+        """The live 26.1.11_6 search row omits ``natreflection``. A
+        tagged row with no such key must still be accepted as a managed
+        rule.
+        """
+        row = observed_row(0)
+        del row["natreflection"]
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=(
+                "test",
+                observed_search_response([row] + unrelated_wan_rows()),
+            ),
+        ):
+            matching = switch_dns_path._search_bypass_rules(**self.api_kwargs())
+        self.assertEqual(matching, [row])
+
+    def test_search_row_with_natreflection_disable_passes(self):
+        """A tagged row whose ``natreflection`` field is the canonical
+        "disable" value (e.g. a future firmware version that starts
+        echoing the field back) must still be accepted.
+        """
+        row = observed_row(0)
+        # observed_row already has natreflection="disable"; assert the
+        # baseline shape stays green after the validator change.
+        self.assertEqual(row["natreflection"], "disable")
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=(
+                "test",
+                observed_search_response([row] + unrelated_wan_rows()),
+            ),
+        ):
+            matching = switch_dns_path._search_bypass_rules(**self.api_kwargs())
+        self.assertEqual(matching, [row])
+
+    def test_search_row_with_natreflection_enable_fails_closed(self):
+        """A tagged row whose ``natreflection`` field has drifted to
+        "enable" (hairpin turned on by hand) must NOT be treated as a
+        managed rule.
+        """
+        row = observed_row(0)
+        row["natreflection"] = "enable"
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=(
+                "test",
+                observed_search_response([row] + unrelated_wan_rows()),
+            ),
+        ):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path._search_bypass_rules(**self.api_kwargs())
+        self.assertIn("natreflection", str(ctx.exception))
+
+    def test_search_row_with_natreflection_non_string_fails_closed(self):
+        """A tagged row whose ``natreflection`` field is present but not
+        a string (e.g. an int 0 / 1 from a hypothetical schema change)
+        must still fail closed, preserving the type contract.
+        """
+        row = observed_row(0)
+        row["natreflection"] = 0  # type: ignore[assignment]
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=(
+                "test",
+                observed_search_response([row] + unrelated_wan_rows()),
+            ),
+        ):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path._search_bypass_rules(**self.api_kwargs())
+        self.assertIn("natreflection", str(ctx.exception))
+
+    def test_build_bypass_rule_payload_omits_natreflection(self):
+        """The OPNsense 26.1.11_6 source_nat model does not accept
+        ``natreflection`` as a column; the add payload must NOT include
+        the key. If a future schema change re-introduces the field, this
+        test will fail and force an explicit re-decision.
+        """
+        payload = switch_dns_path._build_bypass_rule_payload("lan", "udp")
+        self.assertNotIn("natreflection", payload)
+        # Sanity: the rest of the contract is preserved.
+        self.assertEqual(payload["interface"], "lan")
+        self.assertEqual(payload["protocol"], "udp")
+        self.assertEqual(payload["ipprotocol"], "inet")
+        self.assertEqual(payload["source"], "any")
+        self.assertEqual(payload["destination"], "any")
+        self.assertEqual(payload["target"], switch_dns_path.BYPASS_TARGET_IP)
+        self.assertEqual(payload["enabled"], "0")
+
+    def test_apply_nat_accepts_trimmed_ok_status(self):
+        """OPNsense 26.1.11_6 returns ``{"status": "OK\\n\\n"}`` (leading
+        "OK" plus trailing whitespace and newlines) on a successful
+        apply. ``_apply_nat`` must compare against the trimmed value
+        so the live response shape is accepted without weakening the
+        fail-closed contract on any other payload.
+        """
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=("test", {"status": "OK\n\n"}),
+        ) as mock_api_call:
+            switch_dns_path._apply_nat(**self.api_kwargs())
+        mock_api_call.assert_called_once()
+
+    def test_apply_nat_rejects_non_trimmable_status(self):
+        """A status that is not the trimmed "OK" must still fail closed,
+        even after the trim change. Catches regressions where a future
+        ``str.strip()`` is removed and the contract silently loosens.
+        """
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=("test", {"status": "ERR"}),
+        ):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path._apply_nat(**self.api_kwargs())
+        self.assertIn("status='OK'", str(ctx.exception))
+
+    def test_apply_nat_rejects_non_dict_response(self):
+        """A non-dict response from the apply endpoint must fail
+        closed; trim only happens for string statuses.
+        """
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=("test", ["not", "a", "dict"]),
+        ):
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path._apply_nat(**self.api_kwargs())
+
+    def test_apply_nat_rejects_missing_status_key(self):
+        """A dict without a ``status`` key must fail closed; trim only
+        happens for string statuses.
+        """
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=("test", {"result": "saved"}),
+        ):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path._apply_nat(**self.api_kwargs())
+        self.assertIn("status='OK'", str(ctx.exception))
 
     # ---- P1.4: literal-IP POST fallback restricted to pre-send transport failures
 

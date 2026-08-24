@@ -533,10 +533,15 @@ def _validate_match_fields(rule: dict[str, Any], context: str) -> None:
     """Validate the source / destination / natreflection match fields.
 
     OPNsense source_nat rules carry ``source`` (e.g. "any" or a configured
-    LAN-subnet alias name), ``destination`` ("any"), and ``natreflection``
-    ("disable" to avoid hairpin). Drift in any of these means the live
-    row's match side has changed away from what the script installed and
-    we refuse to treat it as one of our managed rules.
+    LAN-subnet alias name) and ``destination`` ("any"); those are
+    required and exact-match. ``natreflection`` is OPTIONAL: on
+    26.1.11_6 the live source_nat search row omits the field entirely
+    (verified 2026-08-24 via ``/api/firewall/source_nat/search_rule``),
+    so the script-installed "disable" value is silently dropped from
+    the read-back. Accept a missing ``natreflection`` as the live
+    shape; reject only when the field is present and not "disable",
+    which would mean the row has drifted (e.g. someone enabled
+    hairpin).
     """
     source = rule.get("source")
     if not isinstance(source, str) or source not in VALID_SOURCES:
@@ -545,6 +550,9 @@ def _validate_match_fields(rule: dict[str, Any], context: str) -> None:
     if not isinstance(destination, str) or destination != EXPECTED_DESTINATION:
         raise BypassError(f"{context} has invalid destination")
     natreflection = rule.get("natreflection")
+    if natreflection is None:
+        # Live source_nat search row omits natreflection on 26.1.11_6.
+        return
     if not isinstance(natreflection, str) or natreflection != EXPECTED_NATREFLECTION:
         raise BypassError(f"{context} has invalid natreflection")
 
@@ -552,12 +560,13 @@ def _validate_match_fields(rule: dict[str, Any], context: str) -> None:
 def _validate_redirect_fields(rule: dict[str, Any], context: str) -> None:
     """Require the redirect configuration that determines DNS bypass behavior.
 
-    This covers the match-side (``source`` / ``destination`` /
-    ``natreflection``) AND the redirect-side (``ipprotocol`` / ``target`` /
-    ``destination_port`` / ``target_port``) fields. All values are
-    exact-match strings as observed live on OPNsense 26.1.11_6; anything
-    else means the live row has drifted away from what the script installed
-    and we refuse to trust it.
+    This covers the match-side (``source`` / ``destination``;
+    ``natreflection`` is tolerated-as-missing — see
+    :func:`_validate_match_fields`) AND the redirect-side
+    (``ipprotocol`` / ``target`` / ``destination_port`` / ``target_port``)
+    fields. All values are exact-match strings as observed live on
+    OPNsense 26.1.11_6; anything else means the live row has drifted
+    away from what the script installed and we refuse to trust it.
     """
     if rule.get("ipprotocol") != "inet":
         raise BypassError(f"{context} has invalid ipprotocol")
@@ -599,6 +608,12 @@ def _validate_fetched_rule(rule: dict[str, Any], search_row: dict[str, Any], pat
             search_row[field], field, "OPNsense search row"
         ):
             raise BypassError(f"OPNsense API {path} returned a rule with mismatched {field}")
+    # natreflection is treated as optional on 26.1.11_6 (see
+    # _validate_match_fields). A drift between the fetched rule and the
+    # search row (one has it, the other omits it) is still a mismatch:
+    # ``rule.get(field) != search_row.get(field)`` reports the
+    # presence/absence delta, so the row has drifted from its search
+    # identity and we refuse to update it.
     for field in ("source", "destination", "natreflection"):
         if rule.get(field) != search_row.get(field):
             raise BypassError(f"OPNsense API {path} returned a rule with mismatched {field}")
@@ -710,16 +725,36 @@ def _require_api_result(data: Any, expected: str, path: str) -> None:
 
 
 def _apply_nat(*, primary: str, fallback: str, key: str, secret: str) -> None:
-    """Reload the kernel filter so rule changes take effect."""
+    """Reload the kernel filter so rule changes take effect.
+
+    OPNsense 26.1.11_6 returns ``{"status": "OK\\n\\n"}`` (a leading "OK"
+    followed by trailing whitespace and a couple of newlines) on success.
+    Compare against the trimmed value so we accept the live response shape
+    without weakening the fail-closed contract on any other payload.
+    """
     _, data = _api_call(
         "POST", NAT_API_APPLY, primary=primary, fallback=fallback, key=key, secret=secret
     )
-    if not isinstance(data, dict) or data.get("status") != "OK":
-        raise BypassError(f"OPNsense API {NAT_API_APPLY} did not return status='OK'")
+    if not isinstance(data, dict):
+        raise BypassError(f"OPNsense API {NAT_API_APPLY} did not return a JSON object")
+    raw_status = data.get("status")
+    if not isinstance(raw_status, str) or raw_status.strip() != "OK":
+        raise BypassError(
+            f"OPNsense API {NAT_API_APPLY} did not return status='OK'"
+        )
 
 
 def _build_bypass_rule_payload(interface: str, protocol: str) -> dict[str, Any]:
-    """Build the OPNsense NAT rule payload for one (interface, protocol)."""
+    """Build the OPNsense NAT rule payload for one (interface, protocol).
+
+    OPNsense 26.1.11_6's source_nat model does not accept ``natreflection``
+    as a model column: ``add_rule`` silently accepts the field but it is
+    dropped from the search-row read-back. The script intentionally
+    omits it here so the post-apply read-back matches the live shape
+    (verified 2026-08-24). Hairpin / NAT-reflection is therefore not
+    configured for these rules; the validator accepts either a missing
+    or ``"disable"`` value when it is present in a future firmware.
+    """
     return {
         "interface": interface,
         "ipprotocol": "inet",
@@ -732,7 +767,6 @@ def _build_bypass_rule_payload(interface: str, protocol: str) -> dict[str, Any]:
         "nat_port": "",
         "descr": BYPASS_RULE_DESCR,
         "associated-rule": [],
-        "natreflection": "disable",
         "enabled": "0",  # install disabled; --enable flips to "1"
     }
 
