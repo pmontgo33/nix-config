@@ -266,6 +266,16 @@
         };
       };
 
+      ali-book = {
+        network = {
+          hostname = "ali-book";
+          address = null;
+          identityRef = "ali-book";
+          interface = "guest";
+          piholeGroup = "kids";
+        };
+      };
+
     };
 
     localDns = {
