@@ -431,11 +431,14 @@ in
         idle_minutes = 2880;
       };
 
-      # Fallbacks are ordered availability routes: two OpenCode Go models
-      # precede Codex Luna so a proxy/provider outage does not spend Codex
-      # subscription quota unless both routes fail.
+      # Fallbacks are ordered availability routes: Codex Luna sits ahead
+      # of OpenCode Go MiMo 2.5 so a single proxy/provider outage does
+      # not exhaust the cheap-MiMo budget before reaching the higher-
+      # quality review model. The prior opencode-go / minimax-m3 entry
+      # was removed because the default model is already minimax
+      # MiniMax-M3, so a same-vendor retry of the same model added no
+      # availability value while still spending opencode-go quota.
       fallback_providers = [
-        { provider = "opencode-go"; model = "minimax-m3"; }
         { provider = "openai-codex"; model = "gpt-5.6-luna"; }
         { provider = "opencode-go"; model = "mimo-v2.5"; }
       ];
