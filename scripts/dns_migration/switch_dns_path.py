@@ -34,7 +34,6 @@ How it works:
         port 53 -> 192.168.86.1 port 53
 
   Implemented as 6 outbound NAT rules in OPNsense (LAN/IoT/Guest × UDP/TCP).
-  All rules share the same descr: "dns-path-switcher: pihole-bypass".
   Re-running --install is idempotent (skips if already present).
 
 Why an "always-on but disabled" install:
@@ -55,15 +54,46 @@ Credentials:
 
 OPNsense ACL requirements (verified 2026-08-23 against OPNsense 26.1.11_6):
 
-  - firewall:source_nat:add_rule, del_rule, get_rule, set_rule,
-    search_rule, apply — REQUIRED for install/uninstall/enable/disable.
-    NOT currently granted on the canonical hermes credential. Add via
-    OPNsense UI: System → Access → Users → (user) → Effective Privileges.
+  - firewall:source_nat:add_rule, del_rule, get_rule, set_rule, apply —
+    REQUIRED for install/uninstall/enable/disable. NOT currently granted
+    on the canonical hermes credential. Add via OPNsense UI: System →
+    Access → Users → (user) → Effective Privileges.
 
-OPNsense 26.1 API notes:
+OPNsense 26.1 API notes (live-verified 2026-08-24):
 
-  - Outbound NAT rules live under /api/firewall/source_nat/*, NOT
-    /api/firewall/nat/* (the latter returns 404 on 26.1).
+  - **Authoritative read is /api/firewall/source_nat/get** (the model
+    endpoint). It returns the entire firewall model under
+    ``{"filter": {"general": ..., "rules": ..., "snatrules": {"rule": ...},
+    ...}}``; the source-NAT ruleset lives at
+    ``data["filter"]["snatrules"]["rule"]``. The list is empty (``[]``) when
+    no rules are present, and a dict keyed by UUID when populated.
+
+  - **/api/firewall/source_nat/search_rule is NOT authoritative.** On
+    26.1.11_6 it returns ONLY rules with ``is_automatic=true`` (the eight
+    WAN auto-created rules). Manually-added rules are silently omitted.
+    The script no longer calls this endpoint.
+
+  - **Ownership is by full attribute tuple, not by descr.** OPNsense
+    26.1.11_6's ``add_rule`` accepts ``descr`` as a documented field but
+    silently discards it on save; the field is empty string on read-back
+    for every rule added through the API. See BYPASS_MANAGED_KEY below.
+
+  - **Outbound NAT rules live under /api/firewall/source_nat/*, NOT
+    /api/firewall/nat/* (the latter returns 404 on 26.1).**
+
+  - **Multi-select fields are dicts in the model, scalars in the add
+    payload.** ``interface`` / ``protocol`` / ``ipprotocol`` come back as
+    ``{"<opt>": {"value": "<Label>", "selected": 0|1}, ...}`` dicts from
+    the read endpoints, but the documented ``add_rule`` payload schema
+    accepts the bytestring ("lan", "udp", "inet") and OPNsense
+    normalizes it correctly on save. The script keeps the scalar
+    shape in the add payload and extracts the canonical "first selected
+    option" from the multi-select dicts on read.
+
+  - **apply responds with literal ``{"status": "OK\\n\\n"}``** (trailing
+    whitespace and two newlines). Compared against the trimmed value so
+    the live response shape is accepted without weakening the
+    fail-closed contract on any other payload.
 
 Scope limitations:
 
@@ -98,6 +128,16 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 BYPASS_TARGET_IP = "192.168.86.1"  # OPNsense Unbound
+
+# Persisted constant — kept for documentation. The original
+# implementation used BYPASS_RULE_DESCR as the ownership marker, but
+# OPNsense 26.1.11_6 silently discards ``descr`` on add and returns
+# empty string on read-back for rules created via the API. The current
+# ownership marker is BYPASS_MANAGED_KEY (below). The constant is
+# retained so audit logs and any external tooling that references the
+# label can still find the documentation in this module, and so the
+# value is unchanged across rewrites (operators should not see the
+# descr string mutate under their feet).
 BYPASS_RULE_DESCR = "dns-path-switcher: pihole-bypass"
 
 # Hard-coded literal-IP fallback for mutating POSTs. The default primary
@@ -108,23 +148,44 @@ BYPASS_RULE_DESCR = "dns-path-switcher: pihole-bypass"
 # using the existing HTTP fallback (which is faster and read-only).
 BYPASS_POST_HTTPS_FALLBACK = "https://192.168.86.1"
 
-# Authoritative-match field constants. Values are exact-match strings as
-# observed live on OPNsense 26.1.11_6 and emitted by
-# _build_bypass_rule_payload below. Operators tightening the install to
-# use an alias for ``source`` would add the alias name to VALID_SOURCES;
-# the validator accepts both "any" (what the script installs) and the
-# configured alias (a future tightening).
-LAN_SUBNET_ALIAS = "lan_subnet"
-VALID_SOURCES = frozenset({"any", LAN_SUBNET_ALIAS})
-EXPECTED_DESTINATION = "any"
-EXPECTED_NATREFLECTION = "disable"
+# Authoritative-match field constants. The ownership marker for the
+# Pi-hole bypass is the FULL attribute tuple below, NOT a single text
+# field. OPNsense 26.1.11_6 silently discards ``descr`` on
+# ``add_rule`` and returns empty string on read-back, so any
+# descr-based ownership check would either (a) match nothing because
+# the read-back descr is "" or (b) match EVERY manual rule because
+# the field is shared. The key-tuple below is the only stable
+# identifier of a script-installed rule.
+#
+# Every rule in the OPNsense source_nat model whose attribute tuple
+# equals BYPASS_MANAGED_KEY is considered managed by this script.
+# Anything else is left alone.
+BYPASS_MANAGED_KEY: tuple[tuple[str, str, str, int, str, int, str, str], ...] = (
+    # (interface, protocol, target_ip, target_port,
+    #  destination_net, destination_port, source_net, ipprotocol)
+    ("lan", "udp", BYPASS_TARGET_IP, 53, "any", 53, "any", "inet"),
+    ("lan", "tcp", BYPASS_TARGET_IP, 53, "any", 53, "any", "inet"),
+    ("opt1", "udp", BYPASS_TARGET_IP, 53, "any", 53, "any", "inet"),
+    ("opt1", "tcp", BYPASS_TARGET_IP, 53, "any", 53, "any", "inet"),
+    ("opt2", "udp", BYPASS_TARGET_IP, 53, "any", 53, "any", "inet"),
+    ("opt2", "tcp", BYPASS_TARGET_IP, 53, "any", 53, "any", "inet"),
+)
+BYPASS_MANAGED_KEY_SET: frozenset[tuple[str, str, str, int, str, int, str, str]] = (
+    frozenset(BYPASS_MANAGED_KEY)
+)
 
+# Expected interface / protocol sets. The validator rejects any rule
+# whose interface is outside INTERFACE_ALIASES or whose protocol is
+# outside PROTOCOLS, even if all other fields match.
 INTERFACE_ALIASES = ("lan", "opt1", "opt2")  # LAN, IoT, Guest
 PROTOCOLS = ("udp", "tcp")
 DNS_PORT = 53
 
-# OPNsense 26.1 outbound NAT API paths.
-NAT_API_SEARCH = "firewall/source_nat/search_rule"
+# OPNsense 26.1 outbound NAT API paths. Note the absence of NAT_API_SEARCH:
+# /api/firewall/source_nat/search_rule on 26.1.11_6 returns ONLY
+# is_automatic=true rules, so it is NOT authoritative and is never
+# called by this script.
+NAT_API_MODEL = "firewall/source_nat/get"  # authoritative read
 NAT_API_ADD = "firewall/source_nat/add_rule"
 NAT_API_GET = "firewall/source_nat/get_rule"
 NAT_API_SET = "firewall/source_nat/set_rule"
@@ -466,161 +527,119 @@ def _api_call(
         ) from e
 
 
-def _search_bypass_rules(
-    *, primary: str, fallback: str, key: str, secret: str
-) -> list[dict[str, Any]]:
-    """Return all outbound NAT rules tagged with the bypass label.
+# ---------------------------------------------------------------------------
+# Multi-select extraction
+# ---------------------------------------------------------------------------
 
-    OPNsense's source_nat search response uses ``description`` for the row
-    label, while the documented add payload still uses ``descr``.  Accept
-    either spelling when reading rows so status and lifecycle operations use
-    the live response shape without changing the add contract.
+
+def _selected_option(multi_select: Any) -> str | None:
+    """Return the bytestring of the single selected option in a multi-select dict.
+
+    OPNsense model fields ``interface``, ``protocol``, and ``ipprotocol``
+    come back from the model endpoint as a dict of the form
+    ``{"<opt>": {"value": "<Label>", "selected": 0|1}, ...}``. The rule
+    is "well-formed for ownership" only when EXACTLY ONE option is
+    selected — the canonical value the rule actually matches.
+
+    Returns ``None`` in three cases (the caller fails closed):
+
+      * the input is not a multi-select dict,
+      * zero options are selected,
+      * two or more options are selected.
+
+    OPNsense can legitimately emit rules with 2+ selected options on
+    some models; classifying such a rule as the first selected option
+    would let install / enable / disable / uninstall mutate or delete
+    a rule that is broader than the script claims to own. Such rules
+    are treated as not-managed.
     """
-    _, data = _api_call(
-        "GET", NAT_API_SEARCH, primary=primary, fallback=fallback, key=key, secret=secret
-    )
-    if not isinstance(data, dict):
-        raise BypassError("OPNsense source_nat search response is not an object")
-    for field in ("current", "rowCount", "rows", "total"):
-        if field not in data:
-            raise BypassError(f"OPNsense source_nat search response is missing {field}")
-    for field in ("current", "rowCount", "total"):
-        value = data[field]
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            raise BypassError(f"OPNsense source_nat search response has invalid {field}")
-    rows_obj: Any = data["rows"]
-    if not isinstance(rows_obj, list):
-        raise BypassError("OPNsense source_nat search response is missing a rows list")
-    if not all(isinstance(row, dict) for row in rows_obj):
-        raise BypassError("OPNsense source_nat search response contains a non-object row")
-    rows: list[dict[str, Any]] = rows_obj
-    matching: list[dict[str, Any]] = []
-    for row in rows:
-        if row.get("description") != BYPASS_RULE_DESCR and row.get("descr") != BYPASS_RULE_DESCR:
+    if not isinstance(multi_select, dict):
+        return None
+    selected_key: str | None = None
+    for key, entry in multi_select.items():
+        if not isinstance(entry, dict):
             continue
-        _validate_managed_row(row)
-        matching.append(row)
-    return matching
+        if entry.get("selected") == 1:
+            if selected_key is not None:
+                # Two (or more) selected options: ambiguous; refuse to
+                # pick one on the script's behalf.
+                return None
+            selected_key = str(key)
+    return selected_key
 
 
-def _validate_managed_row(row: dict[str, Any]) -> None:
-    """Validate the identity, redirect, and state fields in a search row."""
-    for field in ("interface", "protocol", "uuid"):
-        value = row.get(field)
-        if not isinstance(value, str) or not value:
-            raise BypassError(f"OPNsense managed source_nat row is missing {field}")
-    _rule_ownership_label(row)
-    _validate_redirect_fields(row, "OPNsense managed source_nat row")
-    _normalize_enabled(row.get("enabled"))
+# ---------------------------------------------------------------------------
+# Rule identity and validation
+# ---------------------------------------------------------------------------
 
 
-def _rule_ownership_label(rule: dict[str, Any]) -> str:
-    """Return the exact managed label from either known API field spelling."""
-    labels = [rule[field] for field in ("description", "descr") if field in rule]
-    if not labels or any(label != BYPASS_RULE_DESCR for label in labels):
-        raise BypassError("OPNsense managed source_nat rule has an invalid ownership label")
-    return BYPASS_RULE_DESCR
+def _managed_key_of(rule: dict[str, Any]) -> tuple[str, str, str, int, str, int, str, str] | None:
+    """Compute the BYPASS_MANAGED_KEY tuple for a rule, or None if it doesn't match.
 
-
-def _normalize_dns_port(value: Any, field: str, context: str) -> str:
-    """Normalize a DNS port while rejecting every value other than 53."""
-    if isinstance(value, bool) or value not in (DNS_PORT, str(DNS_PORT)):
-        raise BypassError(f"{context} has invalid {field}")
-    return str(DNS_PORT)
-
-
-def _validate_match_fields(rule: dict[str, Any], context: str) -> None:
-    """Validate the source / destination / natreflection match fields.
-
-    OPNsense source_nat rules carry ``source`` (e.g. "any" or a configured
-    LAN-subnet alias name) and ``destination`` ("any"); those are
-    required and exact-match. ``natreflection`` is OPTIONAL: on
-    26.1.11_6 the live source_nat search row omits the field entirely
-    (verified 2026-08-24 via ``/api/firewall/source_nat/search_rule``),
-    so the script-installed "disable" value is silently dropped from
-    the read-back. Accept a missing ``natreflection`` as the live
-    shape; reject only when the field is present and not "disable",
-    which would mean the row has drifted (e.g. someone enabled
-    hairpin).
+    Returns the canonical key tuple (interface, protocol, target_ip,
+    target_port, destination_net, destination_port, source_net,
+    ipprotocol) if and only if EVERY field has the exact value
+    documented in BYPASS_MANAGED_KEY. Otherwise returns None — the rule
+    is not managed by this script.
     """
-    source = rule.get("source")
-    if not isinstance(source, str) or source not in VALID_SOURCES:
-        raise BypassError(f"{context} has invalid source")
-    destination = rule.get("destination")
-    if not isinstance(destination, str) or destination != EXPECTED_DESTINATION:
-        raise BypassError(f"{context} has invalid destination")
-    natreflection = rule.get("natreflection")
-    if natreflection is None:
-        # Live source_nat search row omits natreflection on 26.1.11_6.
-        return
-    if not isinstance(natreflection, str) or natreflection != EXPECTED_NATREFLECTION:
-        raise BypassError(f"{context} has invalid natreflection")
-
-
-def _validate_redirect_fields(rule: dict[str, Any], context: str) -> None:
-    """Require the redirect configuration that determines DNS bypass behavior.
-
-    This covers the match-side (``source`` / ``destination``;
-    ``natreflection`` is tolerated-as-missing — see
-    :func:`_validate_match_fields`) AND the redirect-side
-    (``ipprotocol`` / ``target`` / ``destination_port`` / ``target_port``)
-    fields. All values are exact-match strings as observed live on
-    OPNsense 26.1.11_6; anything else means the live row has drifted
-    away from what the script installed and we refuse to trust it.
-    """
-    if rule.get("ipprotocol") != "inet":
-        raise BypassError(f"{context} has invalid ipprotocol")
-    if rule.get("target") != BYPASS_TARGET_IP:
-        raise BypassError(f"{context} has an unexpected target")
-    _normalize_dns_port(rule.get("destination_port"), "destination_port", context)
-    _normalize_dns_port(rule.get("target_port"), "target_port", context)
-    _validate_match_fields(rule, context)
-
-
-def _validate_fetched_rule(rule: dict[str, Any], search_row: dict[str, Any], path: str) -> None:
-    """Validate a get_rule result against the exact search row being updated."""
-    # OPNsense 26.1 may omit uuid from the get_rule body. The search result
-    # remains the identity authority because it supplied the requested path.
-    if "uuid" in rule:
-        fetched_uuid = rule["uuid"]
-        if not isinstance(fetched_uuid, str) or not fetched_uuid:
-            raise BypassError(f"OPNsense API {path} returned an invalid rule UUID")
-        if fetched_uuid != search_row["uuid"]:
-            raise BypassError(f"OPNsense API {path} returned a rule for the wrong UUID")
-
-    for field in ("interface", "protocol"):
-        value = rule.get(field)
-        if not isinstance(value, str) or not value:
-            raise BypassError(f"OPNsense API {path} returned an invalid {field}")
-        if value != search_row[field]:
-            raise BypassError(f"OPNsense API {path} returned a rule for the wrong {field}")
-    if _rule_ownership_label(rule) != _rule_ownership_label(search_row):
-        raise BypassError(f"OPNsense API {path} returned a rule with the wrong ownership label")
-    if _normalize_enabled(rule.get("enabled")) != _normalize_enabled(search_row["enabled"]):
-        raise BypassError(f"OPNsense API {path} returned a rule with mismatched enabled state")
-
-    _validate_redirect_fields(rule, f"OPNsense API {path} rule")
-    for field in ("ipprotocol", "target"):
-        if rule[field] != search_row[field]:
-            raise BypassError(f"OPNsense API {path} returned a rule with mismatched {field}")
-    for field in ("destination_port", "target_port"):
-        if _normalize_dns_port(rule[field], field, f"OPNsense API {path} rule") != _normalize_dns_port(
-            search_row[field], field, "OPNsense search row"
-        ):
-            raise BypassError(f"OPNsense API {path} returned a rule with mismatched {field}")
-    # natreflection is treated as optional on 26.1.11_6 (see
-    # _validate_match_fields). A drift between the fetched rule and the
-    # search row (one has it, the other omits it) is still a mismatch:
-    # ``rule.get(field) != search_row.get(field)`` reports the
-    # presence/absence delta, so the row has drifted from its search
-    # identity and we refuse to update it.
-    for field in ("source", "destination", "natreflection"):
-        if rule.get(field) != search_row.get(field):
-            raise BypassError(f"OPNsense API {path} returned a rule with mismatched {field}")
+    interface = _selected_option(rule.get("interface"))
+    protocol = _selected_option(rule.get("protocol"))
+    if interface is None or protocol is None:
+        return None
+    if interface not in INTERFACE_ALIASES or protocol.lower() not in PROTOCOLS:
+        return None
+    target = rule.get("target")
+    target_port = rule.get("target_port")
+    destination_net = rule.get("destination_net")
+    destination_port = rule.get("destination_port")
+    source_net = rule.get("source_net")
+    ipprotocol = _selected_option(rule.get("ipprotocol"))
+    if ipprotocol is None:
+        return None
+    if not all(
+        isinstance(field, str)
+        for field in (target, destination_net, source_net)
+    ):
+        return None
+    if not all(
+        isinstance(field, (str, int)) and not isinstance(field, bool)
+        for field in (target_port, destination_port)
+    ):
+        return None
+    # Narrow to str | int for the int() conversion; isinstance above
+    # excludes bool (which is a subclass of int in Python). Catch the
+    # cases where the model carries a service-name string (e.g.
+    # ``"http"``) or any other non-numeric value that ``int()`` cannot
+    # parse — treat the rule as not-managed rather than letting a raw
+    # ValueError propagate out of status / install / enable / disable /
+    # uninstall. TypeError is caught alongside ValueError because
+    # ``int(None)`` and similar shape mismatches would otherwise surface
+    # the same way.
+    try:
+        tp: int = int(target_port)  # type: ignore[arg-type]
+        dp: int = int(destination_port)  # type: ignore[arg-type]
+    except (ValueError, TypeError):
+        return None
+    return (
+        interface,
+        protocol.lower(),
+        str(target),
+        tp,
+        str(destination_net),
+        dp,
+        str(source_net),
+        ipprotocol,
+    )
 
 
 def _normalize_enabled(value: Any) -> str:
-    """Normalize the documented OPNsense enabled representation."""
+    """Normalize the documented OPNsense enabled representation.
+
+    Accepts ``"0"``/``0`` and ``"1"``/``1``; rejects everything else
+    (including bool, because the live model always emits string
+    ``"0"``/``"1"`` and a real ``True``/``False`` would mean a
+    type-drift anomaly worth failing closed on).
+    """
     if isinstance(value, bool):
         raise BypassError("OPNsense managed source_nat row has invalid enabled state")
     if value in ("0", 0):
@@ -630,60 +649,157 @@ def _normalize_enabled(value: Any) -> str:
     raise BypassError("OPNsense managed source_nat row has invalid enabled state")
 
 
-def _rule_state(rows: list[dict[str, Any]]) -> str:
-    """Return absent, disabled, enabled, or mixed from authoritative rows."""
-    if not rows:
-        return "absent"
-    states = {_normalize_enabled(row.get("enabled")) for row in rows}
-    if states == {"0"}:
-        return "disabled"
-    if states == {"1"}:
-        return "enabled"
-    return "mixed"
+# ---------------------------------------------------------------------------
+# Authoritative read
+# ---------------------------------------------------------------------------
 
 
-def _expected_rule_keys() -> set[tuple[str, str]]:
-    return {
-        (interface, protocol)
-        for interface in INTERFACE_ALIASES
-        for protocol in PROTOCOLS
-    }
+def _read_model(
+    *, primary: str, fallback: str, key: str, secret: str
+) -> dict[str, Any]:
+    """Read the authoritative OPNsense source_nat model.
+
+    On 26.1.11_6 the model is a dict with shape
+    ``{"filter": {"general": ..., "rules": ..., "snatrules": {"rule": ...},
+    "npt": {"rule": ...}, "onetoone": {"rule": ...}}}``. The
+    source-NAT ruleset is at ``data["filter"]["snatrules"]["rule"]``
+    (empty list ``[]`` when no rules exist, dict keyed by UUID when
+    populated). The container is validated up front: anything other
+    than a dict or an empty list is treated as schema drift and the
+    function fails closed with a precise message. A non-empty list
+    shape is also rejected — there is no documented case where
+    OPNsense returns a list with entries under ``snatrules.rule`` and
+    silently synthesising UUIDs like ``list:0`` would let a malformed
+    read-back be treated as a managed row.
+    """
+    _, data = _api_call(
+        "GET", NAT_API_MODEL,
+        primary=primary, fallback=fallback, key=key, secret=secret,
+    )
+    if not isinstance(data, dict):
+        raise BypassError(f"OPNsense API {NAT_API_MODEL} did not return a JSON object")
+    if "filter" not in data or not isinstance(data["filter"], dict):
+        raise BypassError(f"OPNsense API {NAT_API_MODEL} response is missing 'filter'")
+    snat_container = data["filter"].get("snatrules")
+    if not isinstance(snat_container, dict) or "rule" not in snat_container:
+        raise BypassError(
+            f"OPNsense API {NAT_API_MODEL} response is missing "
+            "filter.snatrules.rule"
+        )
+    rules_container = snat_container["rule"]
+    if isinstance(rules_container, list):
+        if rules_container:
+            raise BypassError(
+                f"OPNsense API {NAT_API_MODEL} returned an unexpected rule "
+                f"container shape (list with {len(rules_container)} entries); "
+                "refusing to proceed; expected dict keyed by uuid or empty "
+                "list for filter.snatrules.rule"
+            )
+        return data
+    if isinstance(rules_container, dict):
+        return data
+    raise BypassError(
+        f"OPNsense API {NAT_API_MODEL} returned an unexpected "
+        "filter.snatrules.rule container type "
+        f"{type(rules_container).__name__}"
+    )
 
 
-def _require_complete_rule_set(
-    rows: list[dict[str, Any]], *, allow_empty: bool = True
+def _search_bypass_rules(
+    *, primary: str, fallback: str, key: str, secret: str
+) -> list[dict[str, Any]]:
+    """Return all source_nat rules owned by this script.
+
+    Walks the authoritative ``/api/firewall/source_nat/get`` model and
+    returns the subset of rules whose attribute tuple matches
+    ``BYPASS_MANAGED_KEY``. The descriptor (``descr``) is intentionally
+    NOT used as the ownership marker: OPNsense 26.1.11_6 silently
+    discards ``descr`` on ``add_rule`` and returns empty string on
+    read-back, so a descr-based check would either match nothing or
+    match every manual rule with a stray matching prefix.
+
+    Each returned entry is ``{"uuid": str, "rule": dict, "key": tuple}``
+    so the lifecycle actions can operate by UUID and the caller can
+    inspect the matched key without recomputing it.
+
+    Fail-closed on any unexpected model shape. The container
+    validation in ``_read_model`` has already guaranteed that the
+    rules container is either a dict (keyed by UUID) or an empty
+    list, so this function only needs to iterate the dict shape
+    and validate each entry.
+    """
+    model = _read_model(
+        primary=primary, fallback=fallback, key=key, secret=secret
+    )
+    rules_container = model["filter"]["snatrules"]["rule"]
+    if not rules_container:
+        # Empty list (the live empty-state shape): no rules installed.
+        return []
+    managed: list[dict[str, Any]] = []
+    for uuid, rule in rules_container.items():
+        if not isinstance(rule, dict):
+            raise BypassError(
+                f"OPNsense API {NAT_API_MODEL} returned a non-object "
+                f"source_nat rule for uuid {uuid!r}"
+            )
+        key_tuple = _managed_key_of(rule)
+        if key_tuple is None:
+            continue
+        if key_tuple not in BYPASS_MANAGED_KEY_SET:
+            # Rule is shape-compatible (correct interface/protocol/etc.)
+            # but not part of the bypass tuple — e.g. an admin-installed
+            # rule with a different target. Don't include it.
+            continue
+        # Validate enabled field type before accepting: a rule whose
+        # enabled is not "0"/"1"/0/1 means the schema has drifted and
+        # we refuse to trust it.
+        if "enabled" in rule:
+            _normalize_enabled(rule["enabled"])
+        managed.append({"uuid": uuid, "rule": rule, "key": key_tuple})
+    return managed
+
+
+# ---------------------------------------------------------------------------
+# Ruleset completeness
+# ---------------------------------------------------------------------------
+
+
+def _expected_managed_keys() -> set[tuple[str, str, str, int, str, int, str, str]]:
+    return set(BYPASS_MANAGED_KEY_SET)
+
+
+def _require_complete_managed_set(
+    entries: list[dict[str, Any]], *, allow_empty: bool
 ) -> None:
     """Reject partial, duplicate, or unexpected managed rule sets.
 
-    The ``allow_empty`` flag controls whether an empty ruleset is treated
-    as the natural "not installed" state or as a post-mutation read-back
-    anomaly:
+    The ``allow_empty`` flag controls whether an empty ruleset is
+    treated as the natural "not installed" state or as a post-mutation
+    read-back anomaly:
 
       * ``allow_empty=True`` (default, used by ``status_bypass`` and the
-        post-uninstall read-back) — empty is valid. The bypass may simply
-        not be installed yet.
+        post-uninstall read-back) — empty is valid. The bypass may
+        simply not be installed yet.
       * ``allow_empty=False`` (used by ``install_bypass``,
         ``enable_bypass``, and ``disable_bypass`` immediately after they
         issue a mutating POST) — empty is an actionable anomaly. If we
         just added or flipped six rules and the immediate read-back
         returns zero, the firewall table is in a state we did not
-        author, and reporting ``installed=N, total=0, state=absent`` would
-        silently lie to the operator. We raise the actionable
-        ``ruleset incomplete: have 0/6, run --install to repair`` message
-        instead.
+        author. Raise the actionable
+        ``ruleset incomplete: have 0/6, run --install to repair``
+        message instead.
 
     A partial (non-empty, non-full) set always raises the actionable
-    ``ruleset incomplete: have N/6, run --install to repair`` message so
-    operators see a precise remediation instead of a generic
-    ambiguous-set error. The full-6 + extras (duplicates) case raises
-    the ambiguous-set error because install cannot safely dedupe that.
+    message so operators see a precise remediation. A full-6 + extras
+    case raises the generic ambiguous-set error because
+    ``install_bypass`` cannot safely dedupe that.
     """
-    keys = [(row["interface"], row["protocol"]) for row in rows]
-    expected = _expected_rule_keys()
+    keys = [entry["key"] for entry in entries]
+    expected = _expected_managed_keys()
     seen = set(keys)
     if not seen:
         if allow_empty:
-            return  # absent — the natural "not installed" state
+            return
         raise BypassError(
             "ruleset incomplete: have 0/6, run --install to repair "
             "(post-mutation read-back returned no managed rows)"
@@ -695,7 +811,7 @@ def _require_complete_rule_set(
     missing = expected - seen
     extras = seen - expected
     if extras:
-        # Unexpected (interface, protocol) pairs — install cannot repair
+        # Unexpected (key-tuple) entries — install cannot repair
         # safely because it doesn't know whether the extras are
         # mis-tagged rows someone added manually. Bail with the generic
         # ambiguous-set message.
@@ -703,12 +819,29 @@ def _require_complete_rule_set(
     # Partial set of the expected six. Tell the operator exactly what's
     # missing and how to fix it.
     missing_list = ", ".join(
-        f"{iface}/{proto}" for iface, proto in sorted(missing)
+        f"{iface}/{proto}" for iface, proto, *_ in sorted(missing)
     )
     raise BypassError(
         f"ruleset incomplete: have {len(seen)}/6, run --install to repair "
         f"(missing: {missing_list})"
     )
+
+
+def _rule_state(entries: list[dict[str, Any]]) -> str:
+    """Return absent, disabled, enabled, or mixed from authoritative rows."""
+    if not entries:
+        return "absent"
+    states = {_normalize_enabled(entry["rule"].get("enabled")) for entry in entries}
+    if states == {"0"}:
+        return "disabled"
+    if states == {"1"}:
+        return "enabled"
+    return "mixed"
+
+
+# ---------------------------------------------------------------------------
+# Per-rule get / set helpers
+# ---------------------------------------------------------------------------
 
 
 def _unwrap_rule_response(data: Any, path: str) -> dict[str, Any]:
@@ -719,7 +852,15 @@ def _unwrap_rule_response(data: Any, path: str) -> dict[str, Any]:
 
 
 def _require_api_result(data: Any, expected: str, path: str) -> None:
-    """Require the documented result marker for a mutating API response."""
+    """Require the documented result marker for a mutating API response.
+
+    OPNsense 26.1.11_6 returns ``{"result": "saved"}`` for add_rule /
+    set_rule and ``{"result": "deleted"}`` for del_rule, with no
+    trailing whitespace. We compare against the literal value because
+    those endpoints have not been observed to emit a trailing-newline
+    shape; the trim is reserved for the apply endpoint, which does
+    emit ``"OK\\n\\n"`` (see ``_apply_nat``).
+    """
     if not isinstance(data, dict) or data.get("result") != expected:
         raise BypassError(f"OPNsense API {path} did not return result={expected!r}")
 
@@ -733,7 +874,8 @@ def _apply_nat(*, primary: str, fallback: str, key: str, secret: str) -> None:
     without weakening the fail-closed contract on any other payload.
     """
     _, data = _api_call(
-        "POST", NAT_API_APPLY, primary=primary, fallback=fallback, key=key, secret=secret
+        "POST", NAT_API_APPLY,
+        primary=primary, fallback=fallback, key=key, secret=secret,
     )
     if not isinstance(data, dict):
         raise BypassError(f"OPNsense API {NAT_API_APPLY} did not return a JSON object")
@@ -747,13 +889,32 @@ def _apply_nat(*, primary: str, fallback: str, key: str, secret: str) -> None:
 def _build_bypass_rule_payload(interface: str, protocol: str) -> dict[str, Any]:
     """Build the OPNsense NAT rule payload for one (interface, protocol).
 
-    OPNsense 26.1.11_6's source_nat model does not accept ``natreflection``
-    as a model column: ``add_rule`` silently accepts the field but it is
-    dropped from the search-row read-back. The script intentionally
-    omits it here so the post-apply read-back matches the live shape
-    (verified 2026-08-24). Hairpin / NAT-reflection is therefore not
-    configured for these rules; the validator accepts either a missing
-    or ``"disable"`` value when it is present in a future firmware.
+    Live-verified field choices for OPNsense 26.1.11_6:
+
+      * ``descr`` is silently discarded by ``add_rule`` and is not in
+        the read-back. Sending it would add noise to the wire payload
+        but not change behavior; we omit it to make the read-back
+        shape predictable.
+      * ``natreflection`` is silently discarded by ``add_rule`` and is
+        not in the read-back. Hairpin / NAT-reflection is therefore
+        not configured for these rules. We omit the field so the
+        post-apply read-back matches the live shape.
+      * ``associated-rule`` is a filter-rule linkage field that the
+        source_nat model does not use. Sending it is harmless but
+        pointless; we omit it.
+      * The source/destination fields use the bytestring aliases
+        ("any") that the documented add payload schema accepts. The
+        model endpoint reads them back as ``source_net`` /
+        ``destination_net``; the controller normalizes the payload
+        field name to the model field name internally. This is
+        preserved from the merged PR #250 implementation and is the
+        only live-confirmed way to add a rule today.
+
+    The OPNsense add payload schema is the documented one. The
+    ``protocol`` and ``ipprotocol`` fields accept the bytestring
+    ("udp", "inet") and OPNsense normalizes them to the multi-select
+    dicts on save. Sending multi-select dicts in the add payload is
+    NOT supported.
     """
     return {
         "interface": interface,
@@ -765,8 +926,6 @@ def _build_bypass_rule_payload(interface: str, protocol: str) -> dict[str, Any]:
         "target": BYPASS_TARGET_IP,
         "target_port": str(DNS_PORT),
         "nat_port": "",
-        "descr": BYPASS_RULE_DESCR,
-        "associated-rule": [],
         "enabled": "0",  # install disabled; --enable flips to "1"
     }
 
@@ -786,40 +945,59 @@ def install_bypass(
     existing = _search_bypass_rules(
         primary=primary, fallback=fallback, key=key, secret=secret
     )
-    expected_keys = _expected_rule_keys()
-    existing_keys = {(r["interface"], r["protocol"]) for r in existing}
-    if len(existing_keys) != len(existing) or not existing_keys.issubset(expected_keys):
+    existing_keys = {entry["key"] for entry in existing}
+    expected_keys = _expected_managed_keys()
+
+    # Duplicate detection: if the model has more entries than unique
+    # managed keys, two rules share the same BYPASS_MANAGED_KEY signature
+    # (e.g. the prior install ghost-rule incident). We cannot safely
+    # dedupe that from the script side — refuse to add another rule
+    # until the operator cleans up the duplicates through the OPNsense UI.
+    if len(existing) != len(existing_keys):
+        raise BypassError(
+            "OPNsense managed source_nat ruleset is incomplete or ambiguous "
+            f"({len(existing)} rules map to {len(existing_keys)} unique BYPASS keys; "
+            "remove duplicates through the OPNsense UI before re-installing)"
+        )
+
+    # Pre-existing partial set: a non-empty subset of the expected six.
+    # Validate that it's a proper subset (no extras), and if it's
+    # exactly the full set, return "already installed" instead of
+    # re-adding rules.
+    if not existing_keys.issubset(expected_keys):
         raise BypassError("OPNsense managed source_nat ruleset is incomplete or ambiguous")
-    if len(existing) == len(expected_keys) and existing_keys == expected_keys:
+    if existing_keys == expected_keys:
         return (
-            f"installed=0, already_present={len(existing)}, state={_rule_state(existing)} "
+            f"installed=0, already_present={len(existing)}, "
+            f"state={_rule_state(existing)} "
             f"(use --enable to activate)"
         )
 
-    # If we have *some* existing rules but not all 6, complete the set. This
-    # shouldn't normally happen but handles partial installs gracefully.
+    # If we have *some* existing rules but not all 6, complete the set.
+    # This shouldn't normally happen but handles partial installs
+    # gracefully.
     added = 0
-    for iface in INTERFACE_ALIASES:
-        for proto in PROTOCOLS:
-            if (iface, proto) in existing_keys:
-                continue
-            _, data = _api_call(
-                "POST",
-                NAT_API_ADD,
-                body={"rule": _build_bypass_rule_payload(iface, proto)},
-                primary=primary,
-                fallback=fallback,
-                key=key,
-                secret=secret,
-            )
-            _require_api_result(data, "saved", NAT_API_ADD)
-            added += 1
+    for managed_key in BYPASS_MANAGED_KEY:
+        if managed_key in existing_keys:
+            continue
+        interface, protocol, *_ = managed_key
+        _, data = _api_call(
+            "POST",
+            NAT_API_ADD,
+            body={"rule": _build_bypass_rule_payload(interface, protocol)},
+            primary=primary,
+            fallback=fallback,
+            key=key,
+            secret=secret,
+        )
+        _require_api_result(data, "saved", NAT_API_ADD)
+        added += 1
 
     _apply_nat(primary=primary, fallback=fallback, key=key, secret=secret)
     final = _search_bypass_rules(
         primary=primary, fallback=fallback, key=key, secret=secret
     )
-    _require_complete_rule_set(final, allow_empty=False)
+    _require_complete_managed_set(final, allow_empty=False)
     return (
         f"installed={added}, total={len(final)}, state={_rule_state(final)} "
         f"(use --enable to activate)"
@@ -831,26 +1009,27 @@ def uninstall_bypass(
 ) -> str:
     """Remove all bypass rules. Idempotent.
 
-    Only removes rules tagged with BYPASS_RULE_DESCR — never touches other
-    firewall rules.
+    Only removes rules whose attribute tuple matches BYPASS_MANAGED_KEY —
+    never touches other firewall rules.
     """
     existing = _search_bypass_rules(
         primary=primary, fallback=fallback, key=key, secret=secret
     )
     removed = 0
-    for row in existing:
-        uuid = str(row.get("uuid", ""))
-        if uuid:
-            _, data = _api_call(
-                "POST",
-                f"{NAT_API_DEL}/{uuid}",
-                primary=primary,
-                fallback=fallback,
-                key=key,
-                secret=secret,
-            )
-            _require_api_result(data, "deleted", NAT_API_DEL)
-            removed += 1
+    for entry in existing:
+        uuid = entry["uuid"]
+        if not uuid:
+            continue
+        _, data = _api_call(
+            "POST",
+            f"{NAT_API_DEL}/{uuid}",
+            primary=primary,
+            fallback=fallback,
+            key=key,
+            secret=secret,
+        )
+        _require_api_result(data, "deleted", NAT_API_DEL)
+        removed += 1
     if removed:
         _apply_nat(primary=primary, fallback=fallback, key=key, secret=secret)
         post_uninstall = _search_bypass_rules(
@@ -860,34 +1039,45 @@ def uninstall_bypass(
         # We additionally assert the truthy "no rules remain" invariant
         # explicitly so the failure mode reads "rules remained" rather
         # than the generic "ruleset incomplete" message.
-        _require_complete_rule_set(post_uninstall, allow_empty=True)
+        _require_complete_managed_set(post_uninstall, allow_empty=True)
         if post_uninstall:
             raise BypassError("OPNsense managed source_nat rules remained after uninstall")
     return f"uninstalled={removed}"
 
 
-def enable_bypass(
-    *, primary: str, fallback: str, key: str, secret: str
-) -> str:
-    """Activate the bypass rules. Idempotent.
+def _flip_managed_enabled(
+    *,
+    primary: str,
+    fallback: str,
+    key: str,
+    secret: str,
+    target_enabled: str,
+) -> tuple[int, int]:
+    """Flip every managed rule's enabled field to target_enabled.
 
-    Installs first if missing, then flips every bypass rule to enabled=1 and
-    ensures the target IP is correct. Performs a post-enable TCP/53 probe to
-    confirm the resolver is reachable.
+    Returns (updated, already_in_target_state). Fetches the current
+    rule body via get_rule, mutates only the enabled field, and POSTs
+    the full body back via set_rule. This is necessary because
+    OPNsense's set_rule is a full-replacement endpoint, not a partial
+    patch, and the multi-select fields the model endpoint returns must
+    be echoed back verbatim or the controller will reject the set.
 
-    Returns a summary string. Exit code 4 if the post-enable verify fails.
+    Drift detection: if the live rule's target/target_port has moved
+    away from BYPASS_MANAGED_KEY (someone edited the rule in the
+    OPNsense UI), fail closed so a stale read-back cannot enable a
+    rule pointing at the wrong target.
     """
-    install_bypass(primary=primary, fallback=fallback, key=key, secret=secret)
-
     existing = _search_bypass_rules(
         primary=primary, fallback=fallback, key=key, secret=secret
     )
+    _require_complete_managed_set(existing, allow_empty=False)
     updated = 0
-    for row in existing:
-        uuid = str(row.get("uuid", ""))
+    already_in_state = 0
+    for entry in existing:
+        uuid = entry["uuid"]
         if not uuid:
             continue
-        _, rule_data = _api_call(
+        _, rule_data_raw = _api_call(
             "GET",
             f"{NAT_API_GET}/{uuid}",
             primary=primary,
@@ -895,15 +1085,26 @@ def enable_bypass(
             key=key,
             secret=secret,
         )
-        rule_data = _unwrap_rule_response(rule_data, f"{NAT_API_GET}/{uuid}")
-        _validate_fetched_rule(rule_data, row, f"{NAT_API_GET}/{uuid}")
-        rule_data["target"] = BYPASS_TARGET_IP
-        rule_data["target_port"] = str(DNS_PORT)
-        rule_data["enabled"] = "1"
+        rule_body = _unwrap_rule_response(rule_data_raw, f"{NAT_API_GET}/{uuid}")
+        # Drift detection: the freshly-fetched rule body must still
+        # match the BYPASS_MANAGED_KEY signature, with the same UUID
+        # we asked for. If it has moved, refuse to set.
+        live_key = _managed_key_of(rule_body)
+        if live_key != entry["key"]:
+            raise BypassError(
+                f"OPNsense API {NAT_API_GET}/{uuid} returned a rule whose "
+                "attribute tuple no longer matches BYPASS_MANAGED_KEY "
+                f"(expected {entry['key']!r}, got {live_key!r}); refusing "
+                "to set enabled"
+            )
+        if _normalize_enabled(rule_body.get("enabled")) == target_enabled:
+            already_in_state += 1
+            continue
+        rule_body["enabled"] = target_enabled
         _, set_data = _api_call(
             "POST",
             f"{NAT_API_SET}/{uuid}",
-            body={"rule": rule_data},
+            body={"rule": rule_body},
             primary=primary,
             fallback=fallback,
             key=key,
@@ -911,14 +1112,48 @@ def enable_bypass(
         )
         _require_api_result(set_data, "saved", NAT_API_SET)
         updated += 1
-    _apply_nat(primary=primary, fallback=fallback, key=key, secret=secret)
+    return updated, already_in_state
+
+
+def enable_bypass(
+    *, primary: str, fallback: str, key: str, secret: str
+) -> str:
+    """Activate the bypass rules. Idempotent.
+
+    Installs first if missing, then flips every bypass rule to
+    enabled=1 and ensures the target IP is correct. Performs a
+    post-enable TCP/53 probe to confirm the resolver is reachable.
+
+    Returns a summary string. Exit code 4 if the post-enable verify fails.
+    """
+    install_bypass(primary=primary, fallback=fallback, key=key, secret=secret)
+    updated, already_enabled = _flip_managed_enabled(
+        primary=primary, fallback=fallback, key=key, secret=secret,
+        target_enabled="1",
+    )
+    if updated:
+        _apply_nat(primary=primary, fallback=fallback, key=key, secret=secret)
     final = _search_bypass_rules(
         primary=primary, fallback=fallback, key=key, secret=secret
     )
-    _require_complete_rule_set(final, allow_empty=False)
+    _require_complete_managed_set(final, allow_empty=False)
     if _rule_state(final) != "enabled":
         raise BypassError("OPNsense managed source_nat rules were not fully enabled")
-    return f"enabled={updated}, target={BYPASS_TARGET_IP}:{DNS_PORT}"
+    # Drift check on the post-enable read-back: every rule's target
+    # and target_port must still be BYPASS_MANAGED_KEY's values, even
+    # though the bytestring extraction handles the multi-select. This
+    # catches the case where set_rule was accepted by the controller
+    # but the model returned a stale row.
+    for entry in final:
+        if entry["key"] not in BYPASS_MANAGED_KEY_SET:
+            raise BypassError(
+                "OPNsense managed source_nat ruleset contained an unexpected "
+                "managed key on post-enable read-back"
+            )
+    return (
+        f"enabled={updated}, already_enabled={already_enabled}, "
+        f"target={BYPASS_TARGET_IP}:{DNS_PORT}"
+    )
 
 
 def disable_bypass(
@@ -932,47 +1167,16 @@ def disable_bypass(
     the bypass partially active. Fails closed with the actionable
     "ruleset incomplete: have N/6, run --install to repair" message.
     """
-    existing = _search_bypass_rules(
-        primary=primary, fallback=fallback, key=key, secret=secret
+    updated, already_disabled = _flip_managed_enabled(
+        primary=primary, fallback=fallback, key=key, secret=secret,
+        target_enabled="0",
     )
-    _require_complete_rule_set(existing)
-    updated = 0
-    already_disabled = 0
-    for row in existing:
-        uuid = str(row.get("uuid", ""))
-        if not uuid:
-            continue
-        _, rule_data = _api_call(
-            "GET",
-            f"{NAT_API_GET}/{uuid}",
-            primary=primary,
-            fallback=fallback,
-            key=key,
-            secret=secret,
-        )
-        rule_data = _unwrap_rule_response(rule_data, f"{NAT_API_GET}/{uuid}")
-        _validate_fetched_rule(rule_data, row, f"{NAT_API_GET}/{uuid}")
-        if _normalize_enabled(rule_data.get("enabled")) == "0":
-            already_disabled += 1
-            continue
-        rule_data["enabled"] = "0"
-        _, set_data = _api_call(
-            "POST",
-            f"{NAT_API_SET}/{uuid}",
-            body={"rule": rule_data},
-            primary=primary,
-            fallback=fallback,
-            key=key,
-            secret=secret,
-        )
-        _require_api_result(set_data, "saved", NAT_API_SET)
-        updated += 1
     if updated:
         _apply_nat(primary=primary, fallback=fallback, key=key, secret=secret)
         final = _search_bypass_rules(
             primary=primary, fallback=fallback, key=key, secret=secret
         )
-        _require_complete_rule_set(final, allow_empty=False)
+        _require_complete_managed_set(final, allow_empty=False)
         if _rule_state(final) != "disabled":
             raise BypassError("OPNsense managed source_nat rules were not fully disabled")
     return f"disabled={updated}, already_disabled={already_disabled}"
@@ -992,8 +1196,10 @@ def status_bypass(
     existing = _search_bypass_rules(
         primary=primary, fallback=fallback, key=key, secret=secret
     )
-    _require_complete_rule_set(existing)
-    enabled_count = sum(1 for r in existing if _normalize_enabled(r.get("enabled")) == "1")
+    _require_complete_managed_set(existing, allow_empty=True)
+    enabled_count = sum(
+        1 for e in existing if _normalize_enabled(e["rule"].get("enabled")) == "1"
+    )
     disabled_count = len(existing) - enabled_count
     return {
         "installed": len(existing) > 0,

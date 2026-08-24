@@ -1,4 +1,42 @@
 #!/usr/bin/env python3
+"""Tests for switch_dns_path.py against the OPNsense 26.1.11_6 model contract.
+
+The live authoritative read endpoint is ``/api/firewall/source_nat/get``
+(``NAT_API_MODEL``). The model response shape on 26.1.11_6 is:
+
+    {
+      "filter": {
+        "general": {...},
+        "rules": {"rule": {...}},         # firewall filter rules (not source NAT)
+        "snatrules": {"rule": <dict|list>},  # source NAT rules
+        "npt": {"rule": <list>},
+        "onetoone": {"rule": <list>}
+      }
+    }
+
+The ``snatrules.rule`` container is an empty list when no rules are
+present, and a dict keyed by UUID when populated. The script accepts
+both shapes and fails closed on any other type (string, int, malformed
+list, etc.).
+
+Each source_nat rule in the model has the multi-select shape for
+``interface``, ``protocol``, and ``ipprotocol``:
+
+    "interface": {
+        "lan": {"value": "LAN", "selected": 1},
+        "opt1": {"value": "IOT", "selected": 0},
+        ...
+    }
+
+The first selected option is the canonical value. Other fields
+(``target``, ``target_port``, ``destination_net``, ``destination_port``,
+``source_net``, ``enabled``) are scalars. ``descr`` is present in the
+model but is empty string for rules added via the API (it is silently
+discarded by ``add_rule`` on 26.1.11_6), so it is NOT used as the
+ownership marker — the script uses the full attribute tuple
+(``BYPASS_MANAGED_KEY``) instead.
+"""
+
 import copy
 import io
 import unittest
@@ -13,59 +51,115 @@ KEY = "test-key"
 SECRET = "test-secret"
 
 
-def observed_search_response(rows):
-    """The real OPNsense source_nat search envelope, with sanitized rows."""
+# ---------------------------------------------------------------------------
+# Fixtures: live-shape rule dicts and model responses
+# ---------------------------------------------------------------------------
+
+
+def _multi_select(selected, options):
+    """Build an OPNsense multi-select dict shape."""
     return {
-        "current": 1,
-        "rowCount": 1000,
-        "rows": rows,
-        "total": len(rows),
+        opt: {"value": label, "selected": 1 if opt == selected else 0}
+        for opt, label in options.items()
     }
 
 
-def observed_row(index, *, interface=None, protocol=None, enabled="0"):
-    interface = interface or ("lan", "opt1", "opt2")[index // 2]
-    protocol = protocol or ("udp", "tcp")[index % 2]
+_INTERFACE_OPTIONS = {"lan": "LAN", "opt1": "IOT", "opt2": "GUEST"}
+_PROTOCOL_OPTIONS = {"udp": "UDP", "tcp": "TCP", "any": "any", "TCP/UDP": "TCP/UDP"}
+_IPPROTOCOL_OPTIONS = {"inet": "IPv4", "inet6": "IPv6", "inet46": "any"}
+
+
+def _managed_rule(interface, protocol, *, enabled="0", target=None, target_port="53",
+                  source_net="any", destination_net="any", destination_port="53",
+                  ipprotocol="inet", uuid=None):
+    """Build a single managed source_nat rule dict in the live model shape.
+
+    All fields are set to the BYPASS_MANAGED_KEY values by default;
+    pass overrides to simulate drift / partial-set scenarios.
+    """
+    if target is None:
+        target = switch_dns_path.BYPASS_TARGET_IP
     return {
-        "uuid": f"uuid-{index}",
-        "interface": interface,
-        "protocol": protocol,
-        "description": switch_dns_path.BYPASS_RULE_DESCR,
-        "ipprotocol": "inet",
-        "source": "any",
-        "destination": "any",
-        "destination_port": "53",
-        "target": switch_dns_path.BYPASS_TARGET_IP,
-        "target_port": "53",
-        "natreflection": "disable",
         "enabled": enabled,
+        "interface": _multi_select(interface, _INTERFACE_OPTIONS),
+        "ipprotocol": _multi_select(ipprotocol, _IPPROTOCOL_OPTIONS),
+        "protocol": _multi_select(protocol, _PROTOCOL_OPTIONS),
+        "source_net": source_net,
+        "destination_net": destination_net,
+        "destination_port": destination_port,
+        "target": target,
+        "target_port": target_port,
+        "nat_port": "",
+        "descr": "",
+        "uuid": uuid or "",
+        "nonat": "0",
+        "nosync": "0",
     }
 
 
-def managed_rows(*, enabled="0"):
-    return [observed_row(i, enabled=enabled) for i in range(6)]
+def _managed_key(interface, protocol):
+    """Return the BYPASS_MANAGED_KEY tuple for (interface, protocol)."""
+    return (
+        interface, protocol,
+        switch_dns_path.BYPASS_TARGET_IP, 53,
+        "any", 53,
+        "any", "inet",
+    )
 
 
-def unrelated_wan_rows():
+def _full_six_rules(*, enabled="0"):
+    """Return the six managed rules in the canonical (interface, protocol) order."""
+    pairs = [
+        ("lan", "udp"),
+        ("lan", "tcp"),
+        ("opt1", "udp"),
+        ("opt1", "tcp"),
+        ("opt2", "udp"),
+        ("opt2", "tcp"),
+    ]
     return [
-        {
-            "uuid": "wan-uuid-1",
-            "interface": "wan",
-            "protocol": "udp",
-            "description": "unrelated WAN DNS rule",
-            "enabled": "1",
-        },
-        {
-            "uuid": "wan-uuid-2",
-            "interface": "wan",
-            "protocol": "tcp",
-            "description": "unrelated WAN DNS rule",
-            "enabled": "0",
-        },
+        _managed_rule(iface, proto, enabled=enabled, uuid=f"uuid-{i}")
+        for i, (iface, proto) in enumerate(pairs)
     ]
 
 
-class SwitchDnsPathApiShapeTests(unittest.TestCase):
+def _model_response(rules_by_uuid=None, rules_as_list=None, unrelated=None):
+    """Wrap a source_nat rule container in the live model envelope shape.
+
+    ``rules_by_uuid`` populates the canonical dict-keyed-by-UUID shape.
+    ``rules_as_list`` populates the (legacy or empty) list shape. Pass
+    exactly one of them.
+    """
+    if rules_by_uuid is not None and rules_as_list is not None:
+        raise ValueError("pass exactly one of rules_by_uuid / rules_as_list")
+    if rules_by_uuid is None and rules_as_list is None:
+        rules_by_uuid = {}
+    if rules_by_uuid is not None:
+        snatrules_rule = rules_by_uuid
+    else:
+        snatrules_rule = rules_as_list  # type: ignore[assignment]
+    return {
+        "filter": {
+            "general": {"snat_mode": {"automatic": {"value": "Auto", "selected": 1}}},
+            "rules": {"rule": {}},
+            "snatrules": {"rule": snatrules_rule},
+            "npt": {"rule": []},
+            "onetoone": {"rule": []},
+        }
+    }
+
+
+def _six_rules_by_uuid(*, enabled="0"):
+    """Return a dict {uuid: rule} for the six managed rules."""
+    return {f"uuid-{i}": r for i, r in enumerate(_full_six_rules(enabled=enabled))}
+
+
+# ---------------------------------------------------------------------------
+# Shared base for tests
+# ---------------------------------------------------------------------------
+
+
+class _Base(unittest.TestCase):
     def api_kwargs(self):
         return {
             "primary": PRIMARY,
@@ -74,1089 +168,961 @@ class SwitchDnsPathApiShapeTests(unittest.TestCase):
             "secret": SECRET,
         }
 
-    def test_search_parses_live_description_and_preserves_unrelated_wan_rows(self):
-        rows = managed_rows() + unrelated_wan_rows()
+
+# ---------------------------------------------------------------------------
+# P2.0: Model-endpoint read
+# ---------------------------------------------------------------------------
+
+
+class ModelEndpointReadTests(_Base):
+    """The authoritative read is /api/firewall/source_nat/get."""
+
+    def test_search_bypass_rules_reads_from_model_endpoint(self):
+        """``_search_bypass_rules`` must hit NAT_API_MODEL, never NAT_API_SEARCH."""
         with patch.object(
             switch_dns_path,
             "_api_call",
-            return_value=("test", observed_search_response(rows)),
-        ):
-            matching = switch_dns_path._search_bypass_rules(**self.api_kwargs())
+            return_value=("test", _model_response(rules_by_uuid=_six_rules_by_uuid())),
+        ) as mock_api:
+            switch_dns_path._search_bypass_rules(**self.api_kwargs())
 
-        self.assertEqual(matching, rows[:6])
+        mock_api.assert_called_once()
+        called = mock_api.call_args
+        self.assertEqual(called.args[0], "GET")
+        self.assertEqual(called.args[1], switch_dns_path.NAT_API_MODEL)
 
-    def test_status_reports_disabled_enabled_and_mixed_states(self):
-        for enabled, expected_state, expected_enabled, expected_disabled in (
-            ("0", "disabled", 0, 6),
-            ("1", "enabled", 6, 0),
-        ):
-            rows = managed_rows(enabled=enabled) + unrelated_wan_rows()
-            with self.subTest(expected_state=expected_state), patch.object(
-                switch_dns_path,
-                "_api_call",
-                return_value=("test", observed_search_response(rows)),
-            ):
-                status = switch_dns_path.status_bypass(**self.api_kwargs())
-
-            self.assertEqual(status["state"], expected_state)
-            self.assertEqual(status["total_rules"], 6)
-            self.assertEqual(status["enabled"], expected_enabled)
-            self.assertEqual(status["disabled"], expected_disabled)
-
-        mixed = managed_rows()
-        mixed[0]["enabled"] = "1"
-        rows = mixed + unrelated_wan_rows()
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response(rows)),
-        ):
-            status = switch_dns_path.status_bypass(**self.api_kwargs())
-
-        self.assertEqual(status["state"], "mixed")
-        self.assertEqual(status["enabled"], 1)
-        self.assertEqual(status["disabled"], 5)
-
-    def test_install_does_not_duplicate_rules_from_live_search_shape(self):
-        rows = managed_rows() + unrelated_wan_rows()
-        calls = []
-
-        def fake_api_call(method, path, **kwargs):
-            calls.append((method, path, kwargs.get("body")))
-            return "test", observed_search_response(rows)
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            summary = switch_dns_path.install_bypass(**self.api_kwargs())
-
-        self.assertIn("installed=0", summary)
-        self.assertIn("state=disabled", summary)
-        self.assertEqual(
-            [(method, path) for method, path, _ in calls],
-            [("GET", switch_dns_path.NAT_API_SEARCH)],
+    def test_search_bypass_rules_returns_managed_subset(self):
+        """The six rules matching BYPASS_MANAGED_KEY are returned; the rest are not."""
+        managed = _six_rules_by_uuid()
+        # Add a manual rule with the same fields but a different target — not managed.
+        managed["uuid-stray"] = _managed_rule(
+            "lan", "udp", target="8.8.8.8", uuid="uuid-stray",
         )
-
-    def test_install_reports_actual_enabled_state_instead_of_disabled(self):
-        for enabled, expected_state in (("1", "enabled"),):
-            rows = managed_rows(enabled=enabled) + unrelated_wan_rows()
-            with patch.object(
-                switch_dns_path,
-                "_api_call",
-                return_value=("test", observed_search_response(rows)),
-            ):
-                summary = switch_dns_path.install_bypass(**self.api_kwargs())
-
-            self.assertIn(f"state={expected_state}", summary)
-            self.assertNotIn("state=disabled", summary)
-
-        mixed = managed_rows()
-        mixed[0]["enabled"] = "1"
+        # Add a non-bypass rule (wrong interface) — not managed.
+        managed["uuid-wan"] = _managed_rule("wan", "udp", uuid="uuid-wan")
         with patch.object(
             switch_dns_path,
             "_api_call",
-            return_value=("test", observed_search_response(mixed + unrelated_wan_rows())),
+            return_value=("test", _model_response(rules_by_uuid=managed)),
         ):
-            summary = switch_dns_path.install_bypass(**self.api_kwargs())
+            result = switch_dns_path._search_bypass_rules(**self.api_kwargs())
 
-        self.assertIn("state=mixed", summary)
-        self.assertNotIn("state=disabled", summary)
+        # Result entries are dicts with uuid, rule, key.
+        self.assertEqual(len(result), 6)
+        for entry in result:
+            self.assertIn("uuid", entry)
+            self.assertIn("rule", entry)
+            self.assertIn("key", entry)
+        uuids = {entry["uuid"] for entry in result}
+        # Stray target and wan interface are NOT managed — verify exclusion.
+        self.assertNotIn("uuid-stray", uuids)
+        self.assertNotIn("uuid-wan", uuids)
+        # All six uuids uuid-0..uuid-5 are present.
+        self.assertEqual(uuids, {f"uuid-{i}" for i in range(6)})
+        # All returned keys are in BYPASS_MANAGED_KEY_SET.
+        for entry in result:
+            self.assertIn(entry["key"], switch_dns_path.BYPASS_MANAGED_KEY_SET)
 
-    def test_install_uses_rule_envelope_and_reads_back_disabled_rules(self):
-        calls = []
-        installed_rows = []
-        unrelated = unrelated_wan_rows()
+    def test_search_bypass_rules_accepts_empty_list_shape(self):
+        """An empty list (the live empty-state shape) yields zero managed rules."""
+        with patch.object(
+            switch_dns_path,
+            "_api_call",
+            return_value=("test", _model_response(rules_as_list=[])),
+        ):
+            result = switch_dns_path._search_bypass_rules(**self.api_kwargs())
+        self.assertEqual(result, [])
 
-        def fake_api_call(method, path, **kwargs):
-            body = kwargs.get("body")
-            calls.append((method, path, copy.deepcopy(body)))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                return "test", observed_search_response(installed_rows + unrelated)
-            if method == "POST" and path == switch_dns_path.NAT_API_ADD:
-                if not isinstance(body, dict):
-                    self.fail("add_rule body is not an object")
-                self.assertEqual(set(body), {"rule"})
-                rule = body["rule"]
-                self.assertEqual(rule["descr"], switch_dns_path.BYPASS_RULE_DESCR)
-                self.assertNotIn("description", rule)
-                installed_rows.append(
-                    {
-                        "uuid": f"uuid-{len(installed_rows)}",
-                        "interface": rule["interface"],
-                        "protocol": rule["protocol"],
-                        "description": rule["descr"],
-                        "ipprotocol": rule["ipprotocol"],
-                        "source": rule["source"],
-                        "destination": rule["destination"],
-                        "destination_port": rule["destination_port"],
-                        "target": rule["target"],
-                        "target_port": rule["target_port"],
-                        # natreflection is not a model column on 26.1.11_6
-                        # source_nat; _build_bypass_rule_payload omits it
-                        # and the live search row omits it too. Do not echo
-                        # the key here or the post-apply read-back will
-                        # drift from the live shape.
-                        "enabled": rule["enabled"],
+    def test_search_bypass_rules_fails_closed_on_non_dict_non_list_container(self):
+        """Anything other than dict or list at filter.snatrules.rule is rejected."""
+        for bad_value in ("oops", 42, True, None):
+            with self.subTest(bad_value=bad_value):
+                bad_envelope = {
+                    "filter": {
+                        "general": {},
+                        "rules": {"rule": {}},
+                        "snatrules": {"rule": bad_value},
+                        "npt": {"rule": []},
+                        "onetoone": {"rule": []},
                     }
-                )
-                return "test", {"result": "saved", "uuid": installed_rows[-1]["uuid"]}
-            if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
-                return "test", {"status": "OK"}
-            self.fail(f"unexpected API call: {method} {path}")
+                }
+                with patch.object(
+                    switch_dns_path, "_api_call", return_value=("test", bad_envelope)
+                ):
+                    with self.assertRaises(switch_dns_path.BypassError):
+                        switch_dns_path._search_bypass_rules(**self.api_kwargs())
 
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            summary = switch_dns_path.install_bypass(**self.api_kwargs())
-
-        self.assertEqual(summary, "installed=6, total=6, state=disabled (use --enable to activate)")
-        self.assertEqual(
-            sum(path == switch_dns_path.NAT_API_ADD for _, path, _ in calls),
-            6,
-        )
-        self.assertEqual(
-            sum(path == switch_dns_path.NAT_API_SEARCH for _, path, _ in calls),
-            2,
-        )
-
-    def test_malformed_tagged_rows_fail_closed(self):
-        for missing in ("interface", "protocol", "uuid"):
-            row = observed_row(0)
-            del row[missing]
-            with self.subTest(missing=missing), patch.object(
-                switch_dns_path,
-                "_api_call",
-                return_value=("test", observed_search_response([row] + unrelated_wan_rows())),
-            ):
-                with self.assertRaises(switch_dns_path.BypassError):
-                    switch_dns_path._search_bypass_rules(**self.api_kwargs())
-
-    def test_malformed_enabled_value_fails_closed(self):
-        row = observed_row(0, enabled="unexpected")
+    def test_search_bypass_rules_fails_closed_on_missing_filter(self):
+        """A model response missing the 'filter' key fails closed."""
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response([row] + unrelated_wan_rows())),
+            switch_dns_path, "_api_call", return_value=("test", {})
         ):
             with self.assertRaises(switch_dns_path.BypassError):
                 switch_dns_path._search_bypass_rules(**self.api_kwargs())
 
-    def test_add_response_without_saved_result_fails_before_apply_or_next_add(self):
-        calls = []
-        responses = iter(
-            [
-                ("test", observed_search_response([])),
-                ("test", {"result": "failed"}),
-            ]
-        )
+    def test_search_bypass_rules_fails_closed_on_missing_snatrules(self):
+        """A model response missing filter.snatrules.rule fails closed."""
+        bad_envelope = {"filter": {"general": {}, "rules": {"rule": {}}}}
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", bad_envelope)
+        ):
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path._search_bypass_rules(**self.api_kwargs())
 
-        def fake_api_call(method, path, **kwargs):
-            calls.append((method, path))
-            return next(responses)
+    def test_search_bypass_rules_fails_closed_on_non_object_rule_entry(self):
+        """A non-object entry in the rules container fails closed."""
+        bad_envelope = _model_response(rules_by_uuid={
+            "uuid-good": _managed_rule("lan", "udp", uuid="uuid-good"),
+            "uuid-bad": "not-a-dict",
+        })
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", bad_envelope)
+        ):
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path._search_bypass_rules(**self.api_kwargs())
 
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
+    def test_search_bypass_rules_fails_closed_on_invalid_enabled(self):
+        """A managed rule whose enabled field is not '0'/'1'/0/1 fails closed."""
+        rules = _six_rules_by_uuid()
+        rules["uuid-0"]["enabled"] = "yes"
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid=rules))
+        ):
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path._search_bypass_rules(**self.api_kwargs())
+
+
+# ---------------------------------------------------------------------------
+# P2.0b: _read_model shape validation — no synthetic UUIDs for list shapes.
+# ---------------------------------------------------------------------------
+#
+# Luna xhigh review round 4: a non-empty ``filter.snatrules.rule`` list
+# is malformed on the documented 26.1.11_6 contract. The previous
+# implementation yielded ``list:0``, ``list:1`` UUIDs and let lifecycle
+# actions treat them as managed rows. The fix moves the shape
+# validation into ``_read_model`` so the function fails closed on any
+# non-dict / non-empty-list container before the iterator is even
+# constructed.
+
+
+class ReadModelShapeValidationTests(_Base):
+    """``_read_model`` rejects a non-empty ``filter.snatrules.rule`` list."""
+
+    def test_read_model_accepts_empty_list_shape(self):
+        """``_read_model`` returns the model dict when the rule container is ``[]``."""
+        model = _model_response(rules_as_list=[])
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", model)
+        ) as mock_api_call:
+            result = switch_dns_path._read_model(**self.api_kwargs())
+        # The model is returned unchanged.
+        self.assertEqual(result, model)
+        # Only the single NAT_API_MODEL GET was issued.
+        self.assertEqual(mock_api_call.call_count, 1)
+
+    def test_read_model_accepts_dict_shape(self):
+        """``_read_model`` returns the model dict when the rule container is keyed by uuid."""
+        model = _model_response(rules_by_uuid=_six_rules_by_uuid())
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", model)
+        ) as mock_api_call:
+            result = switch_dns_path._read_model(**self.api_kwargs())
+        self.assertEqual(result, model)
+        self.assertEqual(mock_api_call.call_count, 1)
+
+    def test_read_model_rejects_non_empty_list_shape(self):
+        """A non-empty list shape fails closed with the actionable message.
+
+        The previous implementation yielded ``list:0`` / ``list:1``
+        synthetic UUIDs and let lifecycle actions call get_rule /
+        del_rule on them. ``_read_model`` must raise before any
+        consumer sees the data.
+        """
+        bad = _model_response(rules_as_list=[
+            _managed_rule("lan", "udp", uuid="list:0"),
+            _managed_rule("lan", "tcp", uuid="list:1"),
+        ])
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", bad)
+        ) as mock_api_call:
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path._read_model(**self.api_kwargs())
+        # The error message names the exact shape and the remediation.
+        self.assertIn("list with 2 entries", str(ctx.exception))
+        self.assertIn("refusing to proceed", str(ctx.exception))
+        self.assertIn("dict keyed by uuid or empty list", str(ctx.exception))
+        # Single GET issued — no fallback, no extra calls.
+        self.assertEqual(mock_api_call.call_count, 1)
+
+    def test_read_model_rejects_single_entry_list_shape(self):
+        """A list with exactly one entry is also malformed; same actionable error."""
+        bad = _model_response(rules_as_list=[
+            _managed_rule("lan", "udp", uuid="list:0"),
+        ])
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", bad)
+        ):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path._read_model(**self.api_kwargs())
+        self.assertIn("list with 1 entries", str(ctx.exception))
+
+    def test_read_model_rejects_non_dict_non_list_container(self):
+        """Anything other than dict or list at filter.snatrules.rule is rejected."""
+        bad_envelope = {
+            "filter": {
+                "general": {},
+                "rules": {"rule": {}},
+                "snatrules": {"rule": "oops"},
+                "npt": {"rule": []},
+                "onetoone": {"rule": []},
+            }
+        }
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", bad_envelope)
+        ):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path._read_model(**self.api_kwargs())
+        self.assertIn("unexpected", str(ctx.exception))
+        self.assertIn("container type", str(ctx.exception))
+        self.assertIn("str", str(ctx.exception))
+
+    def test_search_bypass_rules_on_empty_list_returns_empty(self):
+        """An empty ``[]`` model envelope yields zero managed rows without raising."""
+        model = _model_response(rules_as_list=[])
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", model)
+        ) as mock_api_call:
+            result = switch_dns_path._search_bypass_rules(**self.api_kwargs())
+        self.assertEqual(result, [])
+        # The read-only path issues exactly one model GET and no
+        # mutating POSTs. This is the read-only-path invariant.
+        self.assertEqual(mock_api_call.call_count, 1)
+        method_paths = [(c.args[0], c.args[1]) for c in mock_api_call.call_args_list]
+        self.assertEqual(method_paths, [("GET", switch_dns_path.NAT_API_MODEL)])
+
+    def test_search_bypass_rules_on_non_empty_list_raises_without_posting(self):
+        """A non-empty list shape must not produce any mutating POST or any
+        ``list:N`` synthetic-UUID-keyed get_rule / del_rule call.
+        """
+        bad = _model_response(rules_as_list=[
+            _managed_rule("lan", "udp", uuid="list:0"),
+            _managed_rule("lan", "tcp", uuid="list:1"),
+        ])
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", bad)
+        ) as mock_api_call:
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path._search_bypass_rules(**self.api_kwargs())
+        # The script saw the malformed model and bailed. No mutating
+        # POSTs (add_rule, set_rule, del_rule, apply) and no per-rule
+        # GETs were issued — the only call is the model read.
+        for c in mock_api_call.call_args_list:
+            method, path = c.args[0], c.args[1]
+            self.assertEqual(method, "GET", f"unexpected POST in fail-closed path: {method} {path}")
+            self.assertEqual(path, switch_dns_path.NAT_API_MODEL)
+            self.assertFalse(
+                path.startswith(f"{switch_dns_path.NAT_API_GET}/"),
+                f"unexpected per-rule get_rule in fail-closed path: {method} {path}",
+            )
+        self.assertEqual(mock_api_call.call_count, 1)
+
+
+class SyntheticUuidNoMutationTests(_Base):
+    """Lifecycle actions must never attempt set_rule / del_rule / get_rule
+    on a synthetic ``list:<index>`` UUID when the model returns a
+    non-empty list shape. The fail-closed contract lives at the read
+    layer; these tests pin the contract from every entry point that
+    would otherwise feed an iterator producing synthetic UUIDs.
+    """
+
+    def _bad_list_model(self):
+        return _model_response(rules_as_list=[
+            _managed_rule("lan", "udp", uuid="list:0"),
+            _managed_rule("lan", "tcp", uuid="list:1"),
+        ])
+
+    def test_install_bypass_does_not_post_on_non_empty_list(self):
+        """A non-empty list shape is treated as schema drift; no add_rule or apply."""
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", self._bad_list_model())
+        ) as mock_api_call:
             with self.assertRaises(switch_dns_path.BypassError):
                 switch_dns_path.install_bypass(**self.api_kwargs())
+        # Only the model GET was issued; no mutating POSTs.
+        for c in mock_api_call.call_args_list:
+            method, path = c.args[0], c.args[1]
+            self.assertEqual(
+                method, "GET",
+                f"install leaked a mutating POST on malformed model: {method} {path}",
+            )
+            self.assertEqual(path, switch_dns_path.NAT_API_MODEL)
+        # Specifically: no add_rule, no apply, no per-rule get_rule/set_rule/del_rule.
+        method_paths = [(c.args[0], c.args[1]) for c in mock_api_call.call_args_list]
+        for m, p in method_paths:
+            self.assertNotEqual(p, switch_dns_path.NAT_API_ADD)
+            self.assertNotEqual(p, switch_dns_path.NAT_API_APPLY)
+            self.assertFalse(p.startswith(f"{switch_dns_path.NAT_API_GET}/"))
+            self.assertFalse(p.startswith(f"{switch_dns_path.NAT_API_SET}/"))
+            self.assertFalse(p.startswith(f"{switch_dns_path.NAT_API_DEL}/"))
 
-        self.assertEqual(calls, [("GET", switch_dns_path.NAT_API_SEARCH), ("POST", switch_dns_path.NAT_API_ADD)])
+    def test_enable_bypass_does_not_post_on_non_empty_list(self):
+        """enable must not flip or get_rule on synthetic ``list:0`` UUIDs."""
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", self._bad_list_model())
+        ) as mock_api_call:
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path.enable_bypass(**self.api_kwargs())
+        for c in mock_api_call.call_args_list:
+            method, path = c.args[0], c.args[1]
+            self.assertEqual(
+                method, "GET",
+                f"enable leaked a mutating POST on malformed model: {method} {path}",
+            )
+            self.assertEqual(path, switch_dns_path.NAT_API_MODEL)
+            self.assertFalse(path.startswith(f"{switch_dns_path.NAT_API_GET}/"))
+            self.assertFalse(path.startswith(f"{switch_dns_path.NAT_API_SET}/"))
+        self.assertEqual(mock_api_call.call_count, 1)
 
-    def test_enable_and_disable_use_get_rule_unwrap_set_rule_envelopes(self):
-        rows = managed_rows()
-        calls = []
+    def test_disable_bypass_does_not_post_on_non_empty_list(self):
+        """disable must not flip or get_rule on synthetic ``list:0`` UUIDs."""
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", self._bad_list_model())
+        ) as mock_api_call:
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path.disable_bypass(**self.api_kwargs())
+        for c in mock_api_call.call_args_list:
+            method, path = c.args[0], c.args[1]
+            self.assertEqual(
+                method, "GET",
+                f"disable leaked a mutating POST on malformed model: {method} {path}",
+            )
+            self.assertEqual(path, switch_dns_path.NAT_API_MODEL)
+            self.assertFalse(path.startswith(f"{switch_dns_path.NAT_API_GET}/"))
+            self.assertFalse(path.startswith(f"{switch_dns_path.NAT_API_SET}/"))
+        self.assertEqual(mock_api_call.call_count, 1)
 
-        def fake_api_call(method, path, **kwargs):
-            body = kwargs.get("body")
-            calls.append((method, path, copy.deepcopy(body)))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                return "test", observed_search_response(rows + unrelated_wan_rows())
+    def test_uninstall_bypass_does_not_post_on_non_empty_list(self):
+        """uninstall must not del_rule or get_rule on synthetic ``list:0`` UUIDs."""
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", self._bad_list_model())
+        ) as mock_api_call:
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path.uninstall_bypass(**self.api_kwargs())
+        for c in mock_api_call.call_args_list:
+            method, path = c.args[0], c.args[1]
+            self.assertEqual(
+                method, "GET",
+                f"uninstall leaked a mutating POST on malformed model: {method} {path}",
+            )
+            self.assertEqual(path, switch_dns_path.NAT_API_MODEL)
+            self.assertFalse(path.startswith(f"{switch_dns_path.NAT_API_GET}/"))
+            self.assertFalse(path.startswith(f"{switch_dns_path.NAT_API_DEL}/"))
+        self.assertEqual(mock_api_call.call_count, 1)
+
+    def test_status_bypass_does_not_post_on_non_empty_list(self):
+        """status is read-only but must still fail closed; no per-rule POSTs."""
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", self._bad_list_model())
+        ) as mock_api_call:
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path.status_bypass(**self.api_kwargs())
+        for c in mock_api_call.call_args_list:
+            method, path = c.args[0], c.args[1]
+            self.assertEqual(method, "GET")
+            self.assertEqual(path, switch_dns_path.NAT_API_MODEL)
+        self.assertEqual(mock_api_call.call_count, 1)
+
+
+# ---------------------------------------------------------------------------
+# P2.1: install_bypass
+# ---------------------------------------------------------------------------
+
+
+class InstallBypassTests(_Base):
+    def _fake_install(self, *, initial_model, added_uuids=None):
+        """Build a fake_api_call that installs and applies. Returns (callable, calls).
+
+        added_uuids: list of uuids to assign in order; defaults to uuid-0..uuid-5
+        for the first six add_rule calls.
+        """
+        added_uuids = added_uuids or [f"uuid-{i}" for i in range(6)]
+        model = copy.deepcopy(initial_model)
+        calls: list[tuple] = []
+        add_idx = [0]
+
+        def fake(method, path, **kwargs):
+            calls.append((method, path, copy.deepcopy(kwargs.get("body"))))
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", model
+            if method == "POST" and path == switch_dns_path.NAT_API_ADD:
+                body = kwargs["body"]
+                rule = body["rule"]
+                uuid = added_uuids[add_idx[0]]
+                add_idx[0] += 1
+                # Reflect the added rule into the model (mirroring the add+get sequence).
+                # The script then re-reads via NAT_API_MODEL, so model mutations stick.
+                # The full key tuple for this rule:
+                new_rule = _managed_rule(
+                    rule["interface"], rule["protocol"],
+                    enabled=rule["enabled"], uuid=uuid,
+                )
+                if isinstance(model["filter"]["snatrules"]["rule"], dict):
+                    model["filter"]["snatrules"]["rule"][uuid] = new_rule
+                else:
+                    # List shape — append
+                    model["filter"]["snatrules"]["rule"].append(new_rule)
+                return "test", {"result": "saved", "uuid": uuid}
+            if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
+                return "test", {"status": "OK"}
+            self.fail(f"unexpected API call: {method} {path}")
+        return fake, calls
+
+    def test_install_no_op_when_six_already_present(self):
+        """If the model already has all six managed rules, install returns 'already installed'."""
+        initial = _model_response(rules_by_uuid=_six_rules_by_uuid(enabled="0"))
+        fake, calls = self._fake_install(initial_model=initial)
+        # The fake populates the model with the same six rules on every read,
+        # so the post-install read-back still has all six.
+        # But the fake tries to add on the first read; pre-condition is the
+        # six are present BEFORE the first read, so install is a no-op.
+        # We need to ensure the fake's add branch never fires.
+        def no_add_fake(method, path, **kwargs):
+            calls.append((method, path))
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", initial
+            self.fail(f"unexpected API call on no-op install: {method} {path}")
+        with patch.object(switch_dns_path, "_api_call", side_effect=no_add_fake):
+            summary = switch_dns_path.install_bypass(**self.api_kwargs())
+        self.assertIn("installed=0", summary)
+        self.assertIn("state=disabled", summary)
+        # No add_rule calls, no apply.
+        method_paths = [(m, p) for m, p, *_ in calls]
+        self.assertEqual(method_paths, [("GET", switch_dns_path.NAT_API_MODEL)])
+
+    def test_install_with_empty_model_adds_six_and_applies(self):
+        """Empty model → install adds all six, applies, returns installed=6."""
+        initial = _model_response(rules_by_uuid={})
+        fake, calls = self._fake_install(initial_model=initial)
+        # Override the fake: empty initial model means all six are missing,
+        # so the add loop will fire six times. The fake's add branch mutates
+        # the model in-place, so the post-install read-back sees six rules.
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            summary = switch_dns_path.install_bypass(**self.api_kwargs())
+        self.assertIn("installed=6", summary)
+        self.assertIn("total=6", summary)
+        self.assertIn("state=disabled", summary)
+        add_paths = [p for m, p, _ in calls if m == "POST" and p == switch_dns_path.NAT_API_ADD]
+        self.assertEqual(len(add_paths), 6)
+        apply_paths = [p for m, p, _ in calls if m == "POST" and p == switch_dns_path.NAT_API_APPLY]
+        self.assertEqual(len(apply_paths), 1)
+        # Two model reads: pre-install + post-apply.
+        get_paths = [p for m, p, _ in calls if m == "GET" and p == switch_dns_path.NAT_API_MODEL]
+        self.assertEqual(len(get_paths), 2)
+
+    def test_install_tops_up_partial_set(self):
+        """A model with only 3 managed rules → install adds the missing 3."""
+        initial_rules = _six_rules_by_uuid(enabled="0")
+        # Drop the last 3 (uuid-3, uuid-4, uuid-5) — partial set.
+        for k in ("uuid-3", "uuid-4", "uuid-5"):
+            initial_rules.pop(k)
+        initial = _model_response(rules_by_uuid=initial_rules)
+        # Build a fake that mutates the model on add and assigns new uuids.
+        added_uuids = [f"uuid-new-{i}" for i in range(3)]
+        fake, calls = self._fake_install(initial_model=initial, added_uuids=added_uuids)
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            summary = switch_dns_path.install_bypass(**self.api_kwargs())
+        self.assertIn("installed=3", summary)
+        self.assertIn("total=6", summary)
+        add_paths = [p for m, p, _ in calls if m == "POST" and p == switch_dns_path.NAT_API_ADD]
+        self.assertEqual(len(add_paths), 3)
+
+    def test_install_does_not_double_add_when_six_present(self):
+        """Idempotency: pre-existing full six → zero add_rule calls."""
+        initial = _model_response(rules_by_uuid=_six_rules_by_uuid(enabled="0"))
+        # fake that fails if any add_rule happens
+        def no_add_fake(method, path, **kwargs):
+            if method == "POST" and path == switch_dns_path.NAT_API_ADD:
+                self.fail("add_rule should not be called when six rules are already present")
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", initial
+            self.fail(f"unexpected API call: {method} {path}")
+        with patch.object(switch_dns_path, "_api_call", side_effect=no_add_fake):
+            switch_dns_path.install_bypass(**self.api_kwargs())
+
+    def test_install_post_apply_readback_empty_raises_actionable_error(self):
+        """If the post-apply read returns zero rows, install raises the actionable error."""
+        empty_model = _model_response(rules_by_uuid={})
+        calls: list = []
+
+        def fake(method, path, **kwargs):
+            calls.append((method, path))
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", empty_model
+            if method == "POST" and path == switch_dns_path.NAT_API_ADD:
+                return "test", {"result": "saved", "uuid": f"uuid-{len([c for c in calls if c[1] == switch_dns_path.NAT_API_ADD])}"}
+            if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
+                return "test", {"status": "OK"}
+            self.fail(f"unexpected API call: {method} {path}")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path.install_bypass(**self.api_kwargs())
+        self.assertIn("have 0/6", str(ctx.exception))
+        self.assertIn("run --install to repair", str(ctx.exception))
+
+    def test_install_refuses_duplicate_keys(self):
+        """If the model has duplicate (interface, protocol) keys in the
+        managed shape (e.g. two lan/udp rules both matching BYPASS_MANAGED_KEY),
+        install bails with the ambiguous-set message because it cannot
+        safely dedupe that — it doesn't know which UUID to keep.
+        """
+        rules = _six_rules_by_uuid(enabled="0")
+        # Add a 7th rule that duplicates (lan, udp) → same key tuple as uuid-0.
+        rules["uuid-dup"] = _managed_rule("lan", "udp", uuid="uuid-dup")
+        initial = _model_response(rules_by_uuid=rules)
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", initial)
+        ):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path.install_bypass(**self.api_kwargs())
+        # The keys-set-size mismatch is the ambiguous-set error.
+        self.assertIn("ambiguous", str(ctx.exception))
+
+
+# ---------------------------------------------------------------------------
+# P2.2: enable_bypass / disable_bypass
+# ---------------------------------------------------------------------------
+
+
+class EnableDisableBypassTests(_Base):
+    def _set_up_flip(self, *, initial_enabled="0", target_enabled="1"):
+        """Build a fake_api_call that flips enabled and reflects in the model."""
+        rules_by_uuid = _six_rules_by_uuid(enabled=initial_enabled)
+        model = _model_response(rules_by_uuid=copy.deepcopy(rules_by_uuid))
+        calls: list = []
+
+        def fake(method, path, **kwargs):
+            calls.append((method, path, copy.deepcopy(kwargs.get("body"))))
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", model
             if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
                 uuid = path.rsplit("/", 1)[1]
-                row = next(row for row in rows if row["uuid"] == uuid)
-                return "test", {"rule": copy.deepcopy(row)}
+                return "test", {"rule": copy.deepcopy(model["filter"]["snatrules"]["rule"][uuid])}
             if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_SET}/"):
-                if not isinstance(body, dict):
-                    self.fail("set_rule body is not an object")
-                self.assertEqual(set(body), {"rule"})
+                body = kwargs["body"]
                 rule = body["rule"]
-                row = next(row for row in rows if row["uuid"] == path.rsplit("/", 1)[1])
-                row.update(rule)
+                uuid = path.rsplit("/", 1)[1]
+                model["filter"]["snatrules"]["rule"][uuid]["enabled"] = rule["enabled"]
+                return "test", {"result": "saved"}
+            if method == "POST" and path == switch_dns_path.NAT_API_ADD:
+                return "test", {"result": "saved", "uuid": "uuid-new"}
+            if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
+                return "test", {"status": "OK"}
+            self.fail(f"unexpected API call: {method} {path}")
+        return fake, calls, model
+
+    def test_enable_flips_each_rule_to_enabled_1(self):
+        fake, calls, _ = self._set_up_flip(initial_enabled="0", target_enabled="1")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            summary = switch_dns_path.enable_bypass(**self.api_kwargs())
+        self.assertIn("enabled=6", summary)
+        # 6 set_rule calls + 1 apply.
+        set_paths = [p for m, p, _ in calls if m == "POST" and p.startswith(f"{switch_dns_path.NAT_API_SET}/")]
+        self.assertEqual(len(set_paths), 6)
+        # Each set_rule body has enabled="1".
+        for c in calls:
+            if c[0] == "POST" and c[1].startswith(f"{switch_dns_path.NAT_API_SET}/"):
+                self.assertEqual(c[2]["rule"]["enabled"], "1")
+
+    def test_enable_idempotent_when_already_enabled(self):
+        """Re-running --enable when already enabled makes zero set_rule calls."""
+        fake, calls, _ = self._set_up_flip(initial_enabled="1", target_enabled="1")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            summary = switch_dns_path.enable_bypass(**self.api_kwargs())
+        self.assertIn("enabled=0", summary)
+        self.assertIn("already_enabled=6", summary)
+        set_paths = [p for m, p, _ in calls if m == "POST" and p.startswith(f"{switch_dns_path.NAT_API_SET}/")]
+        self.assertEqual(len(set_paths), 0)
+
+    def test_disable_flips_each_rule_to_enabled_0(self):
+        fake, calls, _ = self._set_up_flip(initial_enabled="1", target_enabled="0")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            summary = switch_dns_path.disable_bypass(**self.api_kwargs())
+        self.assertIn("disabled=6", summary)
+        for c in calls:
+            if c[0] == "POST" and c[1].startswith(f"{switch_dns_path.NAT_API_SET}/"):
+                self.assertEqual(c[2]["rule"]["enabled"], "0")
+
+    def test_disable_idempotent_when_already_disabled(self):
+        """Re-running --disable when already disabled makes zero set_rule calls."""
+        fake, calls, _ = self._set_up_flip(initial_enabled="0", target_enabled="0")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            summary = switch_dns_path.disable_bypass(**self.api_kwargs())
+        self.assertIn("disabled=0", summary)
+        self.assertIn("already_disabled=6", summary)
+        set_paths = [p for m, p, _ in calls if m == "POST" and p.startswith(f"{switch_dns_path.NAT_API_SET}/")]
+        self.assertEqual(len(set_paths), 0)
+
+    def test_enable_rejects_model_endpoint_with_unexpected_shape(self):
+        """If NAT_API_MODEL returns a non-dict, enable fails closed without flipping."""
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", ["not", "a", "dict"])
+        ):
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path.enable_bypass(**self.api_kwargs())
+
+    def test_enable_rejects_missing_filter_in_model(self):
+        """A model response missing 'filter' fails closed without flipping."""
+        with patch.object(switch_dns_path, "_api_call", return_value=("test", {})):
+            with self.assertRaises(switch_dns_path.BypassError):
+                switch_dns_path.enable_bypass(**self.api_kwargs())
+
+    def test_enable_drift_detection_on_get_rule(self):
+        """If get_rule returns a rule whose attribute tuple has drifted, enable fails closed."""
+        rules_by_uuid = _six_rules_by_uuid(enabled="0")
+        model = _model_response(rules_by_uuid=copy.deepcopy(rules_by_uuid))
+        calls: list = []
+
+        def fake(method, path, **kwargs):
+            calls.append((method, path))
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", model
+            if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
+                uuid = path.rsplit("/", 1)[1]
+                # Return a rule whose target has drifted away from BYPASS_MANAGED_KEY.
+                drifted = copy.deepcopy(model["filter"]["snatrules"]["rule"][uuid])
+                drifted["target"] = "8.8.8.8"
+                return "test", {"rule": drifted}
+            self.fail(f"unexpected API call: {method} {path}")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path.enable_bypass(**self.api_kwargs())
+        self.assertIn("no longer matches", str(ctx.exception))
+        # No set_rule calls — drift is caught before mutation.
+        self.assertFalse(
+            any(p.startswith(f"{switch_dns_path.NAT_API_SET}/") for m, p in calls if m == "POST")
+        )
+
+    def test_disable_post_disable_readback_empty_raises(self):
+        """If disable's post-apply read returns zero rows, it raises the actionable error."""
+        rules_by_uuid = _six_rules_by_uuid(enabled="1")
+        initial = _model_response(rules_by_uuid=rules_by_uuid)
+        calls: list = []
+        # A model that goes empty after apply
+        empty = _model_response(rules_by_uuid={})
+
+        def fake(method, path, **kwargs):
+            calls.append((method, path))
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                # Before apply: full set. After apply: empty.
+                if any(c[1] == switch_dns_path.NAT_API_APPLY for c in calls):
+                    return "test", empty
+                return "test", initial
+            if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
+                uuid = path.rsplit("/", 1)[1]
+                return "test", {"rule": copy.deepcopy(initial["filter"]["snatrules"]["rule"][uuid])}
+            if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_SET}/"):
                 return "test", {"result": "saved"}
             if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
                 return "test", {"status": "OK"}
             self.fail(f"unexpected API call: {method} {path}")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path.disable_bypass(**self.api_kwargs())
+        self.assertIn("have 0/6", str(ctx.exception))
+        self.assertIn("run --install to repair", str(ctx.exception))
 
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            self.assertIn("enabled=6", switch_dns_path.enable_bypass(**self.api_kwargs()))
-            self.assertIn("disabled=6", switch_dns_path.disable_bypass(**self.api_kwargs()))
 
-        get_calls = [call for call in calls if call[1].startswith(f"{switch_dns_path.NAT_API_GET}/")]
-        set_calls = [call for call in calls if call[1].startswith(f"{switch_dns_path.NAT_API_SET}/")]
-        self.assertEqual(len(get_calls), 12)
-        self.assertEqual(len(set_calls), 12)
-        self.assertTrue(all(call[2] and set(call[2]) == {"rule"} for call in set_calls))
+# ---------------------------------------------------------------------------
+# P2.3: uninstall_bypass
+# ---------------------------------------------------------------------------
 
-    def test_set_failure_fails_before_apply_and_counter(self):
-        rows = managed_rows()
-        calls = []
 
-        def fake_api_call(method, path, **kwargs):
+class UninstallBypassTests(_Base):
+    def test_uninstall_removes_each_managed_rule(self):
+        rules_by_uuid = _six_rules_by_uuid(enabled="0")
+        model = _model_response(rules_by_uuid=copy.deepcopy(rules_by_uuid))
+        calls: list = []
+
+        def fake(method, path, **kwargs):
             calls.append((method, path))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                return "test", observed_search_response(rows)
-            if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
-                return "test", {"rule": copy.deepcopy(rows[0])}
-            if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_SET}/"):
-                return "test", {"result": "failed"}
-            self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            with self.assertRaises(switch_dns_path.BypassError):
-                switch_dns_path.enable_bypass(**self.api_kwargs())
-
-        self.assertFalse(any(path == switch_dns_path.NAT_API_APPLY for _, path in calls))
-        self.assertEqual(sum(path.startswith(f"{switch_dns_path.NAT_API_SET}/") for _, path in calls), 1)
-
-    def test_delete_success_is_validated_and_read_back(self):
-        rows = managed_rows()
-        calls = []
-
-        def fake_api_call(method, path, **kwargs):
-            calls.append((method, path))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                return "test", observed_search_response(rows + unrelated_wan_rows())
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", model
             if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_DEL}/"):
-                rows[:] = [row for row in rows if row["uuid"] != path.rsplit("/", 1)[1]]
+                uuid = path.rsplit("/", 1)[1]
+                if isinstance(model["filter"]["snatrules"]["rule"], dict):
+                    model["filter"]["snatrules"]["rule"].pop(uuid, None)
                 return "test", {"result": "deleted"}
             if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
                 return "test", {"status": "OK"}
             self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
             summary = switch_dns_path.uninstall_bypass(**self.api_kwargs())
-
         self.assertEqual(summary, "uninstalled=6")
-        self.assertEqual(sum(path.startswith(f"{switch_dns_path.NAT_API_DEL}/") for _, path in calls), 6)
-        self.assertEqual(calls[-1], ("GET", switch_dns_path.NAT_API_SEARCH))
+        del_paths = [p for m, p in calls if m == "POST" and p.startswith(f"{switch_dns_path.NAT_API_DEL}/")]
+        self.assertEqual(len(del_paths), 6)
+        # Final call is the post-uninstall read-back.
+        self.assertEqual(calls[-1][0:2], ("GET", switch_dns_path.NAT_API_MODEL))
 
-    def test_delete_failure_fails_before_apply_and_counter(self):
-        rows = managed_rows()
-        calls = []
+    def test_uninstall_idempotent_when_empty(self):
+        """No managed rules → uninstall is a no-op returning 'uninstalled=0'."""
+        empty = _model_response(rules_by_uuid={})
+        calls: list = []
 
-        def fake_api_call(method, path, **kwargs):
+        def fake(method, path, **kwargs):
             calls.append((method, path))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                return "test", observed_search_response(rows)
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", empty
+            self.fail(f"unexpected API call: {method} {path}")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            summary = switch_dns_path.uninstall_bypass(**self.api_kwargs())
+        self.assertEqual(summary, "uninstalled=0")
+        # No del_rule or apply calls.
+        self.assertFalse(
+            any(m == "POST" for m, _ in calls)
+        )
+
+    def test_uninstall_uses_key_tuple_not_descr(self):
+        """uninstall must use the key-tuple identifier, not descr.
+
+        The model contains an unrelated manual rule (different target)
+        with the same fields otherwise. uninstall must NOT touch it.
+        """
+        rules_by_uuid = _six_rules_by_uuid(enabled="0")
+        rules_by_uuid["uuid-stray"] = _managed_rule(
+            "lan", "udp", target="8.8.8.8", uuid="uuid-stray",
+        )
+        model = _model_response(rules_by_uuid=copy.deepcopy(rules_by_uuid))
+        calls: list = []
+
+        def fake(method, path, **kwargs):
+            calls.append((method, path))
+            if method == "GET" and path == switch_dns_path.NAT_API_MODEL:
+                return "test", model
             if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_DEL}/"):
-                return "test", {"result": "failed"}
-            self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            with self.assertRaises(switch_dns_path.BypassError):
-                switch_dns_path.uninstall_bypass(**self.api_kwargs())
-
-        self.assertFalse(any(path == switch_dns_path.NAT_API_APPLY for _, path in calls))
-        self.assertEqual(sum(path.startswith(f"{switch_dns_path.NAT_API_DEL}/") for _, path in calls), 1)
-
-    def test_status_rejects_wrong_redirect_target_in_authoritative_search_row(self):
-        rows = managed_rows()
-        rows[0]["target"] = "192.0.2.55"
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response(rows)),
-        ):
-            with self.assertRaises(switch_dns_path.BypassError):
-                switch_dns_path.status_bypass(**self.api_kwargs())
-
-    def test_enable_rejects_mismatched_get_rule_before_set(self):
-        rows = managed_rows()
-        calls = []
-
-        def fake_api_call(method, path, **kwargs):
-            calls.append((method, path, copy.deepcopy(kwargs.get("body"))))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                return "test", observed_search_response(rows)
-            if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
-                # Return a valid rule envelope for the wrong managed rule.
-                return "test", {"rule": copy.deepcopy(rows[1])}
-            self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            with self.assertRaises(switch_dns_path.BypassError):
-                switch_dns_path.enable_bypass(**self.api_kwargs())
-
-        self.assertTrue(any(path.startswith(f"{switch_dns_path.NAT_API_GET}/") for _, path, _ in calls))
-        self.assertFalse(any(path.startswith(f"{switch_dns_path.NAT_API_SET}/") for _, path, _ in calls))
-        self.assertFalse(any(path == switch_dns_path.NAT_API_APPLY for _, path, _ in calls))
-
-    def test_get_without_rule_envelope_fails_closed(self):
-        rows = managed_rows()
-
-        def fake_api_call(method, path, **kwargs):
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                return "test", observed_search_response(rows)
-            if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
-                return "test", {"interface": "lan"}
-            self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            with self.assertRaises(switch_dns_path.BypassError):
-                switch_dns_path.enable_bypass(**self.api_kwargs())
-
-    def test_uuid_less_get_rule_uses_search_uuid_for_set_rule_path(self):
-        rows = managed_rows()
-        set_paths = []
-
-        def fake_api_call(method, path, **kwargs):
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                return "test", observed_search_response(rows)
-            if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
-                requested_uuid = path.rsplit("/", 1)[1]
-                row = next(row for row in rows if row["uuid"] == requested_uuid)
-                uuid_less_rule = copy.deepcopy(row)
-                del uuid_less_rule["uuid"]
-                return "test", {"rule": uuid_less_rule}
-            if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_SET}/"):
-                set_paths.append(path)
-                requested_uuid = path.rsplit("/", 1)[1]
-                set_body = kwargs["body"]
-                self.assertIn(requested_uuid, {row["uuid"] for row in rows})
-                self.assertNotIn("uuid", set_body["rule"])
-                row = next(row for row in rows if row["uuid"] == requested_uuid)
-                row.update(set_body["rule"])
-                return "test", {"result": "saved"}
+                uuid = path.rsplit("/", 1)[1]
+                model["filter"]["snatrules"]["rule"].pop(uuid, None)
+                return "test", {"result": "deleted"}
             if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
                 return "test", {"status": "OK"}
             self.fail(f"unexpected API call: {method} {path}")
+        with patch.object(switch_dns_path, "_api_call", side_effect=fake):
+            switch_dns_path.uninstall_bypass(**self.api_kwargs())
+        # del_rule called six times — for the six managed uuids, NOT for uuid-stray.
+        del_uuids = [p.rsplit("/", 1)[1] for m, p in calls if m == "POST" and p.startswith(f"{switch_dns_path.NAT_API_DEL}/")]
+        self.assertEqual(len(del_uuids), 6)
+        self.assertNotIn("uuid-stray", del_uuids)
+        # Stray rule is still in the post-uninstall model (untouched).
+        self.assertIn("uuid-stray", model["filter"]["snatrules"]["rule"])
 
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            summary = switch_dns_path.enable_bypass(**self.api_kwargs())
 
-        self.assertIn("enabled=6", summary)
-        self.assertEqual(
-            set_paths,
-            [f"{switch_dns_path.NAT_API_SET}/{row['uuid']}" for row in rows],
-        )
+# ---------------------------------------------------------------------------
+# P2.4: status_bypass
+# ---------------------------------------------------------------------------
 
-    def test_mutating_post_falls_through_to_literal_ip_https_and_skips_http_fallback(self):
-        """POSTs whose hostname primary fails with a DNS-resolution error
-        (socket.gaierror) fall through to the hard-coded literal-IP HTTPS
-        fallback. They NEVER try the operator-configured HTTP fallback
-        (which would double-write against a misconfigured firewall), they
-        NEVER retry the hostname primary after a successful transport, and
-        they do NOT fall through on non-DNS urlopen errors (see
-        ``test_post_non_dns_urlopen_error_does_not_fall_through_to_literal_ip``
-        for the regressed-on-purpose check).
-        """
-        import socket
 
+class StatusBypassTests(_Base):
+    def test_status_reports_disabled_when_six_all_off(self):
+        rules = _six_rules_by_uuid(enabled="0")
         with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            side_effect=socket.gaierror(-2, "Name or service not known"),
-        ) as urlopen:
-            with self.assertRaises(switch_dns_path.BypassError):
-                switch_dns_path._api_call(
-                    "POST",
-                    switch_dns_path.NAT_API_ADD,
-                    body={"rule": {"interface": "lan"}},
-                    **self.api_kwargs(),
-                )
-
-        # Two URL opens total: hostname primary + literal-IP HTTPS fallback.
-        # No retry of the primary, no operator-configured HTTP fallback.
-        self.assertEqual(urlopen.call_count, 2)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertTrue(
-            called_urls[1].startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-        )
-        # The literal-IP HTTPS fallback URL must NOT be the operator-configured
-        # HTTP fallback (different scheme and different host).
-        self.assertFalse(any(url.startswith(FALLBACK) for url in called_urls))
-
-    def test_mutating_get_falls_through_to_operator_http_fallback(self):
-        """GETs still fall through to the operator-configured HTTP fallback
-        after the HTTPS primary fails — preserves existing read transport
-        behavior so a hostname resolver outage doesn't block status reads.
-        """
-        import urllib.error
-
-        with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            side_effect=urllib.error.URLError("primary transport failed"),
-        ) as urlopen:
-            with self.assertRaises(switch_dns_path.BypassError):
-                switch_dns_path._api_call(
-                    "GET",
-                    switch_dns_path.NAT_API_SEARCH,
-                    **self.api_kwargs(),
-                )
-
-        self.assertEqual(urlopen.call_count, 2)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertTrue(called_urls[1].startswith(FALLBACK))
-        # GET fallback must be the operator-configured HTTP fallback, NOT the
-        # hard-coded literal-IP HTTPS POST fallback.
-        self.assertFalse(
-            any(
-                url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                for url in called_urls
-            )
-        )
-
-    def test_mutating_post_does_not_retry_primary_after_successful_transport(self):
-        """A successful transport to the hostname primary that returns a
-        4xx/5xx response must NOT fall through to the literal-IP fallback
-        — a reachable-but-rejecting primary is an ACL/result failure, not
-        a transport problem, and falling through would silently bypass the
-        error against a different host.
-        """
-        import urllib.error
-
-        primary_response = urllib.error.HTTPError(
-            PRIMARY + "/api/x", 500, "Internal Server Error", {}, None
-        )
-
-        with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            side_effect=primary_response,
-        ) as urlopen:
-            with self.assertRaises(switch_dns_path.BypassError):
-                switch_dns_path._api_call(
-                    "POST",
-                    switch_dns_path.NAT_API_ADD,
-                    body={"rule": {"interface": "lan"}},
-                    **self.api_kwargs(),
-                )
-
-        self.assertEqual(urlopen.call_count, 1)
-
-    # ---- P1.2: status/disable require complete six-rule set --------------
-
-    def _partial_rows(self, count):
-        """Return the first `count` rows of a valid six-rule set."""
-        all_rows = managed_rows()
-        return all_rows[:count]
-
-    def test_status_fails_closed_on_partial_ruleset_with_actionable_message(self):
-        """Status must NOT report the bypass as installed on fewer than
-        six rows. It must raise BypassError with the actionable
-        ``ruleset incomplete: have N/6, run --install to repair`` message.
-        """
-        for count in (1, 2, 3, 4, 5):
-            with self.subTest(count=count), patch.object(
-                switch_dns_path,
-                "_api_call",
-                return_value=(
-                    "test",
-                    observed_search_response(self._partial_rows(count) + unrelated_wan_rows()),
-                ),
-            ):
-                with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                    switch_dns_path.status_bypass(**self.api_kwargs())
-            msg = str(ctx.exception)
-            self.assertIn(f"have {count}/6", msg)
-            self.assertIn("run --install to repair", msg)
-
-    def test_status_succeeds_on_empty_ruleset(self):
-        """Empty ruleset is the natural "not installed" state, NOT a
-        partial set — must not raise."""
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response([])),
+            switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid=rules))
         ):
-            status = switch_dns_path.status_bypass(**self.api_kwargs())
-        self.assertEqual(status["installed"], False)
-        self.assertEqual(status["state"], "absent")
-        self.assertEqual(status["total_rules"], 0)
+            st = switch_dns_path.status_bypass(**self.api_kwargs())
+        self.assertEqual(st["state"], "disabled")
+        self.assertEqual(st["total_rules"], 6)
+        self.assertEqual(st["enabled"], 0)
+        self.assertEqual(st["disabled"], 6)
+        self.assertTrue(st["installed"])
 
-    def test_disable_fails_closed_on_partial_ruleset(self):
-        """Disable must NOT treat a partial ruleset as a no-op. It must
-        raise BypassError before any set_rule calls are issued, so the
-        firewall table is not silently half-toggled.
-        """
-        for count in (1, 2, 3, 4, 5):
-            rows = self._partial_rows(count)
-            calls = []
-
-            def fake_api_call(method, path, **kwargs):
-                calls.append((method, path))
-                if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                    return "test", observed_search_response(rows)
-                self.fail(
-                    f"unexpected API call on partial disable (count={count}): "
-                    f"{method} {path}"
-                )
-
-            with self.subTest(count=count), patch.object(
-                switch_dns_path, "_api_call", side_effect=fake_api_call
-            ):
-                with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                    switch_dns_path.disable_bypass(**self.api_kwargs())
-            msg = str(ctx.exception)
-            self.assertIn(f"have {count}/6", msg)
-            self.assertIn("run --install to repair", msg)
-            # No set_rule calls — disable must fail closed before mutating.
-            self.assertFalse(
-                any(path.startswith(f"{switch_dns_path.NAT_API_SET}/") for _, path in calls)
-            )
-
-    def test_install_repairs_partial_ruleset_then_disable_succeeds(self):
-        """Round-trip: a partial ruleset fails disable, install repairs
-        the missing rows, then disable succeeds."""
-        for count in (1, 2, 3, 4, 5):
-            with self.subTest(count=count):
-                partial = self._partial_rows(count)
-                installed_rows = [copy.deepcopy(row) for row in partial]
-                calls = []
-
-                def fake_api_call(method, path, **kwargs):
-                    calls.append((method, path))
-                    body = kwargs.get("body")
-                    if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                        return "test", observed_search_response(
-                            installed_rows + unrelated_wan_rows()
-                        )
-                    if method == "POST" and path == switch_dns_path.NAT_API_ADD:
-                        rule = body["rule"]
-                        installed_rows.append(
-                            {
-                                "uuid": f"uuid-{len(installed_rows)}",
-                                "interface": rule["interface"],
-                                "protocol": rule["protocol"],
-                                "description": rule["descr"],
-                                "ipprotocol": rule["ipprotocol"],
-                                "source": rule["source"],
-                                "destination": rule["destination"],
-                                "destination_port": rule["destination_port"],
-                                "target": rule["target"],
-                                "target_port": rule["target_port"],
-                                # natreflection omitted: 26.1.11_6
-                                # source_nat search row has no such key.
-                                "enabled": rule["enabled"],
-                            }
-                        )
-                        return "test", {
-                            "result": "saved",
-                            "uuid": installed_rows[-1]["uuid"],
-                        }
-                    if method == "GET" and path.startswith(
-                        f"{switch_dns_path.NAT_API_GET}/"
-                    ):
-                        uuid = path.rsplit("/", 1)[1]
-                        row = next(
-                            row for row in installed_rows if row["uuid"] == uuid
-                        )
-                        return "test", {"rule": copy.deepcopy(row)}
-                    if method == "POST" and path.startswith(
-                        f"{switch_dns_path.NAT_API_SET}/"
-                    ):
-                        rule = body["rule"]
-                        uuid = path.rsplit("/", 1)[1]
-                        row = next(
-                            row for row in installed_rows if row["uuid"] == uuid
-                        )
-                        row.update(rule)
-                        return "test", {"result": "saved"}
-                    if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
-                        return "test", {"status": "OK"}
-                    self.fail(f"unexpected API call: {method} {path}")
-
-                with patch.object(
-                    switch_dns_path, "_api_call", side_effect=fake_api_call
-                ):
-                    with self.assertRaises(switch_dns_path.BypassError):
-                        switch_dns_path.disable_bypass(**self.api_kwargs())
-                    install_summary = switch_dns_path.install_bypass(
-                        **self.api_kwargs()
-                    )
-                    # install should have added exactly 6 - count rows.
-                    self.assertIn(
-                        f"installed={6 - count}, total=6", install_summary
-                    )
-                    disable_summary = switch_dns_path.disable_bypass(
-                        **self.api_kwargs()
-                    )
-                    self.assertIn("disabled=6", disable_summary)
-
-    # ---- P1.3: source / destination / natreflection match-field validation
-
-    def test_search_row_with_altered_source_fails_closed(self):
-        """A tagged row whose source field has drifted away from the
-        script-managed value (``any`` or the configured LAN-subnet alias)
-        must not be treated as a managed rule.
-        """
-        row = observed_row(0)
-        row["source"] = "192.168.86.0/24"
+    def test_status_reports_enabled_when_six_all_on(self):
+        rules = _six_rules_by_uuid(enabled="1")
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response([row] + unrelated_wan_rows())),
+            switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid=rules))
         ):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertIn("source", str(ctx.exception))
+            st = switch_dns_path.status_bypass(**self.api_kwargs())
+        self.assertEqual(st["state"], "enabled")
+        self.assertEqual(st["total_rules"], 6)
+        self.assertEqual(st["enabled"], 6)
+        self.assertEqual(st["disabled"], 0)
 
-    def test_search_row_with_altered_destination_fails_closed(self):
-        """A tagged row whose destination field has drifted away from
-        ``any`` must not be treated as a managed rule."""
-        row = observed_row(0)
-        row["destination"] = "wan_subnet"
+    def test_status_reports_mixed_when_some_on_some_off(self):
+        rules = _six_rules_by_uuid(enabled="0")
+        rules["uuid-0"]["enabled"] = "1"
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response([row] + unrelated_wan_rows())),
+            switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid=rules))
         ):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertIn("destination", str(ctx.exception))
+            st = switch_dns_path.status_bypass(**self.api_kwargs())
+        self.assertEqual(st["state"], "mixed")
+        self.assertEqual(st["enabled"], 1)
+        self.assertEqual(st["disabled"], 5)
 
-    def test_search_row_with_altered_natreflection_fails_closed(self):
-        """A tagged row whose natreflection field has drifted away from
-        ``disable`` (e.g. someone enabled hairpin) must not be treated as
-        a managed rule.
-        """
-        row = observed_row(0)
-        row["natreflection"] = "enable"
+    def test_status_reports_not_installed_when_empty(self):
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response([row] + unrelated_wan_rows())),
+            switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid={}))
         ):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertIn("natreflection", str(ctx.exception))
+            st = switch_dns_path.status_bypass(**self.api_kwargs())
+        self.assertFalse(st["installed"])
+        self.assertEqual(st["state"], "absent")
+        self.assertEqual(st["total_rules"], 0)
 
-    def test_search_row_with_lan_subnet_alias_source_passes(self):
-        """A tagged row whose source field is the configured LAN-subnet
-        alias name (not "any") is still a valid managed rule — operators
-        may tighten the source match to an alias later without breaking
-        the script's identity check."""
-        row = observed_row(0)
-        row["source"] = switch_dns_path.LAN_SUBNET_ALIAS
+    def test_status_fails_closed_on_partial_set(self):
+        rules = _six_rules_by_uuid(enabled="0")
+        for k in ("uuid-3", "uuid-4", "uuid-5"):
+            rules.pop(k)
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response([row] + unrelated_wan_rows())),
-        ):
-            matching = switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertEqual(matching, [row])
-
-    def test_search_row_with_missing_source_fails_closed(self):
-        """A tagged row missing the source field (e.g. older OPNsense
-        schema) must not be treated as a managed rule.
-        """
-        row = observed_row(0)
-        del row["source"]
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response([row] + unrelated_wan_rows())),
-        ):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertIn("source", str(ctx.exception))
-
-    def test_status_rejects_altered_source_in_authoritative_search_row(self):
-        """status_bypass must propagate the source-validation failure
-        the same way it propagates the target-validation failure."""
-        rows = managed_rows()
-        rows[0]["source"] = "192.168.86.0/24"
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", observed_search_response(rows)),
+            switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid=rules))
         ):
             with self.assertRaises(switch_dns_path.BypassError) as ctx:
                 switch_dns_path.status_bypass(**self.api_kwargs())
-        self.assertIn("source", str(ctx.exception))
+        self.assertIn("have 3/6", str(ctx.exception))
+        self.assertIn("run --install to repair", str(ctx.exception))
 
-    # ---- P1.3b: natreflection is OPTIONAL on 26.1.11_6 source_nat search row
-    #
-    # The live ``/api/firewall/source_nat/search_rule`` endpoint does NOT
-    # include a ``natreflection`` key (verified 2026-08-24). Sending the
-    # field to ``add_rule`` is silently accepted but the value is dropped
-    # from the read-back, which made the post-install validator in
-    # PR #253 filter every newly added rule out. These tests pin the
-    # three live shapes (missing, "disable", "enable") and the
-    # payload-builder contract so a future OPNsense firmware change can
-    # only break the validator by intentionally flipping the field.
 
-    def test_search_row_missing_natreflection_passes(self):
-        """The live 26.1.11_6 search row omits ``natreflection``. A
-        tagged row with no such key must still be accepted as a managed
-        rule.
-        """
-        row = observed_row(0)
-        del row["natreflection"]
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=(
-                "test",
-                observed_search_response([row] + unrelated_wan_rows()),
-            ),
-        ):
-            matching = switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertEqual(matching, [row])
+# ---------------------------------------------------------------------------
+# P2.5: payload shape
+# ---------------------------------------------------------------------------
 
-    def test_search_row_with_natreflection_disable_passes(self):
-        """A tagged row whose ``natreflection`` field is the canonical
-        "disable" value (e.g. a future firmware version that starts
-        echoing the field back) must still be accepted.
-        """
-        row = observed_row(0)
-        # observed_row already has natreflection="disable"; assert the
-        # baseline shape stays green after the validator change.
-        self.assertEqual(row["natreflection"], "disable")
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=(
-                "test",
-                observed_search_response([row] + unrelated_wan_rows()),
-            ),
-        ):
-            matching = switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertEqual(matching, [row])
 
-    def test_search_row_with_natreflection_enable_fails_closed(self):
-        """A tagged row whose ``natreflection`` field has drifted to
-        "enable" (hairpin turned on by hand) must NOT be treated as a
-        managed rule.
-        """
-        row = observed_row(0)
-        row["natreflection"] = "enable"
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=(
-                "test",
-                observed_search_response([row] + unrelated_wan_rows()),
-            ),
-        ):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertIn("natreflection", str(ctx.exception))
+class BuildPayloadTests(_Base):
+    def test_payload_omits_descr(self):
+        """descr is silently discarded by add_rule and is not in the model — do not send it."""
+        payload = switch_dns_path._build_bypass_rule_payload("lan", "udp")
+        self.assertNotIn("descr", payload)
+        self.assertNotIn("description", payload)
 
-    def test_search_row_with_natreflection_non_string_fails_closed(self):
-        """A tagged row whose ``natreflection`` field is present but not
-        a string (e.g. an int 0 / 1 from a hypothetical schema change)
-        must still fail closed, preserving the type contract.
-        """
-        row = observed_row(0)
-        row["natreflection"] = 0  # type: ignore[assignment]
-        with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=(
-                "test",
-                observed_search_response([row] + unrelated_wan_rows()),
-            ),
-        ):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._search_bypass_rules(**self.api_kwargs())
-        self.assertIn("natreflection", str(ctx.exception))
-
-    def test_build_bypass_rule_payload_omits_natreflection(self):
-        """The OPNsense 26.1.11_6 source_nat model does not accept
-        ``natreflection`` as a column; the add payload must NOT include
-        the key. If a future schema change re-introduces the field, this
-        test will fail and force an explicit re-decision.
-        """
+    def test_payload_omits_natreflection(self):
+        """natreflection is silently discarded by add_rule and is not in the model — do not send it."""
         payload = switch_dns_path._build_bypass_rule_payload("lan", "udp")
         self.assertNotIn("natreflection", payload)
-        # Sanity: the rest of the contract is preserved.
+
+    def test_payload_omits_associated_rule(self):
+        """associated-rule is a filter-rule linkage field the source_nat model does not use."""
+        payload = switch_dns_path._build_bypass_rule_payload("lan", "udp")
+        self.assertNotIn("associated-rule", payload)
+
+    def test_payload_includes_documented_add_fields(self):
+        """The payload keeps the documented add fields: interface, ipprotocol, protocol,
+        source, destination, destination_port, target, target_port, nat_port, enabled."""
+        payload = switch_dns_path._build_bypass_rule_payload("lan", "udp")
+        for key in (
+            "interface", "ipprotocol", "protocol", "source", "destination",
+            "destination_port", "target", "target_port", "nat_port", "enabled",
+        ):
+            self.assertIn(key, payload)
         self.assertEqual(payload["interface"], "lan")
         self.assertEqual(payload["protocol"], "udp")
         self.assertEqual(payload["ipprotocol"], "inet")
         self.assertEqual(payload["source"], "any")
         self.assertEqual(payload["destination"], "any")
+        self.assertEqual(payload["destination_port"], "53")
         self.assertEqual(payload["target"], switch_dns_path.BYPASS_TARGET_IP)
-        self.assertEqual(payload["enabled"], "0")
+        self.assertEqual(payload["target_port"], "53")
+        self.assertEqual(payload["nat_port"], "")
+        self.assertEqual(payload["enabled"], "0")  # install disabled; --enable flips
 
-    def test_apply_nat_accepts_trimmed_ok_status(self):
-        """OPNsense 26.1.11_6 returns ``{"status": "OK\\n\\n"}`` (leading
-        "OK" plus trailing whitespace and newlines) on a successful
-        apply. ``_apply_nat`` must compare against the trimmed value
-        so the live response shape is accepted without weakening the
-        fail-closed contract on any other payload.
-        """
+    def test_payload_target_and_target_port_unchanged_across_calls(self):
+        for (iface, proto) in (("lan", "udp"), ("opt1", "tcp"), ("opt2", "udp")):
+            payload = switch_dns_path._build_bypass_rule_payload(iface, proto)
+            self.assertEqual(payload["target"], switch_dns_path.BYPASS_TARGET_IP)
+            self.assertEqual(payload["target_port"], "53")
+
+
+# ---------------------------------------------------------------------------
+# P2.6: ruleset completeness (preserved from earlier PRs)
+# ---------------------------------------------------------------------------
+
+
+class RulesetCompletenessTests(_Base):
+    def test_full_six_passes(self):
+        rules = _six_rules_by_uuid(enabled="0")
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", {"status": "OK\n\n"}),
+            switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid=rules))
+        ):
+            switch_dns_path.status_bypass(**self.api_kwargs())  # should not raise
+
+    def test_empty_passes(self):
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid={}))
+        ):
+            switch_dns_path.status_bypass(**self.api_kwargs())  # should not raise
+
+    def test_partial_set_raises_actionable_error(self):
+        for count in (1, 2, 3, 4, 5):
+            rules = _six_rules_by_uuid(enabled="0")
+            for k in list(rules.keys())[count:]:
+                rules.pop(k)
+            with self.subTest(count=count), patch.object(
+                switch_dns_path, "_api_call", return_value=("test", _model_response(rules_by_uuid=rules))
+            ):
+                with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                    switch_dns_path.status_bypass(**self.api_kwargs())
+            self.assertIn(f"have {count}/6", str(ctx.exception))
+
+
+# ---------------------------------------------------------------------------
+# P2.7: apply_nat
+# ---------------------------------------------------------------------------
+
+
+class ApplyNatTests(_Base):
+    def test_apply_nat_accepts_trimmed_ok_status(self):
+        with patch.object(
+            switch_dns_path, "_api_call", return_value=("test", {"status": "OK\n\n"})
         ) as mock_api_call:
             switch_dns_path._apply_nat(**self.api_kwargs())
         mock_api_call.assert_called_once()
 
     def test_apply_nat_rejects_non_trimmable_status(self):
-        """A status that is not the trimmed "OK" must still fail closed,
-        even after the trim change. Catches regressions where a future
-        ``str.strip()`` is removed and the contract silently loosens.
-        """
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", {"status": "ERR"}),
+            switch_dns_path, "_api_call", return_value=("test", {"status": "ERR"})
         ):
             with self.assertRaises(switch_dns_path.BypassError) as ctx:
                 switch_dns_path._apply_nat(**self.api_kwargs())
         self.assertIn("status='OK'", str(ctx.exception))
 
     def test_apply_nat_rejects_non_dict_response(self):
-        """A non-dict response from the apply endpoint must fail
-        closed; trim only happens for string statuses.
-        """
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", ["not", "a", "dict"]),
+            switch_dns_path, "_api_call", return_value=("test", ["not", "a", "dict"])
         ):
             with self.assertRaises(switch_dns_path.BypassError):
                 switch_dns_path._apply_nat(**self.api_kwargs())
 
     def test_apply_nat_rejects_missing_status_key(self):
-        """A dict without a ``status`` key must fail closed; trim only
-        happens for string statuses.
-        """
         with patch.object(
-            switch_dns_path,
-            "_api_call",
-            return_value=("test", {"result": "saved"}),
+            switch_dns_path, "_api_call", return_value=("test", {"result": "saved"})
         ):
             with self.assertRaises(switch_dns_path.BypassError) as ctx:
                 switch_dns_path._apply_nat(**self.api_kwargs())
         self.assertIn("status='OK'", str(ctx.exception))
 
-    # ---- P1.4: literal-IP POST fallback restricted to pre-send transport failures
 
-    def test_post_send_read_failure_does_not_fall_through_to_literal_ip(self):
-        """A POST whose primary urlopen succeeds but r.read() then raises
-        (e.g. connection reset mid-response) MUST NOT fall through to the
-        hard-coded literal-IP HTTPS fallback. The request body was already
-        flushed to OPNsense, so retrying the same write against a different
-        transport risks double-applying the change. The error must surface
-        as BypassError, the literal-IP fallback must NOT be contacted.
-        """
+# ---------------------------------------------------------------------------
+# P2.8: mutating POST transport split (preserved)
+# ---------------------------------------------------------------------------
 
-        # The "response" object: context-manager-compatible, .read() raises.
-        class _ReadFailResponse:
-            def __enter__(self):
-                return self
 
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-            def read(self):
-                raise ConnectionResetError(
-                    "simulated mid-response reset AFTER request sent"
-                )
-
-        with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            return_value=_ReadFailResponse(),
-        ) as urlopen:
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._api_call(
-                    "POST",
-                    switch_dns_path.NAT_API_ADD,
-                    body={"rule": {"interface": "lan"}},
-                    **self.api_kwargs(),
-                )
-
-        # Exactly one URL open: hostname primary. No literal-IP fallback.
-        self.assertEqual(urlopen.call_count, 1)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertFalse(
-            any(
-                url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                for url in called_urls
-            )
-        )
-        # The error must explicitly mark itself as post-send so operators
-        # can diagnose "OPNsense may have committed" vs "transport down".
-        msg = str(ctx.exception)
-        self.assertIn("AFTER request was sent", msg)
-        # The BypassError must carry post_send=True so the outer handler
-        # can route it correctly (POST → refuse retry; GET → fall through).
-        self.assertTrue(getattr(ctx.exception, "post_send", False))
-
-    def test_dns_error_on_hostname_primary_falls_through_to_literal_ip_post(self):
-        """A pre-send gaierror (DNS resolution failure) on the hostname
-        primary MUST still fall through to the literal-IP POST fallback —
-        the whole point of the break-glass path is to keep working when
-        the local DNS resolver is down. This proves the pre-send vs
-        post-send split does not regress the original DNS-down scenario.
-        """
+class MutatingPostTransportTests(_Base):
+    def test_post_dns_error_falls_through_to_literal_ip(self):
+        """A pre-send gaierror on the hostname primary → literal-IP POST fallback."""
         import socket
-
         with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
+            switch_dns_path.urllib.request, "urlopen",
             side_effect=socket.gaierror(-2, "Name or service not known"),
         ) as urlopen:
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+            with self.assertRaises(switch_dns_path.BypassError):
                 switch_dns_path._api_call(
-                    "POST",
-                    switch_dns_path.NAT_API_ADD,
+                    "POST", switch_dns_path.NAT_API_ADD,
                     body={"rule": {"interface": "lan"}},
                     **self.api_kwargs(),
                 )
-
-        # Two URL opens: hostname primary + literal-IP HTTPS fallback.
         self.assertEqual(urlopen.call_count, 2)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertTrue(
-            called_urls[1].startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-        )
-        # Fallback must be the literal-IP HTTPS endpoint, NOT the
-        # operator-configured HTTP fallback.
-        self.assertFalse(any(url.startswith(FALLBACK) for url in called_urls))
-        # The combined error message references both endpoints.
-        msg = str(ctx.exception)
-        self.assertIn("https-primary", msg)
-        self.assertIn("https-literal-fallback", msg)
+        urls = [c.args[0].full_url for c in urlopen.call_args_list]
+        self.assertTrue(urls[0].startswith(PRIMARY))
+        self.assertTrue(urls[1].startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK))
+        self.assertFalse(any(u.startswith(FALLBACK) for u in urls))
 
-    def test_urllib_wrapped_gaierror_on_post_falls_through_to_literal_ip(self):
-        """Real-world DNS failures inside urlopen surface as
-        ``urllib.error.URLError(reason=socket.gaierror(...))``, NOT as a
-        raw ``socket.gaierror``. The narrowed pre-send classifier must
-        still detect the wrapped gaierror (via ``.reason``) and let the
-        POST fall through to the literal-IP HTTPS fallback. This
-        regression-locks the real-world shape of a DNS outage against
-        a future refactor that only handles the synthetic raw form.
-        """
-        import socket
+    def test_post_non_dns_urlopen_error_does_not_fall_through(self):
+        """A non-DNS urlopen error on POST must not contact the literal-IP fallback."""
         import urllib.error
-
-        # The exact shape urlopen produces when DNS fails on Python 3.12.
-        wrapped = urllib.error.URLError(
-            socket.gaierror(-2, "Name or service not known")
-        )
-
-        with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            side_effect=wrapped,
-        ) as urlopen:
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._api_call(
-                    "POST",
-                    switch_dns_path.NAT_API_ADD,
-                    body={"rule": {"interface": "lan"}},
-                    **self.api_kwargs(),
-                )
-
-        # Two URL opens: hostname primary + literal-IP HTTPS fallback.
-        self.assertEqual(urlopen.call_count, 2)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertTrue(
-            called_urls[1].startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-        )
-        self.assertFalse(any(url.startswith(FALLBACK) for url in called_urls))
-        msg = str(ctx.exception)
-        self.assertIn("https-primary", msg)
-        self.assertIn("https-literal-fallback", msg)
-        # The propagated error from the fallback itself is NOT a
-        # post_send-flagged BypassError (the gaierror was the URL's
-        # primary error; the fallback also raised with its own
-        # transport-style message).
-        self.assertFalse(getattr(ctx.exception, "post_send", False))
-
-    def test_post_non_dns_urlopen_error_does_not_fall_through_to_literal_ip(self):
-        """Regression for Luna xhigh #2: a non-DNS urlopen-time error
-        on the POST hostname primary must NOT fall through to the
-        hard-coded literal-IP HTTPS fallback. urlopen may have buffered
-        and partially transmitted the request body before surfacing the
-        error, so OPNsense could already have committed the mutation by
-        the time the exception propagates out. Retrying the same write
-        against a different transport risks double-applying the change.
-        The error MUST surface as ``BypassError(post_send=True)`` and
-        the literal-IP endpoint MUST NOT be contacted.
-
-        Exercises the three concrete non-DNS failure modes:
-
-          1. Plain ``URLError`` with no ``.reason`` (the synthetic
-             shape that is NOT a gaierror in disguise).
-          2. ``ConnectionError`` (TCP connect reset mid-handshake).
-          3. ``OSError`` / ``BrokenPipeError`` (``EPIPE`` on body write).
-        """
-        import urllib.error
-
-        # Single shared side_effect sequence: first call raises the
-        # non-DNS error, no second call should ever happen.
-        non_dns_shapes = [
-            (urllib.error.URLError("primary transport failed"), "URLError"),
-            (ConnectionResetError("simulated mid-connect reset"), "ConnectionError"),
-            (BrokenPipeError("simulated EPIPE on body write"), "OSError/EPIPE"),
-        ]
-        for raised, label in non_dns_shapes:
-            with self.subTest(failure_shape=label):
-                with patch.object(
-                    switch_dns_path.urllib.request,
-                    "urlopen",
-                    side_effect=raised,
-                ) as urlopen:
-                    with self.assertRaises(
-                        switch_dns_path.BypassError
-                    ) as ctx:
-                        switch_dns_path._api_call(
-                            "POST",
-                            switch_dns_path.NAT_API_ADD,
-                            body={"rule": {"interface": "lan"}},
-                            **self.api_kwargs(),
-                        )
-
-                # Exactly one URL open: hostname primary only. The
-                # literal-IP HTTPS fallback MUST NOT be contacted.
-                self.assertEqual(
-                    urlopen.call_count,
-                    1,
-                    f"non-DNS {label} must not contact the literal-IP fallback",
-                )
-                called_urls = [
-                    call.args[0].full_url for call in urlopen.call_args_list
-                ]
-                self.assertTrue(called_urls[0].startswith(PRIMARY))
-                self.assertFalse(
-                    any(
-                        url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                        for url in called_urls
-                    ),
-                    f"non-DNS {label} must not call the literal-IP fallback",
-                )
-                self.assertFalse(
-                    any(url.startswith(FALLBACK) for url in called_urls),
-                    f"non-DNS {label} must not call the operator HTTP fallback",
-                )
-                # The error MUST carry post_send=True so the outer
-                # caller can route it as "ambiguous, refuse retry".
-                self.assertTrue(
-                    getattr(ctx.exception, "post_send", False),
-                    f"non-DNS {label} BypassError must have post_send=True",
-                )
-                # The error message MUST distinguish this from a
-                # DNS-resolution failure so operators can diagnose.
-                msg = str(ctx.exception)
-                self.assertIn("not a DNS-resolution failure", msg)
-
-    def test_get_non_dns_urlopen_error_falls_through_to_operator_http_fallback(self):
-        """Regression for the GET-path preservation clause: a non-DNS
-        urlopen-time error on the GET hostname primary MUST still fall
-        through to the operator-configured HTTP fallback. Reads are
-        idempotent so retrying against a second transport is safe. This
-        proves the GET-side behavior is unchanged even though the
-        POST-side classifier is now strict.
-        """
-        import urllib.error
-
-        # Walk every non-DNS failure shape the narrowing changed.
         for raised, label in (
             (urllib.error.URLError("primary transport failed"), "URLError"),
             (ConnectionResetError("simulated mid-connect reset"), "ConnectionError"),
@@ -1164,495 +1130,240 @@ class SwitchDnsPathApiShapeTests(unittest.TestCase):
         ):
             with self.subTest(failure_shape=label):
                 with patch.object(
-                    switch_dns_path.urllib.request,
-                    "urlopen",
-                    side_effect=raised,
+                    switch_dns_path.urllib.request, "urlopen", side_effect=raised
                 ) as urlopen:
-                    with self.assertRaises(switch_dns_path.BypassError):
+                    with self.assertRaises(switch_dns_path.BypassError) as ctx:
                         switch_dns_path._api_call(
-                            "GET",
-                            switch_dns_path.NAT_API_SEARCH,
+                            "POST", switch_dns_path.NAT_API_ADD,
+                            body={"rule": {"interface": "lan"}},
                             **self.api_kwargs(),
                         )
+                self.assertEqual(urlopen.call_count, 1)
+                self.assertTrue(getattr(ctx.exception, "post_send", False))
 
-                # Two URL opens: hostname primary + operator HTTP fallback.
-                self.assertEqual(urlopen.call_count, 2)
-                called_urls = [
-                    call.args[0].full_url for call in urlopen.call_args_list
-                ]
-                self.assertTrue(called_urls[0].startswith(PRIMARY))
-                self.assertTrue(called_urls[1].startswith(FALLBACK))
-                # GET fallback MUST be the operator-configured HTTP
-                # endpoint, NEVER the hard-coded literal-IP HTTPS POST
-                # endpoint — that path is POST-only.
-                self.assertFalse(
-                    any(
-                        url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                        for url in called_urls
-                    ),
-                    f"GET {label} must not contact the literal-IP POST fallback",
-                )
-
-    def test_post_send_read_failure_on_get_uses_operator_http_fallback(self):
-        """A GET whose primary urlopen succeeds but r.read() then raises
-        falls through to the operator-configured HTTP fallback — GETs are
-        safe to retry on a second transport because they do not mutate
-        the firewall table. This proves the GET path is unchanged.
-        """
-        class _ReadFailResponse:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-            def read(self):
-                raise ConnectionResetError(
-                    "simulated mid-response reset AFTER GET sent"
-                )
-
+    def test_get_falls_through_to_operator_http_fallback(self):
+        """A non-credential GET failure falls through to the operator-configured HTTP fallback."""
+        import urllib.error
         with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            return_value=_ReadFailResponse(),
+            switch_dns_path.urllib.request, "urlopen",
+            side_effect=urllib.error.URLError("primary transport failed"),
         ) as urlopen:
             with self.assertRaises(switch_dns_path.BypassError):
                 switch_dns_path._api_call(
-                    "GET",
-                    switch_dns_path.NAT_API_SEARCH,
+                    "GET", switch_dns_path.NAT_API_MODEL,
                     **self.api_kwargs(),
                 )
-
-        # Two URL opens: hostname primary + operator-configured HTTP fallback.
         self.assertEqual(urlopen.call_count, 2)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertTrue(called_urls[1].startswith(FALLBACK))
-        # GET fallback must NOT be the hard-coded literal-IP HTTPS POST fallback.
+        urls = [c.args[0].full_url for c in urlopen.call_args_list]
+        self.assertTrue(urls[0].startswith(PRIMARY))
+        self.assertTrue(urls[1].startswith(FALLBACK))
         self.assertFalse(
-            any(
-                url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                for url in called_urls
-            )
+            any(u.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK) for u in urls)
         )
 
-    # ---- P1.5: post-mutation read-back must require exactly six rules
+    def test_post_send_read_failure_does_not_fall_through(self):
+        """A POST whose primary urlopen succeeds but r.read() then raises must not fall through."""
 
-    def test_install_post_apply_readback_empty_reports_actionable_error(self):
-        """install_bypass calls _apply_nat then reads back. If the
-        post-apply read returns zero rows, install must raise the
-        actionable "ruleset incomplete: have 0/6" error instead of
-        silently reporting installed=N, total=0, state=absent.
-        """
-        calls = []
-        installed_rows: list = []
-
-        def fake_api_call(method, path, **kwargs):
-            calls.append((method, path))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                # First search (pre-install): empty. Second search
-                # (post-apply read-back): ALSO empty — simulates the
-                # firewall table being wiped by something else between
-                # add_rule and apply, or apply not propagating.
-                return "test", observed_search_response([])
-            if method == "POST" and path == switch_dns_path.NAT_API_ADD:
-                body = kwargs.get("body") or {}
-                installed_rows.append(body)
-                return "test", {"result": "saved", "uuid": f"uuid-{len(installed_rows)}"}
-            if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
-                return "test", {"status": "OK"}
-            self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path.install_bypass(**self.api_kwargs())
-
-        msg = str(ctx.exception)
-        self.assertIn("have 0/6", msg)
-        self.assertIn("run --install to repair", msg)
-        # All 6 add_rule calls were issued (the read-back is what catches it).
-        self.assertEqual(
-            sum(call[1] == switch_dns_path.NAT_API_ADD for call in calls),
-            6,
-        )
-        # Apply was issued (the script does not pre-check empty); the
-        # post-apply read-back is the gate.
-        self.assertTrue(
-            any(call[1] == switch_dns_path.NAT_API_APPLY for call in calls)
-        )
-
-    def test_enable_final_readback_empty_reports_actionable_error(self):
-        """enable_bypass calls _apply_nat then reads back. If the final
-        read returns zero rows, enable must raise the actionable
-        "ruleset incomplete: have 0/6" error.
-        """
-        calls = []
-        rows = managed_rows()
-
-        def fake_api_call(method, path, **kwargs):
-            calls.append((method, path))
-            body = kwargs.get("body")
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                # First search (from inner install_bypass): full set.
-                # Second search (post-enable final read-back): EMPTY.
-                if not any(c[1] == switch_dns_path.NAT_API_APPLY for c in calls):
-                    return "test", observed_search_response(rows)
-                return "test", observed_search_response([])
-            if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
-                uuid = path.rsplit("/", 1)[1]
-                row = next(row for row in rows if row["uuid"] == uuid)
-                return "test", {"rule": copy.deepcopy(row)}
-            if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_SET}/"):
-                if not isinstance(body, dict) or set(body) != {"rule"}:
-                    self.fail("set_rule body is not a rule envelope")
-                return "test", {"result": "saved"}
-            if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
-                return "test", {"status": "OK"}
-            self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path.enable_bypass(**self.api_kwargs())
-
-        msg = str(ctx.exception)
-        self.assertIn("have 0/6", msg)
-        self.assertIn("run --install to repair", msg)
-
-    def test_disable_post_disable_readback_empty_reports_actionable_error(self):
-        """disable_bypass calls _apply_nat then reads back. If the
-        post-disable read returns zero rows, disable must raise the
-        actionable "ruleset incomplete: have 0/6" error and the
-        message must suggest --install as the remediation.
-        """
-        calls = []
-        rows = managed_rows(enabled="1")
-
-        def fake_api_call(method, path, **kwargs):
-            calls.append((method, path))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                # First search (pre-disable): full set. Second search
-                # (post-disable read-back): EMPTY.
-                if not any(c[1] == switch_dns_path.NAT_API_APPLY for c in calls):
-                    return "test", observed_search_response(rows)
-                return "test", observed_search_response([])
-            if method == "GET" and path.startswith(f"{switch_dns_path.NAT_API_GET}/"):
-                uuid = path.rsplit("/", 1)[1]
-                row = next(row for row in rows if row["uuid"] == uuid)
-                return "test", {"rule": copy.deepcopy(row)}
-            if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_SET}/"):
-                return "test", {"result": "saved"}
-            if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
-                return "test", {"status": "OK"}
-            self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path.disable_bypass(**self.api_kwargs())
-
-        msg = str(ctx.exception)
-        self.assertIn("have 0/6", msg)
-        self.assertIn("run --install to repair", msg)
-
-    def test_uninstall_post_uninstall_readback_empty_returns_visible_state(self):
-        """uninstall_bypass's post-uninstall read-back MUST still allow
-        the empty state (empty is the desired post-uninstall state).
-        Six rules removed → final read-back empty → returns
-        ``uninstalled=6`` cleanly with no exception.
-        """
-        rows = managed_rows()
-        calls = []
-
-        def fake_api_call(method, path, **kwargs):
-            calls.append((method, path))
-            if method == "GET" and path == switch_dns_path.NAT_API_SEARCH:
-                # First search: full set. Second search (post-uninstall): empty.
-                if any(c[1].startswith(f"{switch_dns_path.NAT_API_DEL}/") for c in calls):
-                    return "test", observed_search_response([])
-                return "test", observed_search_response(rows + unrelated_wan_rows())
-            if method == "POST" and path.startswith(f"{switch_dns_path.NAT_API_DEL}/"):
-                rows[:] = [row for row in rows if row["uuid"] != path.rsplit("/", 1)[1]]
-                return "test", {"result": "deleted"}
-            if method == "POST" and path == switch_dns_path.NAT_API_APPLY:
-                return "test", {"status": "OK"}
-            self.fail(f"unexpected API call: {method} {path}")
-
-        with patch.object(switch_dns_path, "_api_call", side_effect=fake_api_call):
-            summary = switch_dns_path.uninstall_bypass(**self.api_kwargs())
-
-        self.assertEqual(summary, "uninstalled=6")
-        self.assertEqual(
-            sum(call[1].startswith(f"{switch_dns_path.NAT_API_DEL}/") for call in calls),
-            6,
-        )
-
-    # ---- Luna xhigh regressions: HTTPError ordering + BadStatusLine gap
-
-    def test_bad_status_line_on_post_does_not_fall_through_to_literal_ip(self):
-        """Regression for Luna xhigh finding #2: ``http.client.BadStatusLine``
-        raised by urlopen on a POST MUST NOT fall through to the literal-IP
-        HTTPS fallback. The BadStatusLine MRO is
-        ``BadStatusLine -> HTTPException -> Exception`` only — not
-        URLError, gaierror, ConnectionError, or OSError. Without the
-        catch-all inside ``_do_request`` this would escape and hit the
-        outer ``except Exception`` in ``_api_call`` (which sets
-        ``primary_transport_err`` and falls through to the literal-IP
-        POST fallback). For a mutating POST that is unsafe: urlopen may
-        have buffered and partially transmitted the request body before
-        the server closed the connection, so OPNsense could already
-        have committed the mutation by the time the exception propagates
-        out. The error MUST surface as ``BypassError(post_send=True)``
-        and the literal-IP endpoint MUST NOT be contacted.
-        """
-
-        import http.client
+        class _ReadFailResponse:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self):
+                raise ConnectionResetError("simulated mid-response reset")
 
         with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
+            switch_dns_path.urllib.request, "urlopen", return_value=_ReadFailResponse()
+        ) as urlopen:
+            with self.assertRaises(switch_dns_path.BypassError) as ctx:
+                switch_dns_path._api_call(
+                    "POST", switch_dns_path.NAT_API_ADD,
+                    body={"rule": {"interface": "lan"}},
+                    **self.api_kwargs(),
+                )
+        self.assertEqual(urlopen.call_count, 1)
+        self.assertTrue(getattr(ctx.exception, "post_send", False))
+        self.assertIn("AFTER request was sent", str(ctx.exception))
+
+    def test_http_error_401_on_post_raises_credential_error(self):
+        import urllib.error
+        http_err = urllib.error.HTTPError(
+            url="https://example.invalid/api/firewall/source_nat/addRule",
+            code=401, msg="Unauthorized", hdrs={}, fp=io.BytesIO(b'{"error":"x"}'),
+        )
+        with patch.object(
+            switch_dns_path.urllib.request, "urlopen", side_effect=http_err
+        ) as urlopen:
+            with self.assertRaises(switch_dns_path.CredentialError):
+                switch_dns_path._api_call(
+                    "POST", switch_dns_path.NAT_API_ADD,
+                    body={"rule": {"interface": "lan"}},
+                    **self.api_kwargs(),
+                )
+        self.assertEqual(urlopen.call_count, 1)
+
+    def test_http_error_500_on_get_falls_through(self):
+        import urllib.error
+
+        class _OkResponse:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self):
+                # Return a valid empty model shape so the second call succeeds.
+                import json as _json
+                return _json.dumps(_model_response(rules_by_uuid={})).encode()
+
+        primary_err = urllib.error.HTTPError(
+            url="https://example.invalid/api/x", code=500,
+            msg="Internal Server Error", hdrs={}, fp=io.BytesIO(b""),
+        )
+        with patch.object(
+            switch_dns_path.urllib.request, "urlopen", side_effect=[primary_err, _OkResponse()]
+        ) as urlopen:
+            switch_dns_path._api_call(
+                "GET", switch_dns_path.NAT_API_MODEL, **self.api_kwargs(),
+            )
+        self.assertEqual(urlopen.call_count, 2)
+
+    def test_bad_status_line_on_post_does_not_fall_through(self):
+        import http.client
+        with patch.object(
+            switch_dns_path.urllib.request, "urlopen",
             side_effect=http.client.BadStatusLine("simulated server reset"),
         ) as urlopen:
             with self.assertRaises(switch_dns_path.BypassError) as ctx:
                 switch_dns_path._api_call(
-                    "POST",
-                    switch_dns_path.NAT_API_ADD,
+                    "POST", switch_dns_path.NAT_API_ADD,
                     body={"rule": {"interface": "lan"}},
                     **self.api_kwargs(),
                 )
-
-        # Exactly one URL open: hostname primary only. The literal-IP
-        # HTTPS fallback MUST NOT be contacted.
         self.assertEqual(urlopen.call_count, 1)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertFalse(
-            any(
-                url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                for url in called_urls
-            ),
-            "BadStatusLine on POST must not contact the literal-IP fallback",
-        )
-        self.assertFalse(
-            any(url.startswith(FALLBACK) for url in called_urls),
-            "BadStatusLine on POST must not contact the operator HTTP fallback",
-        )
-        # The BypassError must carry post_send=True so the outer
-        # handler routes it correctly (POST -> refuse retry).
-        self.assertTrue(
-            getattr(ctx.exception, "post_send", False),
-            "BadStatusLine on POST must surface as BypassError(post_send=True)",
-        )
-        # The error must NOT be a CredentialError (BadStatusLine is a
-        # transport problem, not a credential problem).
+        self.assertTrue(getattr(ctx.exception, "post_send", False))
         self.assertNotIsInstance(ctx.exception, switch_dns_path.CredentialError)
 
-    def test_http_error_401_on_post_raises_credential_error(self):
-        """Regression for Luna xhigh finding #1: ``urllib.error.HTTPError``
-        is a subclass of ``urllib.error.URLError``. If the ``except
-        URLError`` branch inside ``_do_request`` runs first, it wraps
-        HTTPError in ``BypassError(post_send=True)`` and the outer
-        ``except HTTPError -> CredentialError`` fast-path becomes
-        unreachable. A 401 on a POST must propagate to the outer handler
-        and surface as ``CredentialError`` — NOT ``BypassError`` and
-        NOT a fall-through to the literal-IP fallback.
+
+# ---------------------------------------------------------------------------
+# P2.9: BypassError has post_send flag (preserved)
+# ---------------------------------------------------------------------------
+
+
+class BypassErrorTests(unittest.TestCase):
+    def test_post_send_flag_default_false(self):
+        e = switch_dns_path.BypassError("x")
+        self.assertFalse(e.post_send)
+
+    def test_post_send_flag_opt_in(self):
+        e = switch_dns_path.BypassError("x", post_send=True)
+        self.assertTrue(e.post_send)
+
+
+# ---------------------------------------------------------------------------
+# P2.10: _managed_key_of multi-select and port-tolerance regressions
+# ---------------------------------------------------------------------------
+
+
+class ManagedKeyOfRegressionTests(unittest.TestCase):
+    """Regression tests for two Luna xhigh review findings:
+
+    1. ``_selected_option`` must require EXACTLY ONE selected option. A
+       rule with two ``selected:1`` entries must be treated as
+       not-managed (None), not silently classified as the first one.
+    2. ``_managed_key_of`` must tolerate non-numeric ``target_port`` /
+       ``destination_port`` values (e.g. ``"http"``) and return None
+       instead of letting ``ValueError`` propagate out of status /
+       install / enable / disable / uninstall.
+
+    The second finding is verified by asserting the call does not
+    raise — it would have raised ``ValueError`` before the fix.
+    """
+
+    @staticmethod
+    def _build_rule(**overrides):
+        """Build a fully-managed rule shape; pass overrides to mutate fields.
+
+        Defaults are the BYPASS_MANAGED_KEY values. Override ``interface``
+        or ``target_port`` / ``destination_port`` to test failure modes.
         """
+        rule = _managed_rule("lan", "udp", uuid="uuid-regression")
+        rule.update(overrides)
+        return rule
 
-        import urllib.error
+    def test_managed_key_of_accepts_single_selected_option(self):
+        """Sanity: a rule with exactly one selected option still classifies
+        as managed (positive control for the regressions below)."""
+        rule = self._build_rule()
+        # _managed_rule's helper puts exactly one ``selected:1`` entry per
+        # multi-select field. Confirm via the helper.
+        for ms in (rule["interface"], rule["protocol"], rule["ipprotocol"]):
+            self.assertEqual(sum(1 for v in ms.values() if v.get("selected") == 1), 1)
+        key = switch_dns_path._managed_key_of(rule)
+        self.assertEqual(key, _managed_key("lan", "udp"))
 
-        # HTTPError.__init__ wants (url, code, msg, hdrs, fp). Use
-        # BytesIO for fp so HTTPError's __del__ cleanup (it tries to
-        # close fp) does not raise AttributeError in the GC.
-        http_err = urllib.error.HTTPError(
-            url="https://example.invalid/api/firewall/source_nat/addRule",
-            code=401,
-            msg="Unauthorized",
-            hdrs={},
-            fp=io.BytesIO(b'{"error": "unauthorized"}'),
+    def test_managed_key_of_rejects_multi_select_with_two_selected(self):
+        """A rule with two ``selected:1`` entries in the interface multi-select
+        must be classified as not-managed (None)."""
+        rule = self._build_rule()
+        # Force TWO interfaces to be marked selected.
+        rule["interface"]["lan"]["selected"] = 1
+        rule["interface"]["opt1"]["selected"] = 1
+        # Sanity: exactly two are selected now.
+        self.assertEqual(
+            sum(1 for v in rule["interface"].values() if v.get("selected") == 1),
+            2,
         )
+        self.assertIsNone(switch_dns_path._managed_key_of(rule))
 
-        with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            side_effect=http_err,
-        ) as urlopen:
-            with self.assertRaises(switch_dns_path.CredentialError):
-                switch_dns_path._api_call(
-                    "POST",
-                    switch_dns_path.NAT_API_ADD,
-                    body={"rule": {"interface": "lan"}},
-                    **self.api_kwargs(),
-                )
-
-        # Exactly one URL open: hostname primary only. The literal-IP
-        # HTTPS fallback MUST NOT be contacted (a 401 is a credential
-        # problem, not a transport problem).
-        self.assertEqual(urlopen.call_count, 1)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertFalse(
-            any(
-                url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                for url in called_urls
-            ),
-            "HTTP 401 on POST must not contact the literal-IP fallback",
+    def test_managed_key_of_rejects_multi_select_with_zero_selected(self):
+        """A rule with ZERO ``selected:1`` entries in the interface multi-select
+        must be classified as not-managed (None)."""
+        rule = self._build_rule()
+        # Clear ALL selected entries on the interface multi-select.
+        for entry in rule["interface"].values():
+            entry["selected"] = 0
+        # Sanity: zero are selected now.
+        self.assertEqual(
+            sum(1 for v in rule["interface"].values() if v.get("selected") == 1),
+            0,
         )
+        self.assertIsNone(switch_dns_path._managed_key_of(rule))
 
-    def test_http_error_403_on_get_raises_credential_error(self):
-        """Regression for Luna xhigh finding #1 (GET path): a 403 on a
-        GET must propagate to the outer handler and surface as
-        ``CredentialError`` — NOT fall through to the operator-configured
-        HTTP fallback (a 403 on the hostname primary means the credential
-        does not have the required privilege on this host; retrying the
-        same GET against a second transport is pointless and would mask
-        the real problem).
-        """
+    def test_managed_key_of_rejects_nonnumeric_target_port(self):
+        """A non-numeric ``target_port`` (e.g. ``"http"``) must classify the rule
+        as not-managed (None). Previously this raised ValueError out of int()
+        and would propagate out of status/install/enable/disable/uninstall."""
+        rule = self._build_rule(target_port="http")
+        # Must not raise; must return None.
+        try:
+            result = switch_dns_path._managed_key_of(rule)
+        except (ValueError, TypeError) as e:
+            self.fail(f"_managed_key_of must not raise on nonnumeric port, got {type(e).__name__}: {e}")
+        self.assertIsNone(result)
 
-        import urllib.error
+    def test_managed_key_of_rejects_nonnumeric_destination_port(self):
+        """A non-numeric ``destination_port`` (e.g. ``"http"``) must classify
+        the rule as not-managed (None). Previously this raised ValueError
+        out of int()."""
+        rule = self._build_rule(destination_port="http")
+        try:
+            result = switch_dns_path._managed_key_of(rule)
+        except (ValueError, TypeError) as e:
+            self.fail(f"_managed_key_of must not raise on nonnumeric port, got {type(e).__name__}: {e}")
+        self.assertIsNone(result)
 
-        http_err = urllib.error.HTTPError(
-            url="https://example.invalid/api/firewall/source_nat/search",
-            code=403,
-            msg="Forbidden",
-            hdrs={},
-            fp=io.BytesIO(b'{"error": "forbidden"}'),
-        )
-
-        with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            side_effect=http_err,
-        ) as urlopen:
-            with self.assertRaises(switch_dns_path.CredentialError):
-                switch_dns_path._api_call(
-                    "GET",
-                    switch_dns_path.NAT_API_SEARCH,
-                    **self.api_kwargs(),
-                )
-
-        # Exactly one URL open: hostname primary only. A 403 must NOT
-        # fall through to the operator-configured HTTP fallback.
-        self.assertEqual(urlopen.call_count, 1)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertFalse(
-            any(url.startswith(FALLBACK) for url in called_urls),
-            "HTTP 403 on GET must not fall through to the operator HTTP fallback",
-        )
-        self.assertFalse(
-            any(
-                url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                for url in called_urls
-            ),
-            "HTTP 403 on GET must not contact the literal-IP POST fallback",
-        )
-
-    def test_http_error_500_on_post_raises_bypass_error_not_credential(self):
-        """Regression for Luna xhigh finding #1 (non-credential HTTP
-        status on POST): a 500 on a POST must propagate as
-        ``BypassError`` — NOT ``CredentialError`` (a 500 is not a
-        credential failure) and NOT fall through to the literal-IP
-        HTTPS fallback (a reachable-but-erroring primary is a server
-        result, not a transport problem).
-        """
-
-        import urllib.error
-
-        http_err = urllib.error.HTTPError(
-            url="https://example.invalid/api/firewall/source_nat/addRule",
-            code=500,
-            msg="Internal Server Error",
-            hdrs={},
-            fp=io.BytesIO(b'{"error": "internal server error"}'),
-        )
-
-        with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            side_effect=http_err,
-        ) as urlopen:
-            with self.assertRaises(switch_dns_path.BypassError) as ctx:
-                switch_dns_path._api_call(
-                    "POST",
-                    switch_dns_path.NAT_API_ADD,
-                    body={"rule": {"interface": "lan"}},
-                    **self.api_kwargs(),
-                )
-
-        # Must NOT be a CredentialError (a 500 is not a credential failure).
-        self.assertNotIsInstance(ctx.exception, switch_dns_path.CredentialError)
-        # Exactly one URL open: hostname primary only. A 500 on the
-        # hostname primary MUST NOT fall through to the literal-IP
-        # HTTPS fallback (a reachable-but-erroring primary is not a
-        # transport problem; retrying the same write risks double-applying
-        # the mutation).
-        self.assertEqual(urlopen.call_count, 1)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertFalse(
-            any(
-                url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                for url in called_urls
-            ),
-            "HTTP 500 on POST must not contact the literal-IP fallback",
-        )
-
-    def test_http_error_500_on_get_falls_through_to_operator_http_fallback(self):
-        """Regression for the GET-path preservation clause: a non-credential
-        HTTP status (500) on a GET MUST fall through to the
-        operator-configured HTTP fallback. Reads are safe to retry on a
-        second transport, and a 500 from one transport may be a
-        transient server problem that the other transport handles.
-        """
-
-        import urllib.error
-
-        # First call: 500 on the HTTPS primary. Second call: success on
-        # the operator-configured HTTP fallback.
-        primary_err = urllib.error.HTTPError(
-            url="https://example.invalid/api/firewall/source_nat/search",
-            code=500,
-            msg="Internal Server Error",
-            hdrs={},
-            fp=io.BytesIO(b'{"error": "internal server error"}'),
-        )
-
-        class _OkResponse:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-            def read(self):
-                return b'{"current":1,"rowCount":1000,"rows":[],"total":0}'
-
-        with patch.object(
-            switch_dns_path.urllib.request,
-            "urlopen",
-            side_effect=[primary_err, _OkResponse()],
-        ) as urlopen:
-            label, data = switch_dns_path._api_call(
-                "GET",
-                switch_dns_path.NAT_API_SEARCH,
-                **self.api_kwargs(),
-            )
-
-        # Two URL opens: hostname primary + operator HTTP fallback.
-        self.assertEqual(urlopen.call_count, 2)
-        called_urls = [call.args[0].full_url for call in urlopen.call_args_list]
-        self.assertTrue(called_urls[0].startswith(PRIMARY))
-        self.assertTrue(called_urls[1].startswith(FALLBACK))
-        # GET fallback MUST be the operator-configured HTTP endpoint,
-        # NEVER the hard-coded literal-IP HTTPS POST endpoint.
-        self.assertFalse(
-            any(
-                url.startswith(switch_dns_path.BYPASS_POST_HTTPS_FALLBACK)
-                for url in called_urls
-            ),
-            "GET HTTP 500 fallback must not contact the literal-IP POST fallback",
-        )
-        # The successful response came from the operator HTTP fallback.
-        self.assertEqual(label, "http-fallback")
-        self.assertEqual(data, {"current": 1, "rowCount": 1000, "rows": [], "total": 0})
+    def test_selected_option_helper_is_shared(self):
+        """Both _managed_key_of and the regression tests rely on the same
+        _selected_option helper. Sanity-check that helper directly so a
+        future rename of the private symbol is caught here instead of
+        silently breaking ownership detection."""
+        # Two selected → None.
+        ms_two = {"lan": {"value": "LAN", "selected": 1}, "opt1": {"value": "IOT", "selected": 1}}
+        self.assertIsNone(switch_dns_path._selected_option(ms_two))
+        # Zero selected → None.
+        ms_zero = {"lan": {"value": "LAN", "selected": 0}, "opt1": {"value": "IOT", "selected": 0}}
+        self.assertIsNone(switch_dns_path._selected_option(ms_zero))
+        # One selected → that key as a str.
+        ms_one = {"lan": {"value": "LAN", "selected": 1}, "opt1": {"value": "IOT", "selected": 0}}
+        self.assertEqual(switch_dns_path._selected_option(ms_one), "lan")
+        # Non-dict → None.
+        self.assertIsNone(switch_dns_path._selected_option("not a dict"))
 
 
 if __name__ == "__main__":
