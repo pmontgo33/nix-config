@@ -145,6 +145,7 @@ class SecretsPathResolutionTests(unittest.TestCase):
         args = fake_run.call_args[0][0]
         joined = " ".join(str(a) for a in args)
         self.assertNotIn("bash -c", joined)
+        self.assertNotIn("find /run/secrets.d", joined)
         self.assertNotIn("$(", joined)
         self.assertNotIn("`", joined)
 
@@ -184,6 +185,31 @@ class SecretsPathResolutionTests(unittest.TestCase):
                 with self.assertRaises(Exception) as ctx:
                     live_apply._resolve_secrets_path("root@pihole1", name)
                 self.assertIn("unsafe SOPS secret name", str(ctx.exception))
+
+    def test_read_remote_secret_uses_validated_fish_safe_path(self):
+        import unittest.mock as mock
+        secret = "identities:\n    identityRef:alpha:\n        mac: test-mac\n"
+        with mock.patch.object(
+            live_apply.subprocess, "run",
+            return_value=mock.Mock(returncode=0, stdout=secret, stderr=""),
+        ) as fake_run:
+            result = live_apply._read_remote_secret(
+                "root@pihole1", "/run/secrets.d/12/pihole-identities",
+            )
+        self.assertEqual(result, secret)
+        args = fake_run.call_args[0][0]
+        remote_command = args[-1]
+        self.assertIn("cat --", remote_command)
+        self.assertIn("/run/secrets.d/12/pihole-identities", remote_command)
+        self.assertNotIn("bash -c", remote_command)
+        self.assertNotIn("$(", remote_command)
+        self.assertNotIn("`", remote_command)
+
+    def test_read_remote_secret_rejects_untrusted_path(self):
+        with self.assertRaises(Exception):
+            live_apply._read_remote_secret(
+                "root@pihole1", "/tmp/pihole-identities; touch /tmp/leak",
+            )
 
 
 if __name__ == "__main__":

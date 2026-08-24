@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -135,8 +136,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ssh-host", default=None)
     parser.add_argument("--remote-path", default=REMOTE_DEFAULT_PATH)
     parser.add_argument("--inventory-nix", type=Path, default=dry.REPO_ROOT / "inventory" / "default.nix")
-    parser.add_argument("--secrets", type=Path, default=dry.REPO_ROOT / "secrets" / "pihole-identities.yaml")
-    parser.add_argument("--age-key-file", type=Path, default=Path("/var/lib/hermes/.config/sops/age/pihole-identities.txt"))
     parser.add_argument("--password-path", default=dry._PASSWORD_PATH)
     parser.add_argument("--lock-path", default="/var/lib/pihole/.pihole-policy.lock")
     return parser
@@ -156,6 +155,7 @@ def _ssh_apply(ssh_host: str, remote_path: str, payload: dict[str, Any]) -> dict
 
 
 _SAFE_SECRET_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
+_RESOLVED_SECRET_PATH = re.compile(r"^/run/secrets\.d/[0-9]+/[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
 
 
 def _resolve_secrets_path(ssh_host: str, name: str) -> str:
@@ -174,11 +174,9 @@ def _resolve_secrets_path(ssh_host: str, name: str) -> str:
         "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
         ssh_host,
         "set target (readlink /run/secrets 2>/dev/null); "
-        "if test -n \"$target\" -a -e \"$target/" + name + "\"; "
+        "if test -n \"$target\"; and test -e \"$target/" + name + "\"; "
         "echo \"$target/" + name + "\"; exit 0; "
         "end; "
-        "set found (find /run/secrets.d -maxdepth 2 -name '" + name + "' -print -quit); "
-        "if test -n \"$found\"; echo \"$found\"; exit 0; end; "
         "exit 1",
     ]
     result = subprocess.run(ssh_cmd, capture_output=True, text=True, check=False)
@@ -187,8 +185,37 @@ def _resolve_secrets_path(ssh_host: str, name: str) -> str:
         f"could not resolve SOPS path on {ssh_host}: {dry._sanitize(result.stderr)}",
     )
     path = result.stdout.strip()
-    dry._require(bool(path), f"no SOPS secret {name!r} found on {ssh_host}")
+    dry._require(
+        bool(_RESOLVED_SECRET_PATH.fullmatch(path))
+        and Path(path).name == name,
+        f"no valid rendered secret {name!r} found on {ssh_host}",
+    )
     return path
+
+
+def _read_remote_secret(ssh_host: str, path: str) -> str:
+    """Read one already-resolved sops-nix secret into memory over SSH.
+
+    The path is constrained to the per-activation sops-nix directory before
+    it is quoted for the Pi-hole's fish login shell. The plaintext is returned
+    only to the caller and is never written or printed by this module.
+    """
+    dry._require(
+        bool(_RESOLVED_SECRET_PATH.fullmatch(path)),
+        "rendered secret path is not a valid per-activation path",
+    )
+    remote_command = f"cat -- {shlex.quote(path)}"
+    command = [
+        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
+        ssh_host, remote_command,
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    dry._require(
+        result.returncode == 0,
+        f"could not read rendered secret on {ssh_host}: {dry._sanitize(result.stderr)}",
+    )
+    dry._require(bool(result.stdout), "rendered secret file is empty")
+    return result.stdout
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -199,12 +226,16 @@ def main(argv: list[str] | None = None) -> int:
         target = args.target
         ssh_host = dry._validate_ssh_host(args.ssh_host or f"root@{target}", target=target)
         remote_path = dry._validate_remote_path(args.remote_path)
-        # Resolve the active sops-nix secret path on the remote host; the
+        dry._validate_password_path(args.password_path)
+        # Resolve both active sops-nix secret paths on the remote host; the
         # numeric subdirectory under /run/secrets.d/ is per-activation.
         password_basename = Path(args.password_path).name
         password_path = _resolve_secrets_path(ssh_host, password_basename)
+        identities_path = _resolve_secrets_path(ssh_host, "pihole-identities")
+        dry._require_same_secret_generation(password_path, identities_path)
         rendered_inventory = dry.inventory_renderer.render(dry.inventory_renderer.load_source(args.inventory_nix, None))
-        identities = dry._decrypt_identities(args.secrets, args.age_key_file)
+        identities_text = _read_remote_secret(ssh_host, identities_path)
+        identities = dry._parse_identity_yaml(identities_text)
         apply_inventory = _build_apply_inventory(rendered_inventory, identities)
         dry._safe_keys(apply_inventory)
 
@@ -218,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
             raise OrchestratorError("remote policy apply did not verify convergence")
         sys.stdout.write(json.dumps(result, sort_keys=True) + "\n")
         return 0
-    except OrchestratorError as exc:
+    except dry.OrchestratorError as exc:
         print(f"Pi-hole live apply failed: {exc}", file=sys.stderr)
         return 2
 
