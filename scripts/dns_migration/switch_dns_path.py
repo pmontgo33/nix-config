@@ -8,8 +8,11 @@ resolver's data plane.
 
 The three records are owned by exact descriptions.  Discovery validates the
 complete identity tuple before any write, and each authoritative record is
-fetched by UUID.  A switch changes only ``value``; all other fields from the
-GET response are echoed unchanged.
+fetched by UUID.  A switch preserves all unrelated fields from the GET
+response (deep-copied verbatim) while normalizing the controller-owned
+``interface``, ``option``, ``option6``, ``type``, ``set_tag``, and ``force``
+fields to the scalar indices the OPNsense ``set_option`` controller accepts;
+echoing the live OptionField maps back triggers HTTP 500.
 """
 
 from __future__ import annotations
@@ -41,11 +44,16 @@ VALID_VALUES = frozenset((UNBOUND_DNS, PIHOLE_DNS))
 DNSMASQ_API_SEARCH = "dnsmasq/settings/search_option"
 DNSMASQ_API_GET = "dnsmasq/settings/get_option"
 DNSMASQ_API_SET = "dnsmasq/settings/set_option"
-DNSMASQ_API_RECONFIGURE = "dnsmasq/settings/service/reconfigure"
+DNSMASQ_API_RECONFIGURE = "dnsmasq/service/reconfigure"
 SEARCH_PAGE_SIZE = 100
 
-# Kept as a public alias for callers that used the old module's naming style;
-# it is a dnsmasq settings endpoint, not a packet-filter lifecycle endpoint.
+# Public aliases kept for callers that used the old module's naming style.
+# Note: the GET/POST controllers return OptionField maps for some fields
+# (interface, option, option6, type, set_tag); the OPNsense set_option
+# controller accepts only the scalar index form and rejects the map form with
+# HTTP 500. The set path normalizes those six fields and preserves every other
+# field from the GET response verbatim. The reconfigure endpoint must be the
+# live service reconfigure, which returns exactly {"status": "ok"}.
 API_SEARCH_OPTION = DNSMASQ_API_SEARCH
 API_GET_OPTION = DNSMASQ_API_GET
 API_SET_OPTION = DNSMASQ_API_SET
@@ -430,25 +438,55 @@ def _reconfigure(*, primary: str, fallback: str, key: str, secret: str) -> None:
         key=key,
         secret=secret,
     )
-    if not isinstance(data, dict) or data.get("result") not in {"saved", "reconfigured"}:
-        status = data.get("status") if isinstance(data, dict) else None
-        if status != "OK":
-            raise BypassError(
-                f"OPNsense API {DNSMASQ_API_RECONFIGURE} did not confirm reconfigure"
-            )
+    if not isinstance(data, dict):
+        raise BypassError(
+            f"OPNsense API {DNSMASQ_API_RECONFIGURE} did not return a JSON object"
+        )
+    if data == {"status": "ok"}:
+        return
+    if data.get("status") == "ok":
+        raise BypassError(
+            f"OPNsense API {DNSMASQ_API_RECONFIGURE} returned an unexpected shape"
+        )
+    raise BypassError(
+        f"OPNsense API {DNSMASQ_API_RECONFIGURE} did not confirm reconfigure"
+    )
+
+
+def _build_set_option_body(option: dict[str, Any], value: str, uuid: str, interface: str) -> dict[str, Any]:
+    """Construct the scalar body OPNsense accepts on `set_option`.
+
+    The authoritative GET returns OptionField maps (per-key ``{value, selected}``)
+    for ``interface``, ``option``, and ``type``.  Echoing those maps back to
+    `set_option` triggers HTTP 500.  Reshape the body to the scalar indices the
+    controller actually persists.
+    """
+    body = copy.deepcopy(option)
+    for map_field in ("interface", "option", "option6", "type", "set_tag", "force"):
+        body.pop(map_field, None)
+    body["value"] = value
+    body["interface"] = interface
+    body["option"] = "6"
+    body["option6"] = ""
+    body["type"] = "set"
+    body["set_tag"] = ""
+    body["force"] = "0"
+    body.pop("uuid", None)
+    body["uuid"] = uuid
+    return {"option": body}
 
 
 def _set_option_value(
     entry: dict[str, Any], value: str, *, primary: str, fallback: str, key: str, secret: str
 ) -> None:
-    option = copy.deepcopy(entry["option"])
-    option["value"] = value
     uuid = _require_uuid(entry["uuid"], where="set path")
+    interface = entry["interface"]
+    body = _build_set_option_body(entry["option"], value, uuid, interface)
     path = f"{DNSMASQ_API_SET}/{uuid}"
     _, data = _api_call(
         "POST",
         path,
-        body={"option": option},
+        body=body,
         primary=primary,
         fallback=fallback,
         key=key,
