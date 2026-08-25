@@ -811,6 +811,7 @@ in
                   { name = "Briefing";         skill = "topic-briefing";        thread_id = 90466; }
                   { name = "General";          skill = "topic-general";         thread_id = 87664; }
                   { name = "CHOP";             skill = "topic-chop";            thread_id = 88598; }
+                  { name = "Coder";            skill = "topic-coder";           thread_id = 116234; }
                 ];
               }
             ];
