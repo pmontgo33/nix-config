@@ -144,8 +144,9 @@ let
     chmod -R a+rX $out
   '';
   hermes-scripts = pkgs.runCommandLocal "hermes-scripts" { } ''
-    mkdir -p $out
+    mkdir -p $out/dns_migration
     install -m 0555 ${../../../scripts/bernie/model_worker.py} $out/model_worker.py
+    install -m 0555 ${../../../scripts/dns_migration/switch_dns_path.py} $out/dns_migration/switch_dns_path.py
   '';
   forgejo-credential-helper = pkgs.writeShellScript "forgejo-credential-helper" ''
     host=""
@@ -908,6 +909,7 @@ in
   systemd.tmpfiles.rules = [
     "d /var/lib/hermes/scripts 0755 hermes users -"
     "L+ /var/lib/hermes/scripts/bernie - - - - ${hermes-scripts}"
+    "L+ /var/lib/hermes/scripts/dns_migration - - - - ${hermes-scripts}/dns_migration"
     "z /var/lib/hermes/.hermes/.env 0600 hermes users -"
     "d /var/lib/hermes/.local 0700 hermes users -"
     "d /var/lib/hermes/.local/state 0700 hermes users -"
