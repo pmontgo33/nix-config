@@ -542,12 +542,111 @@ in
         };
       };
 
+      # Auxiliary task assignments. Each task declares its primary provider,
+      # model, reasoning level, and an ordered fallback_chain. Reasoning is
+      # task-level in installed Hermes 0.20.0 (auxiliary_client.py:7558-7601)
+      # and the same value is passed to every fallback candidate. Per-entry
+      # reasoning is not honored; per-entry timeout is supported but unused
+      # here. Provider/model IDs are verbatim from the OpenCode Go docs page
+      # https://opencode.ai/docs/go/#endpoints and the live /v1/models
+      # catalog.
       auxiliary = {
         provider = "minimax";
         model = "MiniMax-M2.7";
+
+        web_extract = {
+          provider = "minimax";
+          model = "MiniMax-M2.7";
+          reasoning_effort = "low";
+          fallback_chain = [
+            { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+          ];
+        };
+
+        compression = {
+          provider = "minimax";
+          model = "MiniMax-M2.7";
+          reasoning_effort = "low";
+          fallback_chain = [
+            { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+          ];
+        };
+
+        skills_hub = {
+          provider = "minimax";
+          model = "MiniMax-M2.7";
+          reasoning_effort = "low";
+          fallback_chain = [
+            { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+          ];
+        };
+
+        mcp = {
+          provider = "minimax";
+          model = "MiniMax-M2.7";
+          reasoning_effort = "medium";
+          fallback_chain = [
+            { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+          ];
+        };
+
+        approval = {
+          provider = "minimax";
+          model = "MiniMax-M2.7";
+          reasoning_effort = "low";
+          fallback_chain = [
+            { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+          ];
+        };
+
+        title_generation = {
+          provider = "minimax";
+          model = "MiniMax-M2.7";
+          reasoning_effort = "low";
+          fallback_chain = [
+            { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+          ];
+        };
+
+        triage_specifier = {
+          provider = "minimax";
+          model = "MiniMax-M2.7";
+          reasoning_effort = "medium";
+          fallback_chain = [
+            { provider = "opencode-go"; model = "mimo-v2.5"; }
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+          ];
+        };
+
+        # Vision. Primary MiMo V2.5, then Luna, then the experimental
+        # DeepSeek V4 Flash vision model documented by OpenCode Go.
         vision = {
           provider = "opencode-go";
           model = "mimo-v2.5";
+          reasoning_effort = "low";
+          fallback_chain = [
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
+            { provider = "opencode-go"; model = "deepseek-v4-flash-vision-exp"; }
+          ];
+        };
+
+        # Review. /review launches a full reviewer subagent; Luna at xhigh
+        # is the primary, followed by DeepSeek V4 Flash and MiniMax-M3.
+        # Reasoning applies uniformly because per-entry overrides are unsupported.
+        review = {
+          provider = "openai-codex";
+          model = "gpt-5.6-luna";
+          reasoning_effort = "xhigh";
+          fallback_chain = [
+            { provider = "opencode-go"; model = "deepseek-v4-flash"; }
+            { provider = "minimax"; model = "MiniMax-M3"; }
+          ];
         };
       };
 
