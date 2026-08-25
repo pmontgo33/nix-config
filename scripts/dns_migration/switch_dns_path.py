@@ -8,18 +8,15 @@ resolver's data plane.
 
 The three records are owned by exact descriptions.  Discovery validates the
 complete identity tuple before any write, and each authoritative record is
-fetched by UUID.  A switch preserves all unrelated fields from the GET
-response (deep-copied verbatim) while normalizing the controller-owned
-``interface``, ``option``, ``option6``, ``type``, ``set_tag``, and ``force``
-fields to the scalar indices the OPNsense ``set_option`` controller accepts;
-echoing the live OptionField maps back triggers HTTP 500.
+fetched by UUID.  The live ``set_option`` controller accepts only the scalar
+interface/option/type/value subset; it preserves the other record fields
+server-side while rejecting the full GET envelope with HTTP 500.
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
-import copy
 import json
 import os
 import re
@@ -48,12 +45,10 @@ DNSMASQ_API_RECONFIGURE = "dnsmasq/service/reconfigure"
 SEARCH_PAGE_SIZE = 100
 
 # Public aliases kept for callers that used the old module's naming style.
-# Note: the GET/POST controllers return OptionField maps for some fields
-# (interface, option, option6, type, set_tag); the OPNsense set_option
-# controller accepts only the scalar index form and rejects the map form with
-# HTTP 500. The set path normalizes those six fields and preserves every other
-# field from the GET response verbatim. The reconfigure endpoint must be the
-# live service reconfigure, which returns exactly {"status": "ok"}.
+# The GET response contains full OptionField maps, but set_option accepts only
+# scalar interface/option/type/value fields; the controller preserves unrelated
+# record fields server-side. The reconfigure endpoint returns exactly
+# {"status": "ok"}.
 API_SEARCH_OPTION = DNSMASQ_API_SEARCH
 API_GET_OPTION = DNSMASQ_API_GET
 API_SET_OPTION = DNSMASQ_API_SET
@@ -454,26 +449,22 @@ def _reconfigure(*, primary: str, fallback: str, key: str, secret: str) -> None:
 
 
 def _build_set_option_body(option: dict[str, Any], value: str, uuid: str, interface: str) -> dict[str, Any]:
-    """Construct the scalar body OPNsense accepts on `set_option`.
+    """Construct the minimal scalar body accepted by ``set_option``.
 
-    The authoritative GET returns OptionField maps (per-key ``{value, selected}``)
-    for ``interface``, ``option``, and ``type``.  Echoing those maps back to
-    `set_option` triggers HTTP 500.  Reshape the body to the scalar indices the
-    controller actually persists.
+    The authoritative GET returns a full option record with OptionField maps,
+    but the live controller rejects those maps and unrelated fields with HTTP
+    500.  It persists the targeted value while retaining the existing record
+    fields server-side, so send only the scalar identity/value fields.
     """
-    body = copy.deepcopy(option)
-    for map_field in ("interface", "option", "option6", "type", "set_tag", "force"):
-        body.pop(map_field, None)
-    body["value"] = value
-    body["interface"] = interface
-    body["option"] = "6"
-    body["option6"] = ""
-    body["type"] = "set"
-    body["set_tag"] = ""
-    body["force"] = "0"
-    body.pop("uuid", None)
-    body["uuid"] = uuid
-    return {"option": body}
+    del option, uuid
+    return {
+        "option": {
+            "interface": interface,
+            "option": "6",
+            "type": "set",
+            "value": value,
+        }
+    }
 
 
 def _set_option_value(
