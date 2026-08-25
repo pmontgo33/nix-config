@@ -386,15 +386,19 @@ in
     ];
 
     settings = {
+      # Default conversation model is now GPT-5.6 Luna via Codex at
+      # `high` reasoning. Auxiliary review (see auxiliary.review) is
+      # configured separately on MiniMax-M3 at xhigh so the reviewer
+      # stays strictly more deliberate than the parent conversation —
+      # independent review semantics are preserved.
       model = {
-        default = "MiniMax-M3";
-        provider = "minimax";
+        default = "gpt-5.6-luna";
+        provider = "openai-codex";
+        reasoning_effort = "high";
         # User-defined model aliases — resolved before catalog lookup.
         # Checked BEFORE built-in short names (sonnet/grok/...).
         # See hermes_cli/model_switch.py::resolve_alias().
-        # `mm` is a stable short name for the current default
-        # (model.default above) — keeps `/model mm` working even
-        # if the default changes later.
+        # `mm` is the previous default kept as a stable short name.
         aliases = {
           luna = "openai-codex/gpt-5.6-luna";
           terra = "openai-codex/gpt-5.6-terra";
@@ -407,13 +411,14 @@ in
       };
 
       # Native delegate_task controls (Bernie's delegation path).
-      # Default worker model is governed by the workload-delegation
-      # skill's decision table and by individual delegating skills;
-      # these bounds enforce a hard ceiling on concurrency and depth.
-      # Bernie's SOUL.md (Quality and Orchestration) is the policy
-      # authority — these values must not silently grow without a
-      # separate plan and explicit authorization.
+      # Worker model is MiniMax-M3 via the minimax Portal so children
+      # run on the Portal target and the daily CLI primary quota is
+      # reserved for the parent conversation. Fallback chain inherits
+      # the global fallback_providers (Luna first, then MiMo). Session
+      # /reasoning --session still wins for individual workers.
       delegation = {
+        provider = "minimax";
+        model = "MiniMax-M3";
         max_concurrent_children = 2;
         max_spawn_depth = 1;
         orchestrator_enabled = true;
@@ -637,16 +642,19 @@ in
           ];
         };
 
-        # Review. /review launches a full reviewer subagent; Luna at xhigh
-        # is the primary, followed by DeepSeek V4 Flash and MiniMax-M3.
-        # Reasoning applies uniformly because per-entry overrides are unsupported.
+        # Review. /review launches a full reviewer subagent. The default
+        # conversation is now Luna at `high`, so the reviewer MUST be a
+        # strictly more deliberate target to preserve independent review
+        # semantics. MiniMax-M3 at xhigh is the canonical reviewer
+        # primary; Luna is the immediate fallback. Reasoning applies
+        # uniformly because per-entry overrides are unsupported.
         review = {
-          provider = "openai-codex";
-          model = "gpt-5.6-luna";
+          provider = "minimax";
+          model = "MiniMax-M3";
           reasoning_effort = "xhigh";
           fallback_chain = [
+            { provider = "openai-codex"; model = "gpt-5.6-luna"; }
             { provider = "opencode-go"; model = "deepseek-v4-flash"; }
-            { provider = "minimax"; model = "MiniMax-M3"; }
           ];
         };
       };
