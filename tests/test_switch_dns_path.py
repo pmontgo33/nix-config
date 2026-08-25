@@ -112,7 +112,9 @@ class FixtureTransport:
                 return "fake", {"result": "failed"}
             option = copy.deepcopy(body["option"])
             self.set_bodies.append(option)
-            self.options[uuid] = option
+            current = self.options[uuid]
+            current["value"] = option["value"]
+            self.options[uuid] = current
             if uuid == self.ambiguous_set_for:
                 raise switch_dns_path.BypassError("connection lost after set", post_send=True)
             return "fake", {"result": "saved"}
@@ -181,25 +183,19 @@ class DiscoveryTests(Base):
             status = switch_dns_path.status_bypass(**self.kwargs())
         self.assertEqual(status["options"], {interface: PIHOLES for interface in INTERFACES})
 
-    def test_set_option_body_uses_scalar_indices(self):
+    def test_set_option_body_uses_minimal_scalar_indices(self):
         fake = FixtureTransport()
         with patch.object(switch_dns_path, "_api_call", side_effect=fake):
             switch_dns_path.enable_bypass(**self.kwargs())
-        for body in fake.set_bodies:
-            self.assertEqual(body["value"], UNBOUND)
-            description = str(body["description"])
-            interface_key = description.split(":")[3]
-            self.assertEqual(body["interface"], interface_key)
-            self.assertEqual(body["option"], "6")
-            self.assertEqual(body["option6"], "")
-            self.assertEqual(body["type"], "set")
-            self.assertEqual(body["set_tag"], "")
-            self.assertEqual(body["force"], "0")
-            self.assertNotIsInstance(body["interface"], dict)
-            self.assertNotIsInstance(body["option"], dict)
-            self.assertNotIsInstance(body["type"], dict)
+        self.assertEqual(
+            fake.set_bodies,
+            [
+                {"interface": interface, "option": "6", "type": "set", "value": UNBOUND}
+                for interface in INTERFACES
+            ],
+        )
 
-    def test_set_option_body_normalizes_live_option_field_maps(self):
+    def test_set_option_body_is_minimal_for_live_option_field_maps(self):
         fake = FixtureTransport()
         for option in fake.options.values():
             if option.get("description") not in DESCRIPTIONS.values():
@@ -222,33 +218,25 @@ class DiscoveryTests(Base):
             option.pop("set", None)
         with patch.object(switch_dns_path, "_api_call", side_effect=fake):
             switch_dns_path.enable_bypass(**self.kwargs())
-        for body in fake.set_bodies:
-            self.assertEqual(body["value"], UNBOUND)
-            self.assertIsInstance(body["interface"], str)
-            self.assertIsInstance(body["option"], str)
-            self.assertIsInstance(body["option6"], str)
-            self.assertIsInstance(body["type"], str)
-            self.assertIsInstance(body["set_tag"], str)
-            self.assertIsInstance(body["force"], str)
-            self.assertEqual(body["option"], "6")
-            self.assertEqual(body["option6"], "")
-            self.assertEqual(body["type"], "set")
-            self.assertEqual(body["set_tag"], "")
-            self.assertEqual(body["force"], "0")
-
-    def test_build_set_option_body_preserves_unrelated_fields(self):
-        fake = FixtureTransport()
-        fake.options[_uuid(0)]["description"] = (
-            "hermes:dnsmasq:managed-option:lan:dns"
+        self.assertEqual(
+            fake.set_bodies,
+            [
+                {"interface": interface, "option": "6", "type": "set", "value": UNBOUND}
+                for interface in INTERFACES
+            ],
         )
+
+    def test_set_preserves_unrelated_fields_in_readback(self):
+        fake = FixtureTransport()
         fake.options[_uuid(0)]["description_extra"] = "operator-managed"
         fake.options[_uuid(0)]["custom_object"] = {"nested": ["a", "b"]}
+        before = copy.deepcopy(fake.options[_uuid(0)])
         with patch.object(switch_dns_path, "_api_call", side_effect=fake):
             switch_dns_path.enable_bypass(**self.kwargs())
-        lan_body = next(body for body in fake.set_bodies if body["description"] == "hermes:dnsmasq:managed-option:lan:dns")
-        self.assertEqual(lan_body["description_extra"], "operator-managed")
-        self.assertEqual(lan_body["custom_object"], {"nested": ["a", "b"]})
-        self.assertEqual(lan_body["value"], UNBOUND)
+        after = fake.options[_uuid(0)]
+        self.assertEqual(after["description_extra"], before["description_extra"])
+        self.assertEqual(after["custom_object"], before["custom_object"])
+        self.assertEqual(after["value"], UNBOUND)
 
     def test_reconfigure_endpoint_is_dnsmasq_service_reconfigure(self):
         fake = FixtureTransport()
@@ -384,12 +372,6 @@ class LifecycleTests(Base):
             uuid = _uuid(INTERFACES.index(interface))
             expected = copy.deepcopy(before[uuid])
             expected["value"] = UNBOUND
-            expected["force"] = "0"
-            expected["interface"] = interface
-            expected["option"] = "6"
-            expected["option6"] = ""
-            expected["set_tag"] = ""
-            expected["type"] = "set"
             self.assertEqual(fake.options[uuid], expected)
         unrelated_uuid = "00000000-0000-4000-8000-000000000099"
         self.assertEqual(fake.options[unrelated_uuid], before[unrelated_uuid])
