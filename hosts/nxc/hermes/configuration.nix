@@ -148,6 +148,25 @@ let
     install -m 0555 ${../../../scripts/bernie/model_worker.py} $out/model_worker.py
     install -m 0555 ${../../../scripts/dns_migration/switch_dns_path.py} $out/dns_migration/switch_dns_path.py
   '';
+  calendarPython = python312.withPackages (ps: [ ps.icalendar ]);
+  familyCalendarPublisher = pkgs.writeShellScriptBin "family-calendar-publisher" ''
+    export PYTHON=${calendarPython}/bin/python3
+    export FLOCK=${pkgs.util-linux}/bin/flock
+    export TIMEOUT=${pkgs.coreutils}/bin/timeout
+    export PATH=${pkgs.lib.makeBinPath [ pkgs.coreutils pkgs.openssh pkgs.curl pkgs.util-linux ]}
+    exec ${pkgs.bash}/bin/bash ${../../../scripts/calendar-publish/family-calendar-router/router.sh}
+  '';
+  sportsCalendarPublisher = pkgs.writeShellScriptBin "sports-calendar-publisher" ''
+    export PYTHON=${calendarPython}/bin/python3
+    export RSYNC=${pkgs.rsync}/bin/rsync
+    export SSH=${pkgs.openssh}/bin/ssh
+    export MKDIR=${pkgs.coreutils}/bin/mkdir
+    export MKTemp=${pkgs.coreutils}/bin/mktemp
+    export MV=${pkgs.coreutils}/bin/mv
+    export RM=${pkgs.coreutils}/bin/rm
+    export FLOCK=${pkgs.util-linux}/bin/flock
+    exec ${pkgs.bash}/bin/bash ${../../../scripts/calendar-publish/philly-sports-cal/deploy.sh}
+  '';
   forgejo-credential-helper = pkgs.writeShellScript "forgejo-credential-helper" ''
     host=""
     protocol=""
@@ -294,6 +313,16 @@ in
     mode = "0400";
   };
   sops.secrets."forgejo-token" = {
+    owner = "hermes";
+    group = "users";
+    mode = "0400";
+  };
+  sops.secrets."calendar-proton-url" = {
+    owner = "hermes";
+    group = "users";
+    mode = "0400";
+  };
+  sops.secrets."calendar-google-url" = {
     owner = "hermes";
     group = "users";
     mode = "0400";
@@ -988,6 +1017,78 @@ in
       OnUnitActiveSec = "15min";
       Persistent = true;
       Unit = "tasknotes-calendar-publish.service";
+    };
+  };
+
+  # Migration units for the Nix-managed calendar publishers. They are
+  # intentionally not enabled in this first PR; the existing Hermes calendar
+  # job and sports unit remain the rollback path until these oneshots pass.
+  systemd.services.family-calendar-publish = {
+    description = "Fetch and publish family calendars";
+    wants = [ "network-online.target" "sops-install-secrets.service" ];
+    after = [ "network-online.target" "sops-install-secrets.service" ];
+    path = with pkgs; [ curl openssh coreutils util-linux ];
+    environment = {
+      HOME = "/var/lib/hermes";
+      HERMES_HOME = "/var/lib/hermes/.hermes";
+      PROTON_ICAL_URL_FILE = config.sops.secrets."calendar-proton-url".path;
+      LINA_ICAL_URL_FILE = config.sops.secrets."calendar-google-url".path;
+    };
+    serviceConfig = {
+      Type = "oneshot";
+      User = "hermes";
+      Group = "users";
+      WorkingDirectory = "/var/lib/hermes";
+      UMask = "0077";
+      ExecStartPre = [
+        "${pkgs.coreutils}/bin/test -x ${familyCalendarPublisher}/bin/family-calendar-publisher"
+        "${pkgs.coreutils}/bin/test -r ${config.sops.secrets."calendar-proton-url".path}"
+        "${pkgs.coreutils}/bin/test -r ${config.sops.secrets."calendar-google-url".path}"
+      ];
+      ExecStart = "${familyCalendarPublisher}/bin/family-calendar-publisher";
+      TimeoutStartSec = 900;
+    };
+  };
+
+  systemd.timers.family-calendar-publish = {
+    wantedBy = [ ];
+    timerConfig = {
+      OnCalendar = "*-*-* 00/4:00:00 America/New_York";
+      Persistent = true;
+      Unit = "family-calendar-publish.service";
+    };
+  };
+
+  systemd.services.calendar-sports-publish = {
+    description = "Generate and publish Philadelphia sports calendars (Nix)";
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    path = with pkgs; [ coreutils openssh rsync util-linux ];
+    environment = {
+      HOME = "/var/lib/hermes";
+      HERMES_HOME = "/var/lib/hermes/.hermes";
+    };
+    serviceConfig = {
+      Type = "oneshot";
+      User = "hermes";
+      Group = "users";
+      WorkingDirectory = "/var/lib/hermes";
+      UMask = "0077";
+      ExecStartPre = [
+        "${pkgs.coreutils}/bin/test -x ${sportsCalendarPublisher}/bin/sports-calendar-publisher"
+        "${pkgs.coreutils}/bin/test -d /var/lib/hermes/workspace"
+      ];
+      ExecStart = "${sportsCalendarPublisher}/bin/sports-calendar-publisher";
+      TimeoutStartSec = 1800;
+    };
+  };
+
+  systemd.timers.calendar-sports-publish = {
+    wantedBy = [ ];
+    timerConfig = {
+      OnCalendar = "*-*-* 00/4:00:00 America/New_York";
+      Persistent = true;
+      Unit = "calendar-sports-publish.service";
     };
   };
 

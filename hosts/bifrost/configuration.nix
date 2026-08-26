@@ -119,6 +119,7 @@ in
   environment.systemPackages = with pkgs; [
     inetutils
     mtr
+    rsync
     sysstat
     tasknotes-calendar-publish
   ];

@@ -1,0 +1,334 @@
+import importlib.util
+import io
+import os
+import subprocess
+import tempfile
+import unittest
+from unittest import mock
+from datetime import datetime, timezone
+from email.message import Message
+from pathlib import Path
+from unittest.mock import patch
+from urllib.error import HTTPError
+
+
+REAL_SUBPROCESS_RUN = subprocess.run
+
+
+ROUTER_PATH = Path(__file__).resolve().parents[1] / "router.py"
+SPEC = importlib.util.spec_from_file_location("family_calendar_router", ROUTER_PATH)
+assert SPEC is not None
+router = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+SPEC.loader.exec_module(router)
+
+
+ICAL = """BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//MontyCasa//Family Calendar//EN
+BEGIN:VEVENT
+UID:test-proton-event@example.com
+DTSTART:20260825T120000Z
+DTEND:20260825T130000Z
+SUMMARY:#patrick Proton test event
+END:VEVENT
+END:VCALENDAR
+"""
+
+
+class FakeResponse:
+    def __init__(self, body: str):
+        self.body = body.encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return self.body
+
+
+class FamilyCalendarRouterTests(unittest.TestCase):
+    def test_fetch_proton_reads_url_file_and_parses_remote_calendar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            url_file = Path(tmp) / "proton-url"
+            secret_url = "https://calendar.example.invalid/redacted-token"
+            url_file.write_text(secret_url)
+            original = getattr(router, "PROTON_ICAL_URL_FILE")
+            setattr(router, "PROTON_ICAL_URL_FILE", str(url_file))
+            try:
+                with patch.object(router, "urlopen", return_value=FakeResponse(ICAL)) as fetch:
+                    events = router.fetch_proton()
+            finally:
+                setattr(router, "PROTON_ICAL_URL_FILE", original)
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["source"], "proton")
+        fetch.assert_called_once()
+        self.assertNotIn(secret_url, str(fetch.call_args))
+
+    def test_fetch_remote_ical_retries_transient_http_failure(self):
+        error = HTTPError(
+            "https://calendar.example.invalid/redacted-token",
+            503,
+            "unavailable",
+            Message(),
+            io.BytesIO(b"temporary failure"),
+        )
+        with patch.object(router, "urlopen", side_effect=[error, FakeResponse(ICAL)]) as fetch:
+            with patch.object(router.time, "sleep") as sleep:
+                raw = router.fetch_remote_ical(
+                    "https://calendar.example.invalid/redacted-token",
+                    "Proton",
+                )
+
+        self.assertTrue(raw.startswith("BEGIN:VCALENDAR"))
+        self.assertEqual(fetch.call_count, 2)
+        sleep.assert_called_once_with(2)
+
+    def test_missing_proton_secret_fails_closed(self):
+        original = getattr(router, "PROTON_ICAL_URL_FILE")
+        setattr(router, "PROTON_ICAL_URL_FILE", "/does/not/exist/proton-url")
+        try:
+            with self.assertRaisesRegex(RuntimeError, "secret file not found") as raised:
+                router.fetch_proton()
+        finally:
+            setattr(router, "PROTON_ICAL_URL_FILE", original)
+        self.assertNotIn("calendar.example.invalid", str(raised.exception))
+
+    def test_empty_proton_secret_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            url_file = Path(tmp) / "proton-url"
+            url_file.write_text("\n")
+            original = getattr(router, "PROTON_ICAL_URL_FILE")
+            setattr(router, "PROTON_ICAL_URL_FILE", str(url_file))
+            try:
+                with self.assertRaisesRegex(RuntimeError, "secret file is empty"):
+                    router.fetch_proton()
+            finally:
+                setattr(router, "PROTON_ICAL_URL_FILE", original)
+
+    def test_fetch_remote_ical_sanitizes_malformed_url_errors(self):
+        secret_url = "https://calendar.example.invalid/redacted-token"
+        with patch.object(router, "urlopen", side_effect=ValueError(secret_url)):
+            with patch.object(router.time, "sleep"):
+                with patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                    with self.assertRaisesRegex(RuntimeError, "invalid URL"):
+                        router.fetch_remote_ical(secret_url, "Proton")
+        self.assertNotIn(secret_url, stderr.getvalue())
+
+    def test_fetch_school_retries_and_refuses_partial_feeds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            files = []
+            for name in ("district", "enf"):
+                path = Path(tmp) / name
+                path.write_text(f"https://school.example.invalid/{name}")
+                files.append(str(path))
+
+            original_files = router.SDST_ICAL_URL_FILES
+            router.SDST_ICAL_URL_FILES = files
+            good = subprocess.CompletedProcess(
+                args=["curl"], returncode=0, stdout=ICAL, stderr=""
+            )
+            bad = subprocess.CompletedProcess(
+                args=["curl"], returncode=7, stdout="", stderr="network down"
+            )
+            try:
+                with patch.object(router.subprocess, "run", side_effect=[good, bad, bad, bad, bad]) as run:
+                    with patch.object(router.time, "sleep") as sleep:
+                        self.assertEqual(router.fetch_school(), [])
+            finally:
+                router.SDST_ICAL_URL_FILES = original_files
+
+        self.assertEqual(run.call_count, 5)
+        self.assertEqual(sleep.call_args_list, [mock.call(2), mock.call(5), mock.call(15)])
+
+        secret_url = "https://calendar.example.invalid/redacted-token"
+        error = HTTPError(secret_url, 403, "forbidden", Message(), io.BytesIO())
+        with patch.object(router, "urlopen", side_effect=error):
+            with patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                with self.assertRaisesRegex(RuntimeError, "HTTP 403"):
+                    router.fetch_remote_ical(secret_url, "Proton")
+        self.assertNotIn(secret_url, stderr.getvalue())
+
+    def test_fetch_google_missing_secret_fails_closed(self):
+        original = getattr(router, "LINA_ICAL_URL_FILE")
+        setattr(router, "LINA_ICAL_URL_FILE", "/does/not/exist/google-url")
+        try:
+            with self.assertRaisesRegex(RuntimeError, "Google URL secret file not found"):
+                router.fetch_google()
+        finally:
+            setattr(router, "LINA_ICAL_URL_FILE", original)
+
+    def test_route_untagged_event_to_family(self):
+        event = {
+            "uid": "untagged@example.com",
+            "summary": "Family dinner",
+            "description": "",
+            "start": datetime.now(timezone.utc),
+            "rrule": None,
+        }
+        calendars = router.route_events([event])
+        self.assertEqual(calendars["family"], [event])
+    def test_scp_to_ha_preserves_unrelated_feeds_on_success(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            remote_dir = base / "calendars"
+            remote_dir.mkdir()
+            (remote_dir / "family.ics").write_text("old family")
+            (remote_dir / "lina.ics").write_text("old Lina")
+            (remote_dir / "unrelated.ics").write_text("leave me")
+            outputs = {}
+            for name, content in (("family", "new family"), ("lina", "new Lina")):
+                path = base / f"{name}.ics"
+                path.write_text(content)
+                outputs[name] = str(path)
+
+            original_target = router.HA_TARGET
+            self._ha_fake_bin = None
+            router.HA_TARGET = f"root@fake:{base}"
+            try:
+                with patch.object(router.subprocess, "run", side_effect=self._fake_ha_run):
+                    self.assertTrue(router.scp_to_ha(outputs))
+            finally:
+                router.HA_TARGET = original_target
+                self._ha_fake_bin = None
+
+            self.assertEqual((remote_dir / "family.ics").read_text(), "new family")
+            self.assertEqual((remote_dir / "lina.ics").read_text(), "new Lina")
+            self.assertEqual((remote_dir / "unrelated.ics").read_text(), "leave me")
+
+    def test_scp_to_ha_rolls_back_partial_feed_swap(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            remote_dir = base / "calendars"
+            remote_dir.mkdir()
+            (remote_dir / "family.ics").write_text("old family")
+            (remote_dir / "lina.ics").write_text("old Lina")
+            outputs = {}
+            for name, content in (("family", "new family"), ("lina", "new Lina")):
+                path = base / f"{name}.ics"
+                path.write_text(content)
+                outputs[name] = str(path)
+
+            fake_bin = base / "bin"
+            fake_bin.mkdir()
+            fake_mv = fake_bin / "mv"
+            fake_mv.write_text(
+                "#!/bin/sh\n"
+                "case \"$1\" in *lina.ics.new) exit 1;; esac\n"
+                "exec /run/current-system/sw/bin/mv \"$@\"\n"
+            )
+            fake_mv.chmod(0o755)
+            self._ha_fake_bin = fake_bin
+            original_target = router.HA_TARGET
+            router.HA_TARGET = f"root@fake:{base}"
+            try:
+                with patch.object(router.subprocess, "run", side_effect=self._fake_ha_run):
+                    self.assertFalse(router.scp_to_ha(outputs))
+            finally:
+                router.HA_TARGET = original_target
+                self._ha_fake_bin = None
+
+            self.assertEqual((remote_dir / "family.ics").read_text(), "old family")
+            self.assertEqual((remote_dir / "lina.ics").read_text(), "old Lina")
+            self.assertFalse((remote_dir / "family.ics.new").exists())
+            self.assertFalse((remote_dir / "lina.ics.new").exists())
+
+    def test_scp_to_ha_cleans_uploaded_staging_files_on_upload_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            outputs = {}
+            for name in ("family", "lina"):
+                path = base / f"{name}.ics"
+                path.write_text(name)
+                outputs[name] = str(path)
+
+            calls = []
+            scp_count = 0
+
+            def fail_second_upload(args, **kwargs):
+                nonlocal scp_count
+                calls.append(args)
+                if args[0] == "scp":
+                    scp_count += 1
+                    if scp_count == 2:
+                        raise subprocess.CalledProcessError(1, args)
+                return subprocess.CompletedProcess(args, 0)
+
+            original_target = router.HA_TARGET
+            router.HA_TARGET = f"root@fake:{base}"
+            try:
+                with patch.object(router.subprocess, "run", side_effect=fail_second_upload):
+                    self.assertFalse(router.scp_to_ha(outputs))
+            finally:
+                router.HA_TARGET = original_target
+
+            cleanup_calls = [
+                args[-1] for args in calls
+                if args[0] == "ssh" and args[-1].startswith("rm -f")
+            ]
+            self.assertEqual(len(cleanup_calls), 1)
+            self.assertIn("family.ics.new", cleanup_calls[0])
+            self.assertIn("lina.ics.new", cleanup_calls[0])
+
+    def test_school_publication_cleans_staging_file_on_unexpected_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            filepath = Path(tmp) / "school.ics"
+            filepath.write_text("calendar")
+            calls = []
+
+            def fail_publish(args, **kwargs):
+                calls.append(args)
+                if len(calls) == 2:
+                    raise RuntimeError("unexpected SSH failure")
+                return subprocess.CompletedProcess(args, 0)
+
+            with patch.object(router.subprocess, "run", side_effect=fail_publish):
+                with self.assertRaisesRegex(RuntimeError, "unexpected SSH failure"):
+                    router.scp_school_to_public(str(filepath))
+
+            self.assertEqual(calls[-1][-1], "rm -f /var/www/ical/school.ics.new")
+
+    def _fake_ha_run(self, args, **kwargs):
+        def finish(result):
+            if kwargs.get("check") and result.returncode:
+                raise subprocess.CalledProcessError(result.returncode, args)
+            return result
+
+        if args[0] == "scp":
+            source = Path(args[-2])
+            destination = args[-1].split(":", 1)[1]
+            destination = Path(destination)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(source.read_bytes())
+            return subprocess.CompletedProcess(args, 0)
+
+        if args[0] == "ssh":
+            command = args[-1]
+            if command.startswith("ls "):
+                directory = Path(command[3:].rstrip("/"))
+                stdout = "\n".join(path.name for path in directory.iterdir()) + "\n"
+                return subprocess.CompletedProcess(args, 0, stdout=stdout, stderr="")
+            if command.startswith("rm "):
+                Path(command[3:]).unlink(missing_ok=True)
+                return subprocess.CompletedProcess(args, 0)
+            env = os.environ.copy()
+            fake_bin = getattr(self, "_ha_fake_bin", None)
+            if fake_bin:
+                env["PATH"] = f"{fake_bin}:{env['PATH']}"
+            result = REAL_SUBPROCESS_RUN(
+                ["/run/current-system/sw/bin/bash", "-c", command],
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            return finish(result)
+
+        return subprocess.CompletedProcess(args, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
