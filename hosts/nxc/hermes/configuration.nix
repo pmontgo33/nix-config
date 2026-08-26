@@ -1020,9 +1020,9 @@ in
     };
   };
 
-  # Migration units for the Nix-managed calendar publishers. They are
-  # intentionally not enabled in this first PR; the existing Hermes calendar
-  # job and sports unit remain the rollback path until these oneshots pass.
+  # Nix-managed calendar publishers. The legacy Hermes family job and sports
+  # service remain installed as manual rollback paths, but are no longer
+  # scheduled once this cutover configuration is active.
   systemd.services.family-calendar-publish = {
     description = "Fetch and publish family calendars";
     wants = [ "network-online.target" "sops-install-secrets.service" ];
@@ -1051,7 +1051,7 @@ in
   };
 
   systemd.timers.family-calendar-publish = {
-    wantedBy = [ ];
+    wantedBy = [ "timers.target" ];
     timerConfig = {
       OnCalendar = "*-*-* 00/4:00:00 America/New_York";
       Persistent = true;
@@ -1084,7 +1084,7 @@ in
   };
 
   systemd.timers.calendar-sports-publish = {
-    wantedBy = [ ];
+    wantedBy = [ "timers.target" ];
     timerConfig = {
       OnCalendar = "*-*-* 00/4:00:00 America/New_York";
       Persistent = true;
@@ -1116,7 +1116,9 @@ in
   };
 
   systemd.timers.calendar-sports-generate = {
-    wantedBy = [ "timers.target" ];
+    # Retain the legacy service for manual rollback, but remove its scheduled
+    # trigger once the Nix-managed publisher is enabled.
+    wantedBy = [ ];
     timerConfig = {
       OnCalendar = "*-*-* 00/4:00:00 America/New_York";
       Persistent = true;
