@@ -239,6 +239,32 @@ class FamilyCalendarRouterTests(unittest.TestCase):
             "Holiday - All Schools Closed/Offices Open",
         )
 
+    def test_fetch_school_includes_labor_day_district_closure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            url_file = Path(tmp) / "district"
+            url_file.write_text("https://school.example.invalid/district")
+            original_files = router.SDST_ICAL_URL_FILES
+            router.SDST_ICAL_URL_FILES = [str(url_file)]
+            good = subprocess.CompletedProcess(
+                args=["curl"],
+                returncode=0,
+                stdout=school_ical(
+                    "UID:labor-day@example.com\n"
+                    "DTSTART:20260907\n"
+                    "DTEND:20260908\n"
+                    "SUMMARY:Labor Day - District Closed"
+                ),
+                stderr="",
+            )
+            try:
+                with patch.object(router.subprocess, "run", return_value=good):
+                    events = router.fetch_school()
+            finally:
+                router.SDST_ICAL_URL_FILES = original_files
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["summary"], "Labor Day - District Closed")
+
     def test_fetch_google_missing_secret_fails_closed(self):
         original = getattr(router, "LINA_ICAL_URL_FILE")
         setattr(router, "LINA_ICAL_URL_FILE", "/does/not/exist/google-url")
