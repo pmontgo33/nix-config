@@ -603,7 +603,7 @@ in
 
         compression = {
           provider = "minimax";
-          model = "MiniMax-M2.7";
+          model = "MiniMax-M3";
           reasoning_effort = "low";
           fallback_chain = [
             { provider = "opencode-go"; model = "mimo-v2.5"; }
@@ -633,7 +633,7 @@ in
 
         approval = {
           provider = "minimax";
-          model = "MiniMax-M2.7";
+          model = "MiniMax-M3";
           reasoning_effort = "low";
           fallback_chain = [
             { provider = "opencode-go"; model = "mimo-v2.5"; }
