@@ -473,7 +473,7 @@ def fetch_school() -> list[dict]:
     FAMILY_KEYWORDS = [
         "school closed", "schools closed", "holiday", "early dismissal",
         "teacher inservice", "no school", "last student day",
-        "memorial day", "no student",
+        "memorial day", "labor day", "no student",
     ]
     # ENF/ERD-specific events (not closures, but family should know)
     ENF_ERD_EVENT_KEYWORDS = [
