@@ -1120,6 +1120,7 @@ in
   systemd.timers.calendar-sports-generate = {
     # Retain the legacy service for manual rollback, but remove its scheduled
     # trigger once the Nix-managed publisher is enabled.
+    enable = false;
     wantedBy = [ ];
     timerConfig = {
       OnCalendar = "*-*-* 00/4:00:00 America/New_York";
@@ -1127,6 +1128,17 @@ in
       Unit = "calendar-sports-generate.service";
     };
   };
+
+  # A prior generation may have left the legacy timer active even after its
+  # timers.target link was removed. NixOS owns /etc/systemd/system, so a
+  # manual `systemctl disable` cannot clean that stale runtime unit. Stop it
+  # during activation while retaining the legacy service for manual rollback.
+  system.activationScripts.disable-legacy-calendar-sports-timer =
+    lib.stringAfter [ "etc" ] ''
+      if ${pkgs.systemd}/bin/systemctl is-active --quiet calendar-sports-generate.timer; then
+        ${pkgs.systemd}/bin/systemctl stop calendar-sports-generate.timer
+      fi
+    '';
 
   users.users.hermes = {
     linger = true;
