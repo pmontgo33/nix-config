@@ -149,13 +149,15 @@ let
     install -m 0555 ${../../../scripts/dns_migration/switch_dns_path.py} $out/dns_migration/switch_dns_path.py
   '';
   calendarPython = python312.withPackages (ps: [ ps.icalendar ]);
+  familyCalendarSource = ../../../scripts/calendar-publish/family-calendar-router;
   familyCalendarPublisher = pkgs.writeShellScriptBin "family-calendar-publisher" ''
     export PYTHON=${calendarPython}/bin/python3
     export FLOCK=${pkgs.util-linux}/bin/flock
     export TIMEOUT=${pkgs.coreutils}/bin/timeout
     export PATH=${pkgs.lib.makeBinPath [ pkgs.coreutils pkgs.openssh pkgs.curl pkgs.util-linux ]}
-    exec ${pkgs.bash}/bin/bash ${../../../scripts/calendar-publish/family-calendar-router/router.sh}
+    exec ${pkgs.bash}/bin/bash ${familyCalendarSource}/router.sh
   '';
+  sportsCalendarSource = ../../../scripts/calendar-publish/philly-sports-cal;
   sportsCalendarPublisher = pkgs.writeShellScriptBin "sports-calendar-publisher" ''
     export PYTHON=${calendarPython}/bin/python3
     export RSYNC=${pkgs.rsync}/bin/rsync
@@ -165,7 +167,7 @@ let
     export MV=${pkgs.coreutils}/bin/mv
     export RM=${pkgs.coreutils}/bin/rm
     export FLOCK=${pkgs.util-linux}/bin/flock
-    exec ${pkgs.bash}/bin/bash ${../../../scripts/calendar-publish/philly-sports-cal/deploy.sh}
+    exec ${pkgs.bash}/bin/bash ${sportsCalendarSource}/deploy.sh
   '';
   forgejo-credential-helper = pkgs.writeShellScript "forgejo-credential-helper" ''
     host=""
