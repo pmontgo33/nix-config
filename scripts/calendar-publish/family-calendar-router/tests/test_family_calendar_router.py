@@ -36,6 +36,24 @@ END:VCALENDAR
 """
 
 
+def school_ical(*events: str) -> str:
+    return "BEGIN:VCALENDAR\nVERSION:2.0\n" + "".join(
+        f"BEGIN:VEVENT\n{event}\nEND:VEVENT\n" for event in events
+    ) + "END:VCALENDAR\n"
+
+
+SCHOOL_FILTER_ICAL = school_ical(
+    "UID:hs-only@example.com\n"
+    "DTSTART:20260910T180000\n"
+    "DTEND:20260910T193000\n"
+    "SUMMARY:High School Back to School Night",
+    "UID:mixed-elementary@example.com\n"
+    "DTSTART:20260911\n"
+    "DTEND:20260912\n"
+    "SUMMARY:Early Dismissal - HS & MS - ENF & ERD",
+)
+
+
 class FakeResponse:
     def __init__(self, body: str):
         self.body = body.encode()
@@ -152,6 +170,74 @@ class FamilyCalendarRouterTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "HTTP 403"):
                     router.fetch_remote_ical(secret_url, "Proton")
         self.assertNotIn(secret_url, stderr.getvalue())
+
+    def test_fetch_school_excludes_hs_ms_only_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            url_file = Path(tmp) / "district"
+            url_file.write_text("https://school.example.invalid/district")
+            original_files = router.SDST_ICAL_URL_FILES
+            router.SDST_ICAL_URL_FILES = [str(url_file)]
+            good = subprocess.CompletedProcess(
+                args=["curl"], returncode=0, stdout=SCHOOL_FILTER_ICAL, stderr=""
+            )
+            try:
+                with patch.object(router.subprocess, "run", return_value=good):
+                    events = router.fetch_school()
+            finally:
+                router.SDST_ICAL_URL_FILES = original_files
+
+        self.assertEqual(
+            [event["summary"] for event in events],
+            ["Early Dismissal - HS & MS - ENF & ERD"],
+        )
+
+    def test_fetch_school_deduplicates_same_event_across_feeds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            files = []
+            for name in ("district", "enf", "erd"):
+                path = Path(tmp) / name
+                path.write_text(f"https://school.example.invalid/{name}")
+                files.append(str(path))
+
+            feeds = [
+                school_ical(
+                    "UID:district-copy@example.com\n"
+                    "DTSTART:20260921\nDTEND:20260922\n"
+                    "SUMMARY:Holiday - All Schools Closed/Offices Open"
+                ),
+                school_ical(
+                    "UID:enf-copy@example.com\n"
+                    "DTSTART:20260921\nDTEND:20260922\n"
+                    "SUMMARY:Holiday - All Schools Closed/Offices Open"
+                ),
+                school_ical(
+                    "UID:erd-copy@example.com\n"
+                    "DTSTART:20260921\nDTEND:20260922\n"
+                    "SUMMARY:Holiday - All Schools Closed/Offices Open"
+                ),
+            ]
+            original_files = router.SDST_ICAL_URL_FILES
+            router.SDST_ICAL_URL_FILES = files
+            try:
+                with patch.object(
+                    router.subprocess,
+                    "run",
+                    side_effect=[
+                        subprocess.CompletedProcess(
+                            args=["curl"], returncode=0, stdout=feed, stderr=""
+                        )
+                        for feed in feeds
+                    ],
+                ):
+                    events = router.fetch_school()
+            finally:
+                router.SDST_ICAL_URL_FILES = original_files
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(
+            events[0]["summary"],
+            "Holiday - All Schools Closed/Offices Open",
+        )
 
     def test_fetch_google_missing_secret_fails_closed(self):
         original = getattr(router, "LINA_ICAL_URL_FILE")

@@ -442,6 +442,25 @@ def fetch_google() -> list[dict]:
     )
 
 
+def school_event_key(event: dict) -> tuple[str, str, str, str]:
+    """Return a source-independent identity for a school event.
+
+    SDST publishes the same district-wide event in multiple school feeds with
+    different UIDs. UID is therefore not sufficient for cross-feed merging.
+    Keep location in the identity so two same-named events at different
+    schools remain separate.
+    """
+    def normalize(value: object) -> str:
+        return " ".join(str(value or "").split()).casefold()
+
+    return (
+        normalize(event.get("summary")),
+        normalize(event.get("start")),
+        normalize(event.get("end")),
+        normalize(event.get("location")),
+    )
+
+
 def fetch_school() -> list[dict]:
     """Fetch events from all SDST iCal feeds (District, ENF, ERD), auto-tagging
     ENF/ERD-relevant events with #family so they route to the Family calendar.
@@ -499,7 +518,6 @@ def fetch_school() -> list[dict]:
         return False
 
     all_events: list[dict] = []
-    seen_uids: set[str] = set()
     feeds_loaded = 0
     feed_failures: list[str] = []
 
@@ -558,16 +576,8 @@ def fetch_school() -> list[dict]:
             print(f"  SDST: invalid iCal from {url_file}: {type(exc).__name__}", file=sys.stderr)
             feed_failures.append(url_file)
             continue
-        added = 0
-        for ev in feed_events:
-            uid = ev.get("uid", "")
-            if uid and uid in seen_uids:
-                continue
-            if uid:
-                seen_uids.add(uid)
-            all_events.append(ev)
-            added += 1
-        print(f"  SDST: {url_file} → {len(feed_events)} events ({added} new)", file=sys.stderr)
+        all_events.extend(feed_events)
+        print(f"  SDST: {url_file} → {len(feed_events)} events", file=sys.stderr)
         feeds_loaded += 1
 
     if feed_failures:
@@ -580,14 +590,26 @@ def fetch_school() -> list[dict]:
         print("ERROR: SDST: no feeds loaded", file=sys.stderr)
         return []
 
-    # Auto-tag matching events with #family
-    tagged = 0
+    # Auto-tag and retain only matching events. Untagged school events must
+    # not flow into route_events(), where untagged events intentionally go to
+    # the Family calendar.
+    selected_events = []
+    seen_event_keys: set[tuple[str, str, str, str]] = set()
     for event in all_events:
-        if tag_event(event):
-            tagged += 1
+        if not tag_event(event):
+            continue
+        event_key = school_event_key(event)
+        if event_key in seen_event_keys:
+            continue
+        seen_event_keys.add(event_key)
+        selected_events.append(event)
 
-    print(f"  SDST: {len(all_events)} events total, {tagged} tagged for Family", file=sys.stderr)
-    return all_events
+    print(
+        f"  SDST: {len(all_events)} events total, "
+        f"{len(selected_events)} unique events selected for Family",
+        file=sys.stderr,
+    )
+    return selected_events
 
 
 def scp_to_ha(outputs: dict[str, str]) -> bool:
