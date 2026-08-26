@@ -1017,7 +1017,7 @@ in
   systemd.timers.calendar-sports-generate = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnCalendar = "*-*-* 11:00:00 America/New_York";
+      OnCalendar = "*-*-* 00/4:00:00 America/New_York";
       Persistent = true;
       Unit = "calendar-sports-generate.service";
     };
