@@ -799,7 +799,7 @@ in
       };
 
       # Per-platform display settings for Telegram. Show every tool call,
-      # append runtime metadata to final replies, and remove temporary
+      # group them into one accumulating bubble, and remove temporary
       # progress/heartbeat bubbles after successful turns. Keep the busy-ack
       # iteration counter quiet.
       display = {
@@ -808,7 +808,7 @@ in
           tool_progress_grouping = "accumulate";
           busy_ack_detail = false;
           runtime_footer = {
-            enabled = true;
+            enabled = false;
           };
           cleanup_progress = true;
         };
