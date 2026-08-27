@@ -157,6 +157,13 @@
         upstream = "192.168.86.137:8080";
       };
 
+      # Hermes exposes this listener on its LAN interface; public access
+      # remains through this HTTPS reverse proxy.
+      "hermes.montycasa.net" = {
+        protocol = "http";
+        upstream = "192.168.86.126:8787";
+      };
+
       # Pi-hole admin/API web UIs — Gate 3B exposure. The Caddy host is the
       # only Internet-reachable HTTPS endpoint; it proxies to the LAN-only
       # Pi-hole Web at port 8080 on each instance. Both Pi-holes use the

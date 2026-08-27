@@ -41,6 +41,27 @@
         "type": "github"
       }
     },
+    "hermes-webui": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1784422437,
+        "narHash": "sha256-GAHDC1on2kpsPbNG6yZZQSYSDMFXggUSY8QjdFaXdxA=",
+        "owner": "nesquena",
+        "repo": "hermes-webui",
+        "rev": "c67fd2dd270a1128c2754200406bca58e9d9a25a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nesquena",
+        "ref": "v0.52.113",
+        "repo": "hermes-webui",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -81,7 +102,7 @@
       "inputs": {
         "flake-parts": "flake-parts",
         "nixpkgs": [
-          "nixpkgs"
+          "nixpkgs-unstable"
         ],
         "npm-lockfile-fix": "npm-lockfile-fix",
         "pyproject-build-systems": "pyproject-build-systems",
@@ -264,6 +285,7 @@
     "root": {
       "inputs": {
         "disko": "disko",
+        "hermes-webui": "hermes-webui",
         "home-manager": "home-manager",
         "nix-flatpak": "nix-flatpak",
         "nix-hermes-agent": "nix-hermes-agent",
