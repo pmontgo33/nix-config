@@ -798,18 +798,19 @@ in
         fresh_final_after_seconds = 60;
       };
 
-      # Per-platform display settings (tool-progress messages, busy-ack
-      # detail, reasoning style). Reverted to the Hermes 0.18+/0.19+ tier
-      # defaults for Telegram: tool_progress = "off" (no per-tool bubbles)
-      # and busy_ack_detail = false (no iteration counter). The "all" /
-      # true values added in #159 restored those bubbles, but on
-      # retrospect the in-chat noise outweighed the visibility gain.
-      # Dropping the override lets the upstream default take over, so
-      # future Hermes tier-default changes do not need a follow-up PR.
+      # Per-platform display settings for Telegram. Show every tool call,
+      # append runtime metadata to final replies, and remove temporary
+      # progress/heartbeat bubbles after successful turns. Keep the busy-ack
+      # iteration counter quiet.
       display = {
         platforms.telegram = {
-          tool_progress = "off";
+          tool_progress = "all";
+          tool_progress_grouping = "accumulate";
           busy_ack_detail = false;
+          runtime_footer = {
+            enabled = true;
+          };
+          cleanup_progress = true;
         };
       };
 
