@@ -78,7 +78,9 @@ in {
         AmbientCapabilities = "";
         SystemCallArchitectures = "native";
         ReadWritePaths = [ "/var/lib/nookbridge" "/run/nookbridge" ];
-        UMask = "0077";
+        # Keep the socket private from other users while allowing the
+        # nookbridge-clients group to connect.
+        UMask = "0007";
         Restart = "on-failure";
         RestartSec = "5s";
         TimeoutStopSec = "15s";
