@@ -243,6 +243,7 @@ in
   };
   extra-services.host-checkin.enable = true;
   extra-services.hermes-relay.enable = true;
+  extra-services.nookbridge.enable = true;
   # When extraPlugins changes (e.g. adding/removing Hermes-Relay),
   # restart both hermes-agent and hermes-dashboard so the loader picks
   # up the new plugin tree. Without this, plugin enable requires a
@@ -1154,6 +1155,7 @@ in
 
   users.users.hermes = {
     linger = true;
+    extraGroups = [ "nookbridge-clients" ];
   };
 
   # NixOS's switch-to-configuration reloads lingering user units after

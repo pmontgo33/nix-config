@@ -35,6 +35,14 @@
 
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
 
+    # NookBridge production service, pinned to the merged Stage 5 startup
+    # composition. The package is built by this flake against the host's
+    # pinned nixpkgs; this input supplies only the reviewed source tree.
+    nookbridge = {
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=a5b70d9a3fbf84e5a1c1454c65758c57b477ae4f";
+      flake = false;
+    };
+
     nix-hermes-agent = {
       url = "github:NousResearch/hermes-agent/v2026.8.3";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -843,5 +851,39 @@
         }
       ];
     };
+
+    checks.x86_64-linux.nookbridge-service = let
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      cfg = self.nixosConfigurations.hermes.config;
+      service = cfg.systemd.services.nookd.serviceConfig;
+      configFile = ./modules/nookbridge/service.json;
+      execStart = nixpkgs.lib.escapeShellArg service.ExecStart;
+      credential = nixpkgs.lib.escapeShellArg (toString service.LoadCredential);
+    in pkgs.runCommand "nookbridge-service-boundary-check" {
+      nativeBuildInputs = [ pkgs.coreutils pkgs.jq ];
+    } ''
+      ${pkgs.jq}/bin/jq -e '
+        .stateDir == "/var/lib/nookbridge" and
+        .socketPath == "/run/nookbridge/nookbridge.sock" and
+        .socketGroup == "nookbridge-clients" and
+        .backend == "systemd-credential" and
+        .credentialName == "nookbridge-db-key" and
+        .readPolicy == ["notes.search"]
+      ' ${configFile} > /dev/null
+
+      case ${execStart} in
+        */bin/nookd\ --config\ /etc/nookbridge/service.json) ;;
+        *) echo "unexpected nookd ExecStart" >&2; exit 1 ;;
+      esac
+      test ${credential} = "nookbridge-db-key:/run/secrets/nookbridge-db-key"
+      test ${nixpkgs.lib.escapeShellArg service.User} = nookbridge
+      test ${nixpkgs.lib.escapeShellArg service.Group} = nookbridge-clients
+      test ${nixpkgs.lib.escapeShellArg (toString service.RestrictAddressFamilies)} = AF_UNIX
+      test ${nixpkgs.lib.escapeShellArg service.StateDirectory} = nookbridge
+      test ${nixpkgs.lib.escapeShellArg service.RuntimeDirectory} = nookbridge
+      test ${nixpkgs.lib.escapeShellArg cfg.sops.secrets."nookbridge-db-key".owner} = root
+      test ${nixpkgs.lib.escapeShellArg cfg.sops.secrets."nookbridge-db-key".mode} = 0400
+      touch "$out"
+    '';
   };
 }

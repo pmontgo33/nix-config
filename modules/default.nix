@@ -16,6 +16,7 @@
     ./proxmox-storage-monitor.nix
     ./simplex-relay.nix
     ./hermes-relay.nix
+    ./nookbridge.nix
     ./intel-gpu.nix
     ./pihole
   ];
