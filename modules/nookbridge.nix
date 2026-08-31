@@ -48,9 +48,12 @@ in {
         Group = "nookbridge-clients";
         WorkingDirectory = "/var/lib/nookbridge";
         Environment = "HOME=/var/lib/nookbridge";
+        # The source credential is intentionally root-only. systemd's
+        # LoadCredential= reads it as the manager and presents the daemon's
+        # private copy; checking credentialPath here would run as nookbridge
+        # and reject the correctly protected 0400 source file.
         ExecStartPre = [
           "${pkgs.coreutils}/bin/test -r /etc/nookbridge/service.json"
-          "${pkgs.coreutils}/bin/test -r ${credentialPath}"
         ];
         ExecStart = "${nookbridge}/bin/nookd --config /etc/nookbridge/service.json";
         LoadCredential = [ "nookbridge-db-key:${credentialPath}" ];
