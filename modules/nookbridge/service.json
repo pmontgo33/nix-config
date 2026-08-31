@@ -1,0 +1,8 @@
+{
+  "stateDir": "/var/lib/nookbridge",
+  "socketPath": "/run/nookbridge/nookbridge.sock",
+  "socketGroup": "nookbridge-clients",
+  "backend": "systemd-credential",
+  "credentialName": "nookbridge-db-key",
+  "readPolicy": ["notes.search"]
+}

@@ -188,6 +188,23 @@
         "type": "github"
       }
     },
+    "nookbridge": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788195207,
+        "narHash": "sha256-x2wYipKd5BEwYqWDG+Et2GbSeQURfVLFba7xLC77qZk=",
+        "ref": "refs/heads/main",
+        "rev": "a5b70d9a3fbf84e5a1c1454c65758c57b477ae4f",
+        "revCount": 88,
+        "type": "git",
+        "url": "https://git.montycasa.net/patrick/NookBridge"
+      },
+      "original": {
+        "rev": "a5b70d9a3fbf84e5a1c1454c65758c57b477ae4f",
+        "type": "git",
+        "url": "https://git.montycasa.net/patrick/NookBridge"
+      }
+    },
     "npm-lockfile-fix": {
       "inputs": {
         "nixpkgs": [
@@ -293,6 +310,7 @@
         "nixpkgs-2511": "nixpkgs-2511",
         "nixpkgs-elegoo-compat": "nixpkgs-elegoo-compat",
         "nixpkgs-unstable": "nixpkgs-unstable",
+        "nookbridge": "nookbridge",
         "plasma-manager": "plasma-manager",
         "sops-nix": "sops-nix"
       }
