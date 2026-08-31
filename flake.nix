@@ -37,11 +37,16 @@
 
     nix-hermes-agent = {
       url = "github:NousResearch/hermes-agent/v2026.8.3";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
+    hermes-webui = {
+      url = "github:nesquena/hermes-webui/v0.52.113";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, nixpkgs-2511, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-hermes-agent, ... }: {
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, nixpkgs-2511, home-manager, disko, sops-nix, nix-flatpak, plasma-manager, nix-hermes-agent, hermes-webui, ... }: {
 
     ## tesseract ##
     nixosConfigurations.tesseract = nixpkgs.lib.nixosSystem {
@@ -823,6 +828,7 @@
         ]; }
         ./hosts/nxc/hermes
         sops-nix.nixosModules.sops
+        hermes-webui.nixosModules.default
 
         home-manager.nixosModules.home-manager
         {

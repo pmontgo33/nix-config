@@ -229,6 +229,9 @@ in
 
   networking.hostName = "hermes";
   networking.firewall.allowedTCPPorts = [ 8642 8644 9119 ];
+  # WebUI is bound to the Hermes LAN address; keep its direct listener scoped
+  # to the LAN interface for the local-proxy reverse proxy.
+  networking.firewall.interfaces."eth0".allowedTCPPorts = [ 8787 ];
 
   # python3.12 doc build broken in nixpkgs 26.05 (upstream issue #529084)
   documentation.man.enable = false;
@@ -305,6 +308,14 @@ in
   # Hermes gateway API keys stay in openclaw-env. Forgejo Git authentication is
   # a separate, runtime-only file consumed solely by the URL-scoped helper.
   sops.secrets."openclaw-env" = {
+    owner = "hermes";
+    group = "users";
+    mode = "0400";
+  };
+  # WebUI authentication is separate from the agent's provider environment.
+  # The encrypted value contains the WebUI authentication assignment and is
+  # never embedded in Nix or exposed through the generated system closure.
+  sops.secrets."hermes-webui-env" = {
     owner = "hermes";
     group = "users";
     mode = "0400";
@@ -787,18 +798,19 @@ in
         fresh_final_after_seconds = 60;
       };
 
-      # Per-platform display settings (tool-progress messages, busy-ack
-      # detail, reasoning style). Reverted to the Hermes 0.18+/0.19+ tier
-      # defaults for Telegram: tool_progress = "off" (no per-tool bubbles)
-      # and busy_ack_detail = false (no iteration counter). The "all" /
-      # true values added in #159 restored those bubbles, but on
-      # retrospect the in-chat noise outweighed the visibility gain.
-      # Dropping the override lets the upstream default take over, so
-      # future Hermes tier-default changes do not need a follow-up PR.
+      # Per-platform display settings for Telegram. Show every tool call,
+      # group them into one accumulating bubble, and remove temporary
+      # progress/heartbeat bubbles after successful turns. Keep the busy-ack
+      # iteration counter quiet.
       display = {
         platforms.telegram = {
-          tool_progress = "off";
+          tool_progress = "all";
+          tool_progress_grouping = "accumulate";
           busy_ack_detail = false;
+          runtime_footer = {
+            enabled = false;
+          };
+          cleanup_progress = true;
         };
       };
 
@@ -1185,6 +1197,25 @@ in
       ExecStart = "${config.services.hermes-agent.package}/bin/hermes dashboard --host 0.0.0.0 --port 9119 --no-open --skip-build";
       Restart = "on-failure";
       RestartSec = 5;
+    };
+  };
+
+  services.hermes-webui = {
+    enable = true;
+    user = "hermes";
+    group = "users";
+    host = "192.168.86.126";
+    port = 8787;
+    stateDir = "/var/lib/hermes-webui";
+    hermesHome = "/var/lib/hermes/.hermes";
+    agent.package = config.services.hermes-agent.package;
+    environmentFiles = [
+      config.sops.secrets."openclaw-env".path
+      config.sops.secrets."hermes-webui-env".path
+    ];
+    extraEnvironment = {
+      HERMES_WEBUI_DEFAULT_WORKSPACE = "/var/lib/hermes/workspace";
+      HERMES_WEBUI_SERVER_CWD = "/var/lib/hermes/workspace";
     };
   };
 
