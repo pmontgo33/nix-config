@@ -39,7 +39,7 @@
     # composition. The package is built by this flake against the host's
     # pinned nixpkgs; this input supplies only the reviewed source tree.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=ab938be6f312a8ab0801f09511c7c994819a5b53";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=662ed451c8a78d2b4a8762acf9d2398bfe83e577";
       flake = false;
     };
 
@@ -868,7 +868,7 @@
         .socketGroup == "nookbridge-clients" and
         .backend == "systemd-credential" and
         .credentialName == "nookbridge-db-key" and
-        .readPolicy == ["notes.search"]
+        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get"]
       ' ${configFile} > /dev/null
 
       case ${execStart} in
