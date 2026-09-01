@@ -39,7 +39,7 @@
     # composition. The package is built by this flake against the host's
     # pinned nixpkgs; this input supplies only the reviewed source tree.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=9f021b9ce5bff38afa0148188c8e3ff8e5882339";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=0b05bc33c7276ef008c1d1b2424e600a4e066787";
       flake = false;
     };
 
@@ -859,8 +859,12 @@
       configFile = ./modules/nookbridge/service.json;
       execStart = nixpkgs.lib.escapeShellArg service.ExecStart;
       credential = nixpkgs.lib.escapeShellArg (toString service.LoadCredential);
+      credentialPath = toString cfg.sops.secrets."nookbridge-db-key".path;
+      nookbridgePackage = pkgs.callPackage ./packages/nookbridge.nix { inherit inputs; };
+      operatorProvision = builtins.head (builtins.filter (p: p.name == "nookbridge-provision") cfg.environment.systemPackages);
+      operatorSync = builtins.head (builtins.filter (p: p.name == "nookbridge-sync") cfg.environment.systemPackages);
     in pkgs.runCommand "nookbridge-service-boundary-check" {
-      nativeBuildInputs = [ pkgs.coreutils pkgs.jq ];
+      nativeBuildInputs = [ pkgs.coreutils pkgs.gnugrep pkgs.jq ];
     } ''
       ${pkgs.jq}/bin/jq -e '
         .stateDir == "/var/lib/nookbridge" and
@@ -883,6 +887,55 @@
       test ${nixpkgs.lib.escapeShellArg service.RuntimeDirectory} = nookbridge
       test ${nixpkgs.lib.escapeShellArg cfg.sops.secrets."nookbridge-db-key".owner} = root
       test ${nixpkgs.lib.escapeShellArg cfg.sops.secrets."nookbridge-db-key".mode} = 0400
+
+      assert_wrapper_line() {
+        ${pkgs.gnugrep}/bin/grep -Fxq -- "$1" "$2"
+      }
+
+      for command in \
+        ${operatorProvision}/bin/nookbridge-provision \
+        ${operatorSync}/bin/nookbridge-sync; do
+        test -x "$command"
+        ${pkgs.gnugrep}/bin/grep -Fq -- 'id -u' "$command"
+        ${pkgs.gnugrep}/bin/grep -Fq -- 'must be run as root' "$command"
+        assert_wrapper_line "  --quiet --wait --collect --pty \\" "$command"
+        assert_wrapper_line "  --uid=nookbridge \\" "$command"
+        assert_wrapper_line "  --gid=nookbridge-clients \\" "$command"
+        assert_wrapper_line "  --property=WorkingDirectory=/var/lib/nookbridge \\" "$command"
+        assert_wrapper_line "  --property=Environment=HOME=/var/lib/nookbridge \\" "$command"
+        assert_wrapper_line "  --property=LoadCredential=nookbridge-db-key:${credentialPath} \\" "$command"
+        assert_wrapper_line "  --property=ProtectSystem=strict \\" "$command"
+        assert_wrapper_line "  --property=ProtectHome=yes \\" "$command"
+        assert_wrapper_line "  --property=NoNewPrivileges=yes \\" "$command"
+        assert_wrapper_line "  --property=PrivateTmp=yes \\" "$command"
+        assert_wrapper_line "  --property=PrivateDevices=yes \\" "$command"
+        assert_wrapper_line "  --property=RestrictAddressFamilies='AF_UNIX AF_INET AF_INET6' \\" "$command"
+        assert_wrapper_line "  --property=RestrictNamespaces=yes \\" "$command"
+        assert_wrapper_line "  --property=ProtectKernelTunables=yes \\" "$command"
+        assert_wrapper_line "  --property=ProtectKernelModules=yes \\" "$command"
+        assert_wrapper_line "  --property=ProtectControlGroups=yes \\" "$command"
+        assert_wrapper_line "  --property=LockPersonality=yes \\" "$command"
+        assert_wrapper_line "  --property=RestrictRealtime=yes \\" "$command"
+        assert_wrapper_line "  --property=RestrictSUIDSGID=yes \\" "$command"
+        assert_wrapper_line "  --property=CapabilityBoundingSet= \\" "$command"
+        assert_wrapper_line "  --property=AmbientCapabilities= \\" "$command"
+        assert_wrapper_line "  --property=SystemCallArchitectures=native \\" "$command"
+        assert_wrapper_line "  --property=ReadWritePaths=/var/lib/nookbridge \\" "$command"
+        assert_wrapper_line "  --property=UMask=0077 \\" "$command"
+        assert_wrapper_line "  --property=TimeoutStartSec=10min \\" "$command"
+        assert_wrapper_line "  --property=RuntimeMaxSec=10min \\" "$command"
+        ! ${pkgs.gnugrep}/bin/grep -Fq -- 'wantedBy' "$command"
+      done
+      test -f ${nookbridgePackage}/libexec/nookbridge/dist/provision.js
+      test -f ${nookbridgePackage}/libexec/nookbridge/dist/sync.js
+      assert_wrapper_line "  --unit=nookbridge-provision.service \\" ${operatorProvision}/bin/nookbridge-provision
+      assert_wrapper_line "  --unit=nookbridge-sync.service \\" ${operatorSync}/bin/nookbridge-sync
+      assert_wrapper_line "  --setenv=NOOKBRIDGE_ENABLE_LIVE_AUTH=1 \\" ${operatorProvision}/bin/nookbridge-provision
+      assert_wrapper_line "  --setenv=NOOKBRIDGE_ENABLE_LIVE_SYNC=1 \\" ${operatorSync}/bin/nookbridge-sync
+      assert_wrapper_line "  ${nookbridgePackage}/bin/nookbridge-provision-cli" ${operatorProvision}/bin/nookbridge-provision
+      assert_wrapper_line "  ${nookbridgePackage}/bin/nookbridge-sync-cli" ${operatorSync}/bin/nookbridge-sync
+      ! ${pkgs.gnugrep}/bin/grep -Fq -- 'nookbridge-sync-cli' ${operatorProvision}/bin/nookbridge-provision
+      ! ${pkgs.gnugrep}/bin/grep -Fq -- 'nookbridge-provision-cli' ${operatorSync}/bin/nookbridge-sync
       touch "$out"
     '';
   };
