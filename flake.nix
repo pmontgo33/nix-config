@@ -39,7 +39,7 @@
     # composition. The package is built by this flake against the host's
     # pinned nixpkgs; this input supplies only the reviewed source tree.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=662ed451c8a78d2b4a8762acf9d2398bfe83e577";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=9f021b9ce5bff38afa0148188c8e3ff8e5882339";
       flake = false;
     };
 
