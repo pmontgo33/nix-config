@@ -4,12 +4,88 @@ with lib; let
   nookbridge = pkgs.callPackage ../packages/nookbridge.nix { inherit inputs; };
   serviceConfig = builtins.fromJSON (builtins.readFile ./nookbridge/service.json);
   credentialPath = config.sops.secrets."nookbridge-db-key".path;
+  provisionCommand = pkgs.writeShellScriptBin "nookbridge-provision" ''
+    set -eu
+    if [ "$(${pkgs.coreutils}/bin/id -u)" -ne 0 ]; then
+      ${pkgs.coreutils}/bin/printf '%s\n' 'nookbridge-provision: must be run as root' >&2
+      exit 77
+    fi
+    exec ${pkgs.systemd}/bin/systemd-run \
+      --quiet --wait --collect --pty \
+      --unit=nookbridge-provision.service \
+      --uid=nookbridge \
+      --gid=nookbridge-clients \
+      --property=WorkingDirectory=/var/lib/nookbridge \
+      --property=Environment=HOME=/var/lib/nookbridge \
+      --setenv=NOOKBRIDGE_ENABLE_LIVE_AUTH=1 \
+      --property=LoadCredential=nookbridge-db-key:${credentialPath} \
+      --property=ProtectSystem=strict \
+      --property=ProtectHome=yes \
+      --property=PrivateTmp=yes \
+      --property=PrivateDevices=yes \
+      --property=NoNewPrivileges=yes \
+      --property=RestrictAddressFamilies='AF_UNIX AF_INET AF_INET6' \
+      --property=RestrictNamespaces=yes \
+      --property=ProtectKernelTunables=yes \
+      --property=ProtectKernelModules=yes \
+      --property=ProtectControlGroups=yes \
+      --property=LockPersonality=yes \
+      --property=RestrictRealtime=yes \
+      --property=RestrictSUIDSGID=yes \
+      --property=CapabilityBoundingSet= \
+      --property=AmbientCapabilities= \
+      --property=SystemCallArchitectures=native \
+      --property=ReadWritePaths=/var/lib/nookbridge \
+      --property=UMask=0077 \
+      --property=TimeoutStartSec=10min \
+      --property=RuntimeMaxSec=10min \
+      ${nookbridge}/bin/nookbridge-provision-cli
+  '';
+  syncCommand = pkgs.writeShellScriptBin "nookbridge-sync" ''
+    set -eu
+    if [ "$(${pkgs.coreutils}/bin/id -u)" -ne 0 ]; then
+      ${pkgs.coreutils}/bin/printf '%s\n' 'nookbridge-sync: must be run as root' >&2
+      exit 77
+    fi
+    exec ${pkgs.systemd}/bin/systemd-run \
+      --quiet --wait --collect --pty \
+      --unit=nookbridge-sync.service \
+      --uid=nookbridge \
+      --gid=nookbridge-clients \
+      --property=WorkingDirectory=/var/lib/nookbridge \
+      --property=Environment=HOME=/var/lib/nookbridge \
+      --setenv=NOOKBRIDGE_ENABLE_LIVE_SYNC=1 \
+      --property=LoadCredential=nookbridge-db-key:${credentialPath} \
+      --property=ProtectSystem=strict \
+      --property=ProtectHome=yes \
+      --property=PrivateTmp=yes \
+      --property=PrivateDevices=yes \
+      --property=NoNewPrivileges=yes \
+      --property=RestrictAddressFamilies='AF_UNIX AF_INET AF_INET6' \
+      --property=RestrictNamespaces=yes \
+      --property=ProtectKernelTunables=yes \
+      --property=ProtectKernelModules=yes \
+      --property=ProtectControlGroups=yes \
+      --property=LockPersonality=yes \
+      --property=RestrictRealtime=yes \
+      --property=RestrictSUIDSGID=yes \
+      --property=CapabilityBoundingSet= \
+      --property=AmbientCapabilities= \
+      --property=SystemCallArchitectures=native \
+      --property=ReadWritePaths=/var/lib/nookbridge \
+      --property=UMask=0077 \
+      --property=TimeoutStartSec=10min \
+      --property=RuntimeMaxSec=10min \
+      ${nookbridge}/bin/nookbridge-sync-cli
+  '';
 in {
   options.extra-services.nookbridge = {
     enable = mkEnableOption "NookBridge read-only Unix-socket service";
   };
 
   config = mkIf cfg.enable {
+    environment.systemPackages = [ provisionCommand syncCommand ];
+
     users.groups.nookbridge = {};
     users.groups.nookbridge-clients = {};
     users.users.nookbridge = {

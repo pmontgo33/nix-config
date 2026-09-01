@@ -60,6 +60,12 @@ buildNpmPackage rec {
     makeWrapper ${nodejs_22}/bin/node "$out/bin/nook-mcp" \
       --add-flags "$out/libexec/nookbridge/dist/mcp/cli.js"
 
+    makeWrapper ${nodejs_22}/bin/node "$out/bin/nookbridge-provision-cli" \
+      --add-flags "$out/libexec/nookbridge/dist/provision.js"
+
+    makeWrapper ${nodejs_22}/bin/node "$out/bin/nookbridge-sync-cli" \
+      --add-flags "$out/libexec/nookbridge/dist/sync.js"
+
     runHook postInstall
   '';
 
