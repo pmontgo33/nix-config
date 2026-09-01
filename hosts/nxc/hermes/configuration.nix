@@ -5,6 +5,7 @@ let
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
+  nookbridge = pkgs.callPackage ../../../packages/nookbridge.nix { inherit inputs; };
   hermesBasePkgs = import inputs.nixpkgs {
     system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
@@ -256,7 +257,8 @@ in
     # The Hermes module merges settings into mutable config.yaml during
     # activation. Restart when the memory provider/settings change so a
     # provider cutover is effective without a manual systemctl command.
-    ++ [ (builtins.toJSON config.services.hermes-agent.settings.memory) ];
+    ++ [ (builtins.toJSON config.services.hermes-agent.settings.memory) ]
+    ++ [ (builtins.toJSON config.services.hermes-agent.settings.mcp_servers) nookbridge ];
   # Memory databases contain private user context. Keep files created by the
   # service private even though the parent state directory is group-accessible.
   systemd.services.hermes-agent.serviceConfig.UMask = lib.mkForce "0077";
@@ -362,6 +364,12 @@ in
     # Binary comes from pinned nixpkgs; smoke-tested in /tmp/mcp-smoke4.py.
     mcpServers.nixos = {
       command = "${pkgs.mcp-nixos}/bin/mcp-nixos";
+      timeout = 60;
+      connect_timeout = 30;
+    };
+    mcpServers.nookbridge = {
+      command = "${nookbridge}/bin/nook-mcp";
+      args = [ "--socket" "/run/nookbridge/nookbridge.sock" ];
       timeout = 60;
       connect_timeout = 30;
     };

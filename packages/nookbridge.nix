@@ -20,7 +20,7 @@ buildNpmPackage rec {
   src = inputs.nookbridge;
   nodejs = nodejs_22;
 
-  npmDepsHash = "sha256-XGfjVhLKZwNcF5S9rogxQCljaIglfhgvHH8oRdVCx2A=";
+  npmDepsHash = "sha256-1cff91fgAnESE6Jh3BD0peaJKN2msjy8DEsSkPxOaeg=";
   npmRebuildFlags = [ "--ignore-scripts" ];
 
   preBuild = ''
@@ -56,6 +56,9 @@ buildNpmPackage rec {
 
     makeWrapper ${nodejs_22}/bin/node "$out/bin/nookd" \
       --add-flags "$out/libexec/nookbridge/dist/nookd.js"
+
+    makeWrapper ${nodejs_22}/bin/node "$out/bin/nook-mcp" \
+      --add-flags "$out/libexec/nookbridge/dist/mcp/cli.js"
 
     runHook postInstall
   '';
