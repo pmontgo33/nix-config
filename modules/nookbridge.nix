@@ -109,8 +109,8 @@ in {
         message = "NookBridge credentialName is fixed to nookbridge-db-key";
       }
       {
-        assertion = serviceConfig.readPolicy == [ "notes.search" ];
-        message = "NookBridge readPolicy is fixed to notes.search";
+        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" ];
+        message = "NookBridge readPolicy is fixed to the four read-only MCP RPC methods";
       }
     ];
   };
