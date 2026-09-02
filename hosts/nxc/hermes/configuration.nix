@@ -144,6 +144,10 @@ let
     cp -r ${mnemosyneHermes}/lib/python3.12/site-packages/mnemosyne_hermes/* $out/
     chmod -R a+rX $out
   '';
+  # Hermes' sealed venv does not include external plugin packages. Keep the
+  # closure on PYTHONPATH for the gateway only; do not alter global Python state.
+  mnemosynePythonPath = lib.makeSearchPath python312.sitePackages
+    (python312.pkgs.requiredPythonModules [ mnemosyneMemory mnemosyneHermes ]);
   hermes-scripts = pkgs.runCommandLocal "hermes-scripts" { } ''
     mkdir -p $out/dns_migration
     install -m 0555 ${../../../scripts/bernie/model_worker.py} $out/model_worker.py
@@ -958,6 +962,7 @@ in
     WIKI_PATH = "/var/lib/hermes/vault/MontyVault/Hermes/Wiki";
     BERNIE_WORKER_REGISTRY = "/etc/hermes/bernie/worker-registry.json";
     BERNIE_WORKER_EXECUTABLE = "/var/lib/hermes/scripts/bernie/model_worker.py";
+    PYTHONPATH = mnemosynePythonPath;
   };
 
   # Fix file ownership after nix rebuilds. The activation script chowns
