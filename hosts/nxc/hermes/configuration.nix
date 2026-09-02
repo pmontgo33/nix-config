@@ -979,6 +979,11 @@ in
     "d /var/lib/hermes/.local/state/bernie-delegation 0700 hermes users -"
     "d /var/lib/hermes/.cache 0700 hermes users -"
     "d /var/lib/hermes/.hermes/mnemosyne 0750 hermes users -"
+    "d /var/lib/hermes/.hermes/plugins 0750 hermes users -"
+    # The memory provider loader resolves providers by this directory name;
+    # expose the Nix-built plugin at the canonical `mnemosyne` path instead of
+    # relying on the mutable user-installed wrapper.
+    "L+ /var/lib/hermes/.hermes/plugins/mnemosyne - - - - ${mnemosyneHermesPlugin}"
     "d /var/lib/hermes/.hermes/mnemosyne/data 0750 hermes users -"
     "d /var/lib/hermes/.hermes/mnemosyne/data/shared 0750 hermes users -"
     # Tighten existing SQLite files as well as files created under UMask=0077.
