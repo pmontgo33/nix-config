@@ -726,7 +726,7 @@ in
       # Voice requests get Home Assistant plus one narrow health write action.
       # They never receive generic file, shell, browser, or Google tools.
       platform_toolsets.api_server = [ "homeassistant" "health_log" ];
-      plugins.enabled = [ "health-log" "hermes-relay" ];
+      plugins.enabled = [ "health-log" "hermes-relay" "hermes-mnemosyne" ];
 
       # The v0.19 migration is blocked in Nix-managed mode. Declare its schema
       # marker here; the disposable migration lab validated this is sufficient.
@@ -780,7 +780,9 @@ in
 
         # Mnemosyne provider settings are declared here because this host is
         # NixOS-managed; hermes config set is intentionally blocked. The
-        # provider remains inactive until the cutover provider flip above.
+        # provider is packaged in extraPlugins above and selected via this
+        # provider key. Keep built-in file-backed injection disabled so Hermes
+        # does not mix MEMORY.md/USER.md with Mnemosyne's store.
         mnemosyne = {
           auto_sleep = false;
           sleep_threshold = 50;
