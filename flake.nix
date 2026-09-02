@@ -903,6 +903,7 @@
         assert_wrapper_line "  --gid=nookbridge-clients \\" "$command"
         assert_wrapper_line "  --property=WorkingDirectory=/var/lib/nookbridge \\" "$command"
         assert_wrapper_line "  --property=Environment=HOME=/var/lib/nookbridge \\" "$command"
+        assert_wrapper_line "  --property=Environment=PATH=${pkgs.coreutils}/bin \\" "$command"
         assert_wrapper_line "  --property=LoadCredential=nookbridge-db-key:${credentialPath} \\" "$command"
         assert_wrapper_line "  --property=ProtectSystem=strict \\" "$command"
         assert_wrapper_line "  --property=ProtectHome=yes \\" "$command"

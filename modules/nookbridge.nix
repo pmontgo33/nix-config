@@ -17,6 +17,7 @@ with lib; let
       --gid=nookbridge-clients \
       --property=WorkingDirectory=/var/lib/nookbridge \
       --property=Environment=HOME=/var/lib/nookbridge \
+      --property=Environment=PATH=${pkgs.coreutils}/bin \
       --setenv=NOOKBRIDGE_ENABLE_LIVE_AUTH=1 \
       --property=LoadCredential=nookbridge-db-key:${credentialPath} \
       --property=ProtectSystem=strict \
@@ -54,6 +55,7 @@ with lib; let
       --gid=nookbridge-clients \
       --property=WorkingDirectory=/var/lib/nookbridge \
       --property=Environment=HOME=/var/lib/nookbridge \
+      --property=Environment=PATH=${pkgs.coreutils}/bin \
       --setenv=NOOKBRIDGE_ENABLE_LIVE_SYNC=1 \
       --property=LoadCredential=nookbridge-db-key:${credentialPath} \
       --property=ProtectSystem=strict \
