@@ -852,6 +852,28 @@
       ];
     };
 
+    # Stage 8 VM isolation gate: real `pkgs.testers.nixosTest`
+    # proving service/client user/group separation, socket ACL access
+    # for a nookbridge-clients member, denial of state/credential
+    # visibility for that same member, denial of socket access for an
+    # outsider, and absence of the runtime-generated fixture secret
+    # in the built package output directory. The test is self-contained: it
+    # defines its own users/groups, state/runtime dirs, root-only
+    # oneshot secret-fixture service, and nookd.service whose only
+    # difference from the production unit is `ExecStart` (a Python
+    # AF_UNIX stub). The production module evaluation / service-
+    # boundary static structure is covered by
+    # `checks.x86_64-linux.nookbridge-service`; live application
+    # behaviour (RPC handlers, native SQLite) is covered by the
+    # NookBridge repo's own test suite.
+    checks.x86_64-linux.nookbridge-isolation =
+      nixpkgs.legacyPackages.x86_64-linux.testers.nixosTest
+        (import ./tests/nookbridge-isolation.nix {
+          lib = nixpkgs.lib;
+          pkgs = nixpkgs.legacyPackages.x86_64-linux;
+          inherit inputs;
+        });
+
     checks.x86_64-linux.nookbridge-service = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
       cfg = self.nixosConfigurations.hermes.config;
@@ -929,6 +951,11 @@
       done
       test -f ${nookbridgePackage}/libexec/nookbridge/dist/provision.js
       test -f ${nookbridgePackage}/libexec/nookbridge/dist/sync.js
+
+      # Stage 8: structural assertions for the packaged nookctl wrapper.
+      test -x ${nookbridgePackage}/bin/nookctl
+      ${pkgs.gnugrep}/bin/grep -Fq -- 'dist/cli.js' ${nookbridgePackage}/bin/nookctl
+      test -f ${nookbridgePackage}/libexec/nookbridge/dist/cli.js
       assert_wrapper_line "  --unit=nookbridge-provision.service \\" ${operatorProvision}/bin/nookbridge-provision
       assert_wrapper_line "  --unit=nookbridge-sync.service \\" ${operatorSync}/bin/nookbridge-sync
       assert_wrapper_line "  --setenv=NOOKBRIDGE_ENABLE_LIVE_AUTH=1 \\" ${operatorProvision}/bin/nookbridge-provision

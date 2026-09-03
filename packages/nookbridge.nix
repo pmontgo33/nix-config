@@ -66,6 +66,13 @@ buildNpmPackage rec {
     makeWrapper ${nodejs_22}/bin/node "$out/bin/nookbridge-sync-cli" \
       --add-flags "$out/libexec/nookbridge/dist/sync.js"
 
+    # `nookctl` is the admin-only operator CLI. Stage 8 packages it
+    # alongside the service binaries so the structural check and the
+    # NixOS VM isolation test can exercise the `doctor` subcommand
+    # against a real on-host wrapper without touching source.
+    makeWrapper ${nodejs_22}/bin/node "$out/bin/nookctl" \
+      --add-flags "$out/libexec/nookbridge/dist/cli.js"
+
     runHook postInstall
   '';
 
