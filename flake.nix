@@ -35,8 +35,8 @@
 
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
 
-    # Pinned to the merged Stage 9 source tree; deployment policy remains
-    # explicitly read-only in service.json until a separate review.
+    # Pinned to the merged Stage 9 source tree; deployment policy is
+    # explicitly read-write-no-delete in service.json; delete is absent.
     nookbridge = {
       url = "git+https://git.montycasa.net/patrick/NookBridge?rev=909ec4a9d19eac2adf7a1a9bbeac573d82caee69";
       flake = false;
@@ -893,7 +893,7 @@
         .socketGroup == "nookbridge-clients" and
         .backend == "systemd-credential" and
         .credentialName == "nookbridge-db-key" and
-        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get"]
+        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.create", "notes.append", "notes.update"]
       ' ${configFile} > /dev/null
 
       case ${execStart} in

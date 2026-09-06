@@ -4,5 +4,5 @@
   "socketGroup": "nookbridge-clients",
   "backend": "systemd-credential",
   "credentialName": "nookbridge-db-key",
-  "readPolicy": ["notes.search", "notes.status", "notes.list_notebooks", "notes.get"]
+  "readPolicy": ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.create", "notes.append", "notes.update"]
 }
