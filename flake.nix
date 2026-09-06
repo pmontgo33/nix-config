@@ -35,11 +35,10 @@
 
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
 
-    # NookBridge production service, pinned to the merged Stage 5 startup
-    # composition. The package is built by this flake against the host's
-    # pinned nixpkgs; this input supplies only the reviewed source tree.
+    # Pinned to the merged Stage 9 source tree; deployment policy remains
+    # explicitly read-only in service.json until a separate review.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=9df0c3414c737713f03341aca6fb6714413831ce";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=3689c20364cbbdd9c9dfb5418a8bf8c178ed07db";
       flake = false;
     };
 
