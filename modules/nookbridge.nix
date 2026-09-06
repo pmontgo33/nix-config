@@ -82,7 +82,7 @@ with lib; let
   '';
 in {
   options.extra-services.nookbridge = {
-    enable = mkEnableOption "NookBridge read-only Unix-socket service";
+    enable = mkEnableOption "NookBridge read-write-no-delete Unix-socket service";
   };
 
   config = mkIf cfg.enable {
@@ -115,7 +115,7 @@ in {
     };
 
     systemd.services.nookd = {
-      description = "NookBridge read-only Unix-socket service";
+      description = "NookBridge read-write-no-delete Unix-socket service";
       wantedBy = [ "multi-user.target" ];
       wants = [ "sops-install-secrets.service" ];
       after = [ "sops-install-secrets.service" ];
@@ -187,8 +187,8 @@ in {
         message = "NookBridge credentialName is fixed to nookbridge-db-key";
       }
       {
-        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" ];
-        message = "NookBridge readPolicy is fixed to the four read-only MCP RPC methods";
+        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.create" "notes.append" "notes.update" ];
+        message = "NookBridge readPolicy is fixed to the read-write-no-delete MCP RPC methods";
       }
     ];
   };
