@@ -38,7 +38,7 @@
     # Pinned to the merged Stage 9 source tree; deployment policy remains
     # explicitly read-only in service.json until a separate review.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=3689c20364cbbdd9c9dfb5418a8bf8c178ed07db";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=909ec4a9d19eac2adf7a1a9bbeac573d82caee69";
       flake = false;
     };
 
