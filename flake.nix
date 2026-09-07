@@ -38,7 +38,7 @@
     # Pinned to the merged Stage 9 source tree; deployment policy is
     # explicitly read-write-no-delete in service.json; delete is absent.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=d2cbc6d75245eedbd8eda379910d856a7871724d";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=0f2f4f4f480a767be9b9d3aed0002dc61d46ce49";
       flake = false;
     };
 
