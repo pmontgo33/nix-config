@@ -144,7 +144,7 @@ in {
         PrivateTmp = true;
         PrivateDevices = true;
         NoNewPrivileges = true;
-        RestrictAddressFamilies = [ "AF_UNIX" ];
+        RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" "AF_INET6" ];
         RestrictNamespaces = true;
         ProtectKernelTunables = true;
         ProtectKernelModules = true;
@@ -187,7 +187,7 @@ in {
         message = "NookBridge credentialName is fixed to nookbridge-db-key";
       }
       {
-        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.create" "notes.append" "notes.update" ];
+        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.create" "notes.append" "notes.update" "notes.sync" ];
         message = "NookBridge readPolicy is fixed to the read-write-no-delete MCP RPC methods";
       }
     ];

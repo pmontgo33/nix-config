@@ -38,7 +38,7 @@
     # Pinned to the merged Stage 9 source tree; deployment policy is
     # explicitly read-write-no-delete in service.json; delete is absent.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=7e7502a07f26811c3850d8f4830f1ce442cd1175";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=d2cbc6d75245eedbd8eda379910d856a7871724d";
       flake = false;
     };
 
@@ -893,7 +893,7 @@
         .socketGroup == "nookbridge-clients" and
         .backend == "systemd-credential" and
         .credentialName == "nookbridge-db-key" and
-        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.create", "notes.append", "notes.update"]
+        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.create", "notes.append", "notes.update", "notes.sync"]
       ' ${configFile} > /dev/null
 
       case ${execStart} in
@@ -903,7 +903,7 @@
       test ${credential} = "nookbridge-db-key:/run/secrets/nookbridge-db-key"
       test ${nixpkgs.lib.escapeShellArg service.User} = nookbridge
       test ${nixpkgs.lib.escapeShellArg service.Group} = nookbridge-clients
-      test ${nixpkgs.lib.escapeShellArg (toString service.RestrictAddressFamilies)} = AF_UNIX
+      test ${nixpkgs.lib.escapeShellArg (toString service.RestrictAddressFamilies)} = 'AF_UNIX AF_INET AF_INET6'
       test ${nixpkgs.lib.escapeShellArg service.StateDirectory} = nookbridge
       test ${nixpkgs.lib.escapeShellArg service.RuntimeDirectory} = nookbridge
       test ${nixpkgs.lib.escapeShellArg cfg.sops.secrets."nookbridge-db-key".owner} = root
