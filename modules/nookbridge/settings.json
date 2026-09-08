@@ -4,7 +4,7 @@
     "read": true,
     "edit": false,
     "create": false,
-    "delete": false
+    "delete": true
   },
   "overrides": []
 }
