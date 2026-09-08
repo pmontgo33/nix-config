@@ -42,7 +42,14 @@ buildNpmPackage rec {
     zlib.dev
   ];
 
-  dontNpmBuild = false;
+  # Use an explicit build phase because the install phase below copies the
+  # generated dist tree and must never rely on an implicit hook ordering.
+  dontNpmBuild = true;
+  buildPhase = ''
+    runHook preBuild
+    npm run build
+    runHook postBuild
+  '';
 
   installPhase = ''
     runHook preInstall
