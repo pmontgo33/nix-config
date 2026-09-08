@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "defaults": {
+    "read": true,
+    "edit": false,
+    "create": false,
+    "delete": false
+  },
+  "overrides": []
+}

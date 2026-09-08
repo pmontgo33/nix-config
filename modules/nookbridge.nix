@@ -4,6 +4,7 @@ with lib; let
   nookbridge = pkgs.callPackage ../packages/nookbridge.nix { inherit inputs; };
   serviceConfig = builtins.fromJSON (builtins.readFile ./nookbridge/service.json);
   credentialPath = config.sops.secrets."nookbridge-db-key".path;
+  settingsPath = "/etc/nookbridge/settings.json";
   provisionCommand = pkgs.writeShellScriptBin "nookbridge-provision" ''
     set -eu
     if [ "$(${pkgs.coreutils}/bin/id -u)" -ne 0 ]; then
@@ -114,12 +115,23 @@ in {
       mode = "0644";
     };
 
+    environment.etc."nookbridge/settings.json" = {
+      source = ./nookbridge/settings.json;
+      user = "patrick";
+      group = "users";
+      mode = "0640";
+    };
+
     systemd.services.nookd = {
       description = "NookBridge read-write-no-delete Unix-socket service";
       wantedBy = [ "multi-user.target" ];
       wants = [ "sops-install-secrets.service" ];
       after = [ "sops-install-secrets.service" ];
-      restartTriggers = [ nookbridge (builtins.readFile ./nookbridge/service.json) ];
+      restartTriggers = [
+        nookbridge
+        (builtins.readFile ./nookbridge/service.json)
+        (builtins.readFile ./nookbridge/settings.json)
+      ];
       serviceConfig = {
         Type = "simple";
         User = "nookbridge";
@@ -134,7 +146,10 @@ in {
           "${pkgs.coreutils}/bin/test -r /etc/nookbridge/service.json"
         ];
         ExecStart = "${nookbridge}/bin/nookd --config /etc/nookbridge/service.json";
-        LoadCredential = [ "nookbridge-db-key:${credentialPath}" ];
+        LoadCredential = [
+          "nookbridge-db-key:${credentialPath}"
+          "nookbridge-settings:${settingsPath}"
+        ];
         StateDirectory = "nookbridge";
         StateDirectoryMode = "0750";
         RuntimeDirectory = "nookbridge";
