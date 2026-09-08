@@ -202,8 +202,8 @@ in {
         message = "NookBridge credentialName is fixed to nookbridge-db-key";
       }
       {
-        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.create" "notes.append" "notes.update" "notes.sync" ];
-        message = "NookBridge readPolicy is fixed to the read-write-no-delete MCP RPC methods";
+        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.create" "notes.append" "notes.update" "notes.delete" "notes.sync" ];
+        message = "NookBridge readPolicy is fixed to the read-write-with-bounded-delete MCP RPC methods";
       }
     ];
   };
