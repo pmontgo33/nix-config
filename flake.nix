@@ -36,9 +36,9 @@
     nixpkgs-2511.url = "github:NixOS/nixpkgs/nixos-25.11";
 
     # Pinned to the merged Stage 9 source tree; deployment policy is
-    # explicitly read-write-no-delete in service.json; delete is absent.
+    # explicitly read-write with bounded single-note delete capability.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=717ffda2a544fed3c5d8cd56e18763c024a5aa7d";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=6ba8ca63d6825c5be2028628ac6366a74cddfea1";
       flake = false;
     };
 
