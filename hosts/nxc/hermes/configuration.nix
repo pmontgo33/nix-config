@@ -766,6 +766,7 @@ in
         # across the rewrite, so gateway routing, /goal, and session_search
         # stay coherent across long topic sessions.
         threshold = 0.85;
+        threshold_tokens = 300000;
         target_ratio = 0.20;
         protect_last_n = 120;
         protect_first_n = 3;
