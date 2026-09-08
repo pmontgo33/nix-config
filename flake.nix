@@ -38,7 +38,7 @@
     # Pinned to the merged Stage 9 source tree; deployment policy is
     # explicitly read-write with bounded single-note delete capability.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=6ba8ca63d6825c5be2028628ac6366a74cddfea1";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=f30d21ae7ba856324186e06288ea6b54c1d5062a";
       flake = false;
     };
 
