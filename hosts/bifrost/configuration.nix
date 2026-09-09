@@ -222,7 +222,7 @@ in
 
       "theoffice.montycasa.com" = {
         protocol = "http";
-        upstream = "http://nextcloud:8000";
+        upstream = "http://nextcloud:80";
       };
 
       "endurain.montycasa.com" = { 
