@@ -220,9 +220,9 @@ in
         upstream = "http://pocket-id:1411"; 
       };
 
-      "office.montycasa.com" = { 
-        protocol = "http"; 
-        upstream = "http://onlyoffice:80"; 
+      "theoffice.montycasa.com" = {
+        protocol = "http";
+        upstream = "http://nextcloud:8000";
       };
 
       "endurain.montycasa.com" = { 
