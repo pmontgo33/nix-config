@@ -39,7 +39,7 @@
     # deployment policy is explicitly read-write with bounded single-note
     # delete capability.
     nookbridge = {
-      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=b46bbe1a57a67b30a23e1eccdd40f60fd92f442b";
+      url = "git+https://git.montycasa.net/patrick/NookBridge?rev=34249acd09d98d4f41d6ef1729f63022d50e8c08";
       flake = false;
     };
 
@@ -879,8 +879,11 @@
       cfg = self.nixosConfigurations.hermes.config;
       service = cfg.systemd.services.nookd.serviceConfig;
       configFile = ./modules/nookbridge/service.json;
+      settingsEtc = cfg.environment.etc."nookbridge/settings.json";
       execStart = nixpkgs.lib.escapeShellArg service.ExecStart;
-      credential = nixpkgs.lib.escapeShellArg (toString service.LoadCredential);
+      credentialCount = builtins.length service.LoadCredential;
+      credentialDb = nixpkgs.lib.escapeShellArg (builtins.elemAt service.LoadCredential 0);
+      credentialSettings = nixpkgs.lib.escapeShellArg (builtins.elemAt service.LoadCredential 1);
       credentialPath = toString cfg.sops.secrets."nookbridge-db-key".path;
       nookbridgePackage = pkgs.callPackage ./packages/nookbridge.nix { inherit inputs; };
       operatorProvision = builtins.head (builtins.filter (p: p.name == "nookbridge-provision") cfg.environment.systemPackages);
@@ -894,14 +897,19 @@
         .socketGroup == "nookbridge-clients" and
         .backend == "systemd-credential" and
         .credentialName == "nookbridge-db-key" and
-        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.create", "notes.append", "notes.update", "notes.sync"]
+        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.create", "notes.append", "notes.update", "notes.delete", "notes.sync"]
       ' ${configFile} > /dev/null
 
       case ${execStart} in
         */bin/nookd\ --config\ /etc/nookbridge/service.json) ;;
         *) echo "unexpected nookd ExecStart" >&2; exit 1 ;;
       esac
-      test ${credential} = "nookbridge-db-key:/run/secrets/nookbridge-db-key"
+      test ${toString credentialCount} = 2
+      test ${credentialDb} = "nookbridge-db-key:/run/secrets/nookbridge-db-key"
+      test ${credentialSettings} = "nookbridge-settings:/etc/nookbridge/settings.json"
+      test ${nixpkgs.lib.escapeShellArg settingsEtc.user} = root
+      test ${nixpkgs.lib.escapeShellArg settingsEtc.group} = root
+      test ${nixpkgs.lib.escapeShellArg settingsEtc.mode} = 0640
       test ${nixpkgs.lib.escapeShellArg service.User} = nookbridge
       test ${nixpkgs.lib.escapeShellArg service.Group} = nookbridge-clients
       test ${nixpkgs.lib.escapeShellArg (toString service.RestrictAddressFamilies)} = 'AF_UNIX AF_INET AF_INET6'
