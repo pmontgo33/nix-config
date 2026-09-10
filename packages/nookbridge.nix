@@ -78,6 +78,8 @@ buildNpmPackage rec {
     # NixOS VM isolation test can exercise the `doctor` subcommand
     # against a real on-host wrapper without touching source.
     makeWrapper ${nodejs_22}/bin/node "$out/bin/nookctl" \
+      --set NOOKBRIDGE_SERVICE_CONFIG /etc/nookbridge/service.json \
+      --set NOOKBRIDGE_SETTINGS_PATH /etc/nookbridge/settings.json \
       --add-flags "$out/libexec/nookbridge/dist/cli.js"
 
     runHook postInstall

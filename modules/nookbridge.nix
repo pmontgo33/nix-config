@@ -87,7 +87,11 @@ in {
   };
 
   config = mkIf cfg.enable {
-    environment.systemPackages = [ provisionCommand syncCommand ];
+    environment.systemPackages = [
+      nookbridge
+      provisionCommand
+      syncCommand
+    ];
 
     users.groups.nookbridge = {};
     users.groups.nookbridge-clients = {};
@@ -200,6 +204,10 @@ in {
       {
         assertion = serviceConfig.credentialName == "nookbridge-db-key";
         message = "NookBridge credentialName is fixed to nookbridge-db-key";
+      }
+      {
+        assertion = serviceConfig.settingsBackend == "nix";
+        message = "NookBridge settingsBackend is fixed to nix";
       }
       {
         assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.create" "notes.append" "notes.update" "notes.delete" "notes.sync" ];
