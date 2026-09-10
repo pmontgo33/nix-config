@@ -2,9 +2,14 @@
   "version": 1,
   "defaults": {
     "read": true,
-    "edit": false,
-    "create": false,
+    "edit": true,
+    "create": true,
     "delete": true
   },
-  "overrides": []
+  "overrides": [
+    {
+      "notebooks": ["Financial"],
+      "delete": false
+    }
+  ]
 }
