@@ -83,7 +83,7 @@ with lib; let
   '';
 in {
   options.extra-services.nookbridge = {
-    enable = mkEnableOption "NookBridge read-write-no-delete Unix-socket service";
+    enable = mkEnableOption "NookBridge read-write Unix-socket service with settings-gated delete";
   };
 
   config = mkIf cfg.enable {
@@ -121,13 +121,13 @@ in {
 
     environment.etc."nookbridge/settings.json" = {
       source = ./nookbridge/settings.json;
-      user = "patrick";
-      group = "users";
+      user = "root";
+      group = "root";
       mode = "0640";
     };
 
     systemd.services.nookd = {
-      description = "NookBridge read-write-no-delete Unix-socket service";
+      description = "NookBridge read-write Unix-socket service with settings-gated delete";
       wantedBy = [ "multi-user.target" ];
       wants = [ "sops-install-secrets.service" ];
       after = [ "sops-install-secrets.service" ];

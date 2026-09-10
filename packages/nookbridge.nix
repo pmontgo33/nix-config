@@ -14,8 +14,8 @@ buildNpmPackage rec {
   pname = "nookbridge";
   version = "0.0.0-stage.0";
 
-  # The source input is pinned in flake.lock to the merged Stage 5 startup
-  # composition. Build against this host's pinned nixpkgs rather than using
+  # The source input is pinned in flake.lock to the merged NookBridge source
+  # tree. Build against this host's pinned nixpkgs rather than using
   # NookBridge's development flake as a second package universe.
   src = inputs.nookbridge;
   nodejs = nodejs_22;
@@ -86,7 +86,7 @@ buildNpmPackage rec {
   '';
 
   meta = {
-    description = "NookBridge Notesnook read-only Unix-socket service";
+    description = "NookBridge Notesnook read-write Unix-socket service with settings-gated delete";
     homepage = "https://git.montycasa.net/patrick/NookBridge";
     license = lib.licenses.gpl3Plus;
     mainProgram = "nookd";
