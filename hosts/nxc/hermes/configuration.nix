@@ -381,6 +381,7 @@ in
     group = "users";
     createUser = true;
     stateDir = "/var/lib/hermes";
+    workingDirectory = "/var/lib/hermes/workspace";
     environmentFiles = [ config.sops.secrets.openclaw-env.path ];
     environment = {
       TZ = "America/New_York";
