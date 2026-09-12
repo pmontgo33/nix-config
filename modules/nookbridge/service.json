@@ -5,5 +5,5 @@
   "backend": "systemd-credential",
   "credentialName": "nookbridge-db-key",
   "settingsBackend": "nix",
-  "readPolicy": ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.create", "notes.append", "notes.update", "notes.delete", "notes.sync"]
+  "readPolicy": ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.path_diagnostic", "notes.create", "notes.append", "notes.update", "notes.delete", "notes.sync"]
 }

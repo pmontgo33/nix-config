@@ -210,7 +210,7 @@ in {
         message = "NookBridge settingsBackend is fixed to nix";
       }
       {
-        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.create" "notes.append" "notes.update" "notes.delete" "notes.sync" ];
+        assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.path_diagnostic" "notes.create" "notes.append" "notes.update" "notes.delete" "notes.sync" ];
         message = "NookBridge readPolicy is fixed to the read-write-with-bounded-delete MCP RPC methods";
       }
     ];
