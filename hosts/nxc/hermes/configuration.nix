@@ -248,7 +248,22 @@ in
   };
   extra-services.host-checkin.enable = true;
   extra-services.hermes-relay.enable = true;
-  extra-services.nookbridge.enable = true;
+  extra-services.nookbridge = {
+    enable = true;
+    # Keep the deployed policy declarative in Nix rather than sourcing JSON.
+    settingsFile = null;
+    settings = {
+      defaults = {
+        read = true;
+        edit = true;
+        create = true;
+        delete = true;
+      };
+      overrides = [
+        { notebooks = [ "Financial" ]; delete = false; }
+      ];
+    };
+  };
   # When extraPlugins changes (e.g. adding/removing Hermes-Relay),
   # restart both hermes-agent and hermes-dashboard so the loader picks
   # up the new plugin tree. Without this, plugin enable requires a
