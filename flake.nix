@@ -874,6 +874,24 @@
           inherit inputs;
         });
 
+    # Pure settings-module check: inline Nix settings are rendered to the
+    # same closed JSON schema consumed by nookd, with null option fields
+    # removed and invalid override selectors rejected at evaluation time.
+    checks.x86_64-linux.nookbridge-settings =
+      import ./tests/nookbridge-settings.nix {
+        lib = nixpkgs.lib;
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      };
+
+    # Integration check: evaluate the production module with inline settings
+    # and verify the generated /etc payload and ownership contract.
+    checks.x86_64-linux.nookbridge-settings-module =
+      import ./tests/nookbridge-settings-module.nix {
+        lib = nixpkgs.lib;
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        inherit inputs;
+      };
+
     checks.x86_64-linux.nookbridge-service = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
       cfg = self.nixosConfigurations.hermes.config;
@@ -897,7 +915,7 @@
         .socketGroup == "nookbridge-clients" and
         .backend == "systemd-credential" and
         .credentialName == "nookbridge-db-key" and
-        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.create", "notes.append", "notes.update", "notes.delete", "notes.sync"]
+        .readPolicy == ["notes.search", "notes.status", "notes.list_notebooks", "notes.get", "notes.path_diagnostic", "notes.create", "notes.append", "notes.update", "notes.delete", "notes.sync"]
       ' ${configFile} > /dev/null
 
       case ${execStart} in

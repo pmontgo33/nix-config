@@ -3,8 +3,17 @@ with lib; let
   cfg = config.extra-services.nookbridge;
   nookbridge = pkgs.callPackage ../packages/nookbridge.nix { inherit inputs; };
   serviceConfig = builtins.fromJSON (builtins.readFile ./nookbridge/service.json);
+  settingsSpec = import ./nookbridge/settings.nix { inherit lib; };
   credentialPath = config.sops.secrets."nookbridge-db-key".path;
   settingsPath = "/etc/nookbridge/settings.json";
+  settingsContent =
+    if cfg.settings != null
+    then settingsSpec.renderSettings cfg.settings
+    else if cfg.settingsFile != null then builtins.readFile cfg.settingsFile else "";
+  settingsSource =
+    if cfg.settings != null
+    then pkgs.writeText "nookbridge-settings.json" settingsContent
+    else cfg.settingsFile;
   provisionCommand = pkgs.writeShellScriptBin "nookbridge-provision" ''
     set -eu
     if [ "$(${pkgs.coreutils}/bin/id -u)" -ne 0 ]; then
@@ -84,6 +93,26 @@ with lib; let
 in {
   options.extra-services.nookbridge = {
     enable = mkEnableOption "NookBridge read-write Unix-socket service with settings-gated delete";
+
+    settings = mkOption {
+      type = types.nullOr settingsSpec.settingsType;
+      default = null;
+      description = ''
+        Inline NookBridge settings rendered to the service JSON file. Set
+        `settingsFile = null` when using this source. The schema is closed to
+        the daemon's version-1 defaults and override fields.
+      '';
+    };
+
+    settingsFile = mkOption {
+      type = types.nullOr types.path;
+      default = ./nookbridge/settings.json;
+      description = ''
+        Declarative JSON settings file copied to /etc/nookbridge/settings.json.
+        Set this to null when using inline `settings`. The file is still
+        validated fail-closed by nookd before runtime construction.
+      '';
+    };
   };
 
   config = mkIf cfg.enable {
@@ -120,7 +149,7 @@ in {
     };
 
     environment.etc."nookbridge/settings.json" = {
-      source = ./nookbridge/settings.json;
+      source = settingsSource;
       user = "root";
       group = "root";
       mode = "0640";
@@ -134,7 +163,7 @@ in {
       restartTriggers = [
         nookbridge
         (builtins.readFile ./nookbridge/service.json)
-        (builtins.readFile ./nookbridge/settings.json)
+        settingsContent
       ];
       serviceConfig = {
         Type = "simple";
@@ -210,9 +239,16 @@ in {
         message = "NookBridge settingsBackend is fixed to nix";
       }
       {
+        assertion = settingsSpec.sourceSelectionValid cfg.settings cfg.settingsFile;
+        message = "Configure exactly one of extra-services.nookbridge.settings or settingsFile";
+      }
+      {
         assertion = serviceConfig.readPolicy == [ "notes.search" "notes.status" "notes.list_notebooks" "notes.get" "notes.path_diagnostic" "notes.create" "notes.append" "notes.update" "notes.delete" "notes.sync" ];
         message = "NookBridge readPolicy is fixed to the read-write-with-bounded-delete MCP RPC methods";
       }
-    ];
+    ] ++ map (message: {
+      assertion = false;
+      inherit message;
+    }) (settingsSpec.inlineSettingsErrors cfg.settings);
   };
 }
