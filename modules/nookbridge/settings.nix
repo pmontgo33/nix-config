@@ -88,11 +88,23 @@ let
   sourceSelectionValid = settings: settingsFile:
     (settings != null) == (settingsFile == null);
 
-  renderSettings = settings: builtins.toJSON {
-    version = 1;
-    defaults = settings.defaults;
-    overrides = map cleanNullAttrs settings.overrides;
-  };
+  renderSettings = settings:
+    let
+      defaults = settings.defaults;
+      overrides = builtins.toJSON (map cleanNullAttrs settings.overrides);
+    in
+    (builtins.concatStringsSep "\n" [
+      "{"
+      "  \"version\": 1,"
+      "  \"defaults\": {"
+      "    \"read\": ${builtins.toJSON defaults.read},"
+      "    \"edit\": ${builtins.toJSON defaults.edit},"
+      "    \"create\": ${builtins.toJSON defaults.create},"
+      "    \"delete\": ${builtins.toJSON defaults.delete}"
+      "  },"
+      "  \"overrides\": ${overrides}"
+      "}"
+    ]) + "\n";
 in
 {
   inherit settingsType renderSettings inlineSettingsErrors sourceSelectionValid;
