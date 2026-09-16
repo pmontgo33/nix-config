@@ -34,6 +34,50 @@ Personal NixOS homelab configuration managing 37 flake configurations across Pro
 
 See [`host-states.md`](host-states.md) for the latest recorded operational snapshot. The flake remains authoritative for configured hosts.
 
+## NookBridge settings
+
+NookBridge settings can be declared inline in Nix or supplied as a separate
+JSON file. Both forms produce the same root-owned,
+`/etc/nookbridge/settings.json` payload and restart `nookd` when the content
+changes. Configure exactly one source:
+
+```nix
+extra-services.nookbridge = {
+  enable = true;
+  settingsFile = null;
+  settings = {
+    defaults = {
+      read = true;
+      edit = true;
+      create = false;
+      delete = false;
+    };
+    overrides = [
+      { notebooks = [ "Financial" ]; delete = false; }
+      { notes = [ "private/**" ]; edit = false; }
+    ];
+  };
+};
+```
+
+For a separate declarative JSON file, leave `settings` as `null` and set
+`settingsFile` to a Nix path:
+
+```nix
+extra-services.nookbridge = {
+  settings = null;
+  settingsFile = ./nookbridge/settings.json;
+};
+```
+
+The JSON file uses version `1` with `defaults` and `overrides` fields. It is
+copied into the Nix store and installed as `root:root` mode `0640`; it is not a
+runtime-editable file. Keep settings limited to non-secret permission policy:
+Nix-store copies are readable to local users according to normal store
+permissions. `nookd` validates either form fail-closed before it constructs the
+Notesnook runtime. CLI-managed, non-Nix installations continue
+to use their separate user settings file through `nookctl settings edit`.
+
 ## Common Commands
 
 ```bash
