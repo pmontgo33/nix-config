@@ -2,6 +2,7 @@
 
 let
   forgejo-mcp = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.forgejo-mcp;
+  nodejs_22 = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nodejs_22;
 in
 {
   imports = [
@@ -79,7 +80,7 @@ in
       glibc
       gzip
       nix
-      nodejs
+      nodejs_22
       pkg-config
       python3
       wget
