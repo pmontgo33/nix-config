@@ -65,13 +65,23 @@ in
     ];
     hostPackages = with pkgs; [
       bash
+      binutils
       coreutils
       curl
+      findutils
       gawk
+      gcc
       gitMinimal
+      gnugrep
       gnused
+      gnumake
+      gnutar
+      glibc
+      gzip
       nix
       nodejs
+      pkg-config
+      python3
       wget
     ];
   };
