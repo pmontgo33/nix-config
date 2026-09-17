@@ -21,7 +21,7 @@
     settings = {
       user = {
         name = "Monty";
-        email = "21371673+pmontgo33@users.noreply.github.com";
+        email = "21371673+monty033@users.noreply.github.com";
       };
     };
   };

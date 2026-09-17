@@ -23,7 +23,7 @@ git-cpush message:
   git push origin master
 
 git-rpull remote:
-  ssh root@{{remote}} "cd /etc/nixos && git pull https://github.com/pmontgo33/nixos-config.git"
+  ssh root@{{remote}} "cd /etc/nixos && git pull https://github.com/monty033/nix-config.git"
 
 tf-init host:
   cd terraform/{{host}} && terraform init

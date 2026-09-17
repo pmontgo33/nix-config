@@ -100,7 +100,7 @@ EOF
       dates = "weekly";
       extraArgs = "--keep-since 14d --keep 5";
     };
-    flake = "github:pmontgo33/nix-config";
+    flake = "github:monty033/nix-config";
   };
 
 }

@@ -55,7 +55,7 @@ git-cpush message branch="master":
   git push origin "{{branch}}"
 
 git-rpull remote:
-  ssh root@{{remote}} "cd /etc/nixos && git pull https://github.com/pmontgo33/nixos-config.git"
+  ssh root@{{remote}} "cd /etc/nixos && git pull https://github.com/monty033/nix-config.git"
 
 rescue-build:
   nix build .#nixosConfigurations.rescue.config.system.build.isoImage --impure

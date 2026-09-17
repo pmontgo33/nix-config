@@ -16,7 +16,7 @@ Personal NixOS homelab configuration managing 37 flake configurations across Pro
 - [`flake.nix`](flake.nix) — entry point; inputs include home-manager, disko, sops-nix, plasma-manager, and Hermes Agent
 - [`flake.lock`](flake.lock) — pinned input revisions; commits to PRs that bump inputs should call out the source/timestamp of the new commit
 - `hosts/`
-  - [`nxc/`](hosts/nxc) — Proxmox LXC containers (Jellyfin, Nextcloud, Forgejo, Paperless-NGX, Ollama, etc.); new containers are provisioned with [nxc-scripts](https://github.com/pmontgo33/nxc-scripts)
+  - [`nxc/`](hosts/nxc) — Proxmox LXC containers (Jellyfin, Nextcloud, Forgejo, Paperless-NGX, Ollama, etc.); new containers are provisioned with [nxc-scripts](https://github.com/monty033/nxc-scripts)
     - `nxc/common/` — shared modules for LXC containers
   - [`nixbooks/`](hosts/nixbooks) — laptop configurations (ali-book, emma-book, cora-book)
   - individual servers such as [bifrost](hosts/bifrost), [tesseract](hosts/tesseract), and [yondu](hosts/yondu)
