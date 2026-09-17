@@ -113,7 +113,7 @@ in
           {
             "GitHub" = [{
                 icon = "si-github";
-                href = "https://github.com/pmontgo33?tab=repositories";
+                href = "https://github.com/monty033?tab=repositories";
             }];
           }
           {

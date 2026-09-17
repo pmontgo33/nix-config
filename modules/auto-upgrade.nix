@@ -23,7 +23,7 @@ in {
     # Auto Upgrade NixOS
     system.autoUpgrade = {
       enable = true;
-      flake = "github:pmontgo33/nix-config#${config.networking.hostName}";
+      flake = "github:monty033/nix-config#${config.networking.hostName}";
       flags = [
         "-L" # print build logs
         "--refresh"
