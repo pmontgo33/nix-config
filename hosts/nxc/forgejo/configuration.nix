@@ -78,6 +78,7 @@ in
       gnumake
       gnutar
       glibc
+      glibc.getent
       gzip
       nix
       nodejs_22
