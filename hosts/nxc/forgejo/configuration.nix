@@ -85,6 +85,7 @@ in
       pkg-config
       util-linux
       python3
+      shadow
       wget
     ];
   };
