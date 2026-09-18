@@ -82,6 +82,7 @@ in
       nix
       nodejs_22
       pkg-config
+      util-linux
       python3
       wget
     ];
