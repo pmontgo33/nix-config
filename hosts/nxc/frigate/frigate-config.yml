@@ -76,6 +76,8 @@ classification:
         classification_type: sub_label
 
 go2rtc:
+  ffmpeg:
+    bin: /usr/lib/ffmpeg/7.0/bin/ffmpeg
   rtsp:
     listen: :8554
   webrtc:
@@ -98,6 +100,8 @@ go2rtc:
     nursery:
       - rtsp://admin:{FRIGATE_CAMERA_PASSWORD}@192.168.10.52:554/cam/realmonitor?channel=1&subtype=0
       - "ffmpeg:nursery#audio=opus"
+    elegoo_cc2_chamber:
+      - "ffmpeg:http://192.168.20.20:8080/#video=h264#hardware=vaapi"
 
 cameras:
   front_door:
@@ -283,3 +287,19 @@ cameras:
     objects:
       track:
         - person
+
+  elegoo_cc2_chamber:
+    ffmpeg:
+      output_args:
+        record: preset-record-generic
+      inputs:
+        - path: rtsp://127.0.0.1:8554/elegoo_cc2_chamber
+          input_args: preset-rtsp-restream
+          roles:
+            - record
+    record:
+      enabled: true
+      continuous:
+        days: 1
+    detect:
+      enabled: false
